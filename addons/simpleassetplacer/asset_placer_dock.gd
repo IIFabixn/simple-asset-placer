@@ -1,0 +1,502 @@
+@tool
+extends Control
+
+class_name AssetPlacerDock
+
+const ThumbnailGenerator = preload("res://addons/simpleassetplacer/thumbnail_generator.gd")
+const MeshLibraryBrowser = preload("res://addons/simpleassetplacer/meshlib_browser.gd")
+const PlacementSettings = preload("res://addons/simpleassetplacer/placement_settings.gd")
+
+signal asset_selected(asset_path: String, mesh_resource: Resource, settings: Dictionary)
+signal meshlib_item_selected(meshlib: MeshLibrary, item_id: int, settings: Dictionary)
+
+# UI Components
+var search_line_edit: LineEdit
+var refresh_button: Button
+var filter_options: OptionButton
+var tab_container: TabContainer
+var models_tab: Control
+var meshlib_tab: Control
+var scroll_container: ScrollContainer
+var grid_container: GridContainer
+var meshlib_browser: MeshLibraryBrowser
+var placement_settings: PlacementSettings
+var settings_tab: Control
+var thumbnail_size: int = 64
+
+# Asset Management
+var discovered_assets: Array = []
+var mesh_thumbnails: Dictionary = {}
+var supported_extensions = ["obj", "fbx", "dae", "gltf", "glb", "tres", "res", "meshlib"]
+
+# Thumbnail generation queue to prevent conflicts
+var thumbnail_queue: Array = []
+var is_generating_thumbnails: bool = false
+
+func _ready():
+	name = "Asset Placer"
+	setup_ui()
+	discover_assets()
+
+func setup_ui():
+	set_custom_minimum_size(Vector2(200, 400))
+	
+	# Use anchors and offsets to fill the entire available space
+	var main_margin = MarginContainer.new()
+	main_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	main_margin.add_theme_constant_override("margin_left", 8)
+	main_margin.add_theme_constant_override("margin_right", 8)
+	main_margin.add_theme_constant_override("margin_top", 8)
+	main_margin.add_theme_constant_override("margin_bottom", 8)
+	add_child(main_margin)
+	
+	# Main layout
+	var vbox = VBoxContainer.new()
+	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	vbox.add_theme_constant_override("separation", 8)
+	main_margin.add_child(vbox)
+	
+	# Header with search and refresh
+	var header = HBoxContainer.new()
+	header.add_theme_constant_override("separation", 8)
+	vbox.add_child(header)
+	
+	# Search field
+	search_line_edit = LineEdit.new()
+	search_line_edit.placeholder_text = "Search assets..."
+	search_line_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(search_line_edit)
+	
+	# Refresh button
+	refresh_button = Button.new()
+	refresh_button.text = "🔄"
+	refresh_button.tooltip_text = "Refresh asset list"
+	header.add_child(refresh_button)
+	
+	# Tab container for different asset types
+	tab_container = TabContainer.new()
+	tab_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(tab_container)
+	
+	# Models tab
+	models_tab = Control.new()
+	models_tab.name = "3D Models"
+	tab_container.add_child(models_tab)
+	
+	# Add margin container for models tab
+	var models_margin = MarginContainer.new()
+	models_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	models_margin.add_theme_constant_override("margin_left", 8)
+	models_margin.add_theme_constant_override("margin_right", 8)
+	models_margin.add_theme_constant_override("margin_top", 8)
+	models_margin.add_theme_constant_override("margin_bottom", 8)
+	models_tab.add_child(models_margin)
+	
+	var models_vbox = VBoxContainer.new()
+	models_vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	models_vbox.add_theme_constant_override("separation", 8)
+	models_margin.add_child(models_vbox)
+	
+	# Filter options for models
+	filter_options = OptionButton.new()
+	filter_options.add_item("All Models")
+	filter_options.add_item("OBJ Files")
+	filter_options.add_item("FBX Files")
+	filter_options.add_item("GLTF Files")
+	models_vbox.add_child(filter_options)
+	
+	# Scroll container for assets
+	scroll_container = ScrollContainer.new()
+	scroll_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	models_vbox.add_child(scroll_container)
+	
+	# Grid for thumbnails
+	grid_container = GridContainer.new()
+	grid_container.columns = 2  # Start with 2 columns, will adjust dynamically
+	grid_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid_container.add_theme_constant_override("h_separation", 8)
+	grid_container.add_theme_constant_override("v_separation", 8)
+	scroll_container.add_child(grid_container)
+	
+	# MeshLibrary tab
+	meshlib_tab = Control.new()
+	meshlib_tab.name = "MeshLibraries"
+	tab_container.add_child(meshlib_tab)
+	
+	# Add a margin container for better layout
+	var margin = MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_right", 8)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	meshlib_tab.add_child(margin)
+	
+	meshlib_browser = MeshLibraryBrowser.new()
+	meshlib_browser.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	meshlib_browser.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	margin.add_child(meshlib_browser)
+	
+	# Initialize search state for meshlib browser
+	if search_line_edit:
+		meshlib_browser.set_search_text(search_line_edit.text)
+	
+	# Settings tab
+	settings_tab = Control.new()
+	settings_tab.name = "Settings"
+	tab_container.add_child(settings_tab)
+	
+	# Add margin container for settings tab
+	var settings_margin = MarginContainer.new()
+	settings_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	settings_margin.add_theme_constant_override("margin_left", 8)
+	settings_margin.add_theme_constant_override("margin_right", 8)
+	settings_margin.add_theme_constant_override("margin_top", 8)
+	settings_margin.add_theme_constant_override("margin_bottom", 8)
+	settings_tab.add_child(settings_margin)
+	
+	placement_settings = PlacementSettings.new()
+	placement_settings.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	settings_margin.add_child(placement_settings)
+	
+	# Connect signals
+	refresh_button.pressed.connect(_on_refresh_pressed)
+	search_line_edit.text_changed.connect(_on_search_changed)
+	filter_options.item_selected.connect(_on_filter_changed)
+	meshlib_browser.meshlib_item_selected.connect(_on_meshlib_item_selected)
+	placement_settings.cache_cleared.connect(_on_cache_cleared)
+	
+	# Connect to resize events to adjust layout dynamically
+	resized.connect(_on_dock_resized)
+	
+	# Call initial responsive sizing
+	call_deferred("update_responsive_sizes")
+
+func _on_dock_resized():
+	# Calculate responsive thumbnail size
+	update_responsive_sizes()
+	
+	# Adjust grid columns based on available width
+	if grid_container:
+		var available_width = get_rect().size.x - 32  # Account for margins and scrollbar
+		var thumbnail_width = thumbnail_size + 18  # Thumbnail + spacing + padding
+		var new_columns = max(1, int(available_width / thumbnail_width))
+		grid_container.columns = min(new_columns, 4)  # Max 4 columns
+	
+	# Also update meshlib browser grid
+	if meshlib_browser:
+		meshlib_browser.update_grid_columns(get_rect().size.x)
+
+func update_responsive_sizes():
+	var dock_width = get_rect().size.x
+	var old_thumbnail_size = thumbnail_size
+	
+	# Responsive thumbnail sizing
+	if dock_width < 250:
+		thumbnail_size = 48  # Small thumbnails for narrow dock
+	elif dock_width < 350:
+		thumbnail_size = 64  # Medium thumbnails
+	else:
+		thumbnail_size = 80  # Larger thumbnails for wider dock
+	
+	# Only refresh if size actually changed
+	if old_thumbnail_size != thumbnail_size:
+		# Update meshlib browser thumbnail size
+		if meshlib_browser:
+			meshlib_browser.update_thumbnail_size(thumbnail_size)
+		
+		# Refresh 3D models grid with new thumbnail size
+		update_asset_grid()
+
+func discover_assets():
+	discovered_assets.clear()
+	_scan_directory("res://")
+	update_asset_grid()
+	update_meshlib_browser()
+
+func _scan_directory(path: String):
+	var dir = DirAccess.open(path)
+	if dir:
+		dir.list_dir_begin()
+		var file_name = dir.get_next()
+		
+		while file_name != "":
+			var full_path = path + "/" + file_name
+			
+			if dir.current_is_dir() and not file_name.begins_with("."):
+				# Skip .godot and other hidden directories
+				if file_name != ".godot":
+					_scan_directory(full_path)
+			else:
+				var extension = file_name.get_extension().to_lower()
+				if extension in supported_extensions:
+					# Check if it's a MeshLibrary resource
+					var is_meshlib = false
+					var has_mesh = false
+					
+					if extension in ["tres", "res", "meshlib"]:
+						# Try to load resource safely
+						var resource = null
+						if ResourceLoader.exists(full_path):
+							resource = load(full_path)
+						
+						if resource != null and resource is MeshLibrary:
+							is_meshlib = true
+							has_mesh = true  # MeshLibraries are always valid
+						elif resource != null:
+							# Check if other .tres/.res files contain meshes
+							has_mesh = _resource_contains_mesh(resource)
+					else:
+						# For 3D model files (.fbx, .obj, .gltf, etc.), check if they contain meshes
+						has_mesh = _model_file_contains_mesh(full_path)
+					
+					# Only add assets that have meshes or are MeshLibraries
+					if has_mesh:
+						var asset_info = {
+							"path": full_path,
+							"name": file_name.get_basename(),
+							"extension": extension,
+							"is_meshlib": is_meshlib,
+							"type": "MeshLibrary" if is_meshlib else "3D Model"
+						}
+						discovered_assets.append(asset_info)
+			
+			file_name = dir.get_next()
+
+func update_asset_grid():
+	# Clear existing thumbnails
+	for child in grid_container.get_children():
+		child.queue_free()
+	
+	# Filter assets based on search and filter
+	var filtered_assets = get_filtered_assets()
+	
+	# Create thumbnail buttons for each asset
+	for asset in filtered_assets:
+		create_asset_thumbnail(asset)
+
+func get_filtered_assets() -> Array:
+	var search_text = search_line_edit.text.to_lower()
+	var selected_filter = filter_options.get_selected_id()
+	
+	var filtered = []
+	for asset in discovered_assets:
+		# Skip MeshLibraries in the models tab
+		if asset.is_meshlib:
+			continue
+		
+		# Search filter
+		if search_text != "" and not asset.name.to_lower().contains(search_text):
+			continue
+		
+		# Extension filter
+		match selected_filter:
+			1: # OBJ Files only
+				if asset.extension != "obj":
+					continue
+			2: # FBX Files only
+				if asset.extension != "fbx":
+					continue
+			3: # GLTF Files only
+				if not asset.extension in ["gltf", "glb"]:
+					continue
+		
+		filtered.append(asset)
+	
+	return filtered
+
+func update_meshlib_browser():
+	# Get all MeshLibrary paths
+	var meshlib_paths = []
+	for asset in discovered_assets:
+		if asset.is_meshlib:
+			meshlib_paths.append(asset.path)
+	
+	meshlib_browser.populate_meshlib_options(meshlib_paths)
+
+func _on_meshlib_item_selected(meshlib: MeshLibrary, item_id: int):
+	var settings = placement_settings.get_placement_settings()
+	meshlib_item_selected.emit(meshlib, item_id, settings)
+
+func create_asset_thumbnail(asset_info: Dictionary):
+	var button = Button.new()
+	button.custom_minimum_size = Vector2(thumbnail_size + 10, thumbnail_size + 30)
+	button.flat = true
+	
+	# Create vertical layout for thumbnail and label
+	var vbox = VBoxContainer.new()
+	button.add_child(vbox)
+	
+	# Thumbnail area
+	var thumbnail_rect = TextureRect.new()
+	thumbnail_rect.custom_minimum_size = Vector2(thumbnail_size, thumbnail_size)
+	thumbnail_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	vbox.add_child(thumbnail_rect)
+	
+	# Asset name label
+	var label = Label.new()
+	label.text = asset_info.name
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.custom_minimum_size.y = 20
+	vbox.add_child(label)
+	
+	# Generate or load thumbnail
+	generate_thumbnail_for_asset(asset_info, thumbnail_rect)
+	
+	# Connect button signal
+	button.pressed.connect(_on_asset_selected.bind(asset_info))
+	
+	# Enable drag and drop
+	button.gui_input.connect(_on_thumbnail_gui_input.bind(asset_info))
+	
+	grid_container.add_child(button)
+
+func generate_thumbnail_for_asset(asset_info: Dictionary, thumbnail_rect: TextureRect):
+	# Generate actual 3D thumbnail
+	if asset_info.is_meshlib:
+		# Use placeholder for MeshLibrary for now
+		thumbnail_rect.texture = EditorInterface.get_editor_theme().get_icon("MeshLibrary", "EditorIcons")
+	else:
+		# Generate 3D mesh thumbnail asynchronously
+		_generate_mesh_thumbnail_async(asset_info, thumbnail_rect)
+
+func _generate_mesh_thumbnail_async(asset_info: Dictionary, thumbnail_rect: TextureRect):
+	# Set placeholder first
+	thumbnail_rect.texture = EditorInterface.get_editor_theme().get_icon("MeshInstance3D", "EditorIcons")
+	
+	# Queue thumbnail generation to avoid simultaneous generation conflicts
+	_queue_thumbnail_generation(asset_info, thumbnail_rect)
+
+func _on_asset_selected(asset_info: Dictionary):
+	# Load the resource and emit signal
+	var resource = load(asset_info.path)
+	if resource:
+		var settings = placement_settings.get_placement_settings()
+		asset_selected.emit(asset_info.path, resource, settings)
+	else:
+		print("AssetPlacerDock: Failed to load resource: ", asset_info.path)
+
+func _on_thumbnail_gui_input(event: InputEvent, asset_info: Dictionary):
+	# For now, just handle click - drag and drop can be added later
+	pass
+
+func create_drag_preview(asset_info: Dictionary) -> Control:
+	var preview = Label.new()
+	preview.text = asset_info.name
+	preview.add_theme_color_override("font_color", Color.WHITE)
+	preview.add_theme_color_override("font_shadow_color", Color.BLACK)
+	return preview
+
+func _on_refresh_pressed():
+	discover_assets()
+
+func _on_search_changed(new_text: String):
+	update_asset_grid()
+	# Also update MeshLibrary browser search
+	if meshlib_browser:
+		meshlib_browser.set_search_text(new_text)
+
+func _on_filter_changed(index: int):
+	update_asset_grid()
+
+func _on_cache_cleared():
+	# Clear any pending thumbnail queue
+	thumbnail_queue.clear()
+	is_generating_thumbnails = false
+	# Refresh the asset grid to regenerate thumbnails
+	update_asset_grid()
+
+func _queue_thumbnail_generation(asset_info: Dictionary, thumbnail_rect: TextureRect):
+	# Add to queue
+	thumbnail_queue.append({"asset_info": asset_info, "thumbnail_rect": thumbnail_rect})
+	
+	# Start processing if not already running
+	if not is_generating_thumbnails:
+		_process_thumbnail_queue()
+
+func _process_thumbnail_queue():
+	if thumbnail_queue.is_empty():
+		is_generating_thumbnails = false
+		return
+	
+	is_generating_thumbnails = true
+	var item = thumbnail_queue.pop_front()
+	var asset_info = item.asset_info
+	var thumbnail_rect = item.thumbnail_rect
+	
+	# Check if thumbnail_rect is still valid (UI might have been refreshed)
+	if not is_instance_valid(thumbnail_rect):
+		# Skip and continue with next
+		_process_thumbnail_queue()
+		return
+	
+	# Generate thumbnail
+	var thumbnail = await ThumbnailGenerator.generate_mesh_thumbnail(asset_info.path)
+	
+	# Apply thumbnail if successful and UI element still valid
+	if thumbnail and is_instance_valid(thumbnail_rect):
+		thumbnail_rect.texture = thumbnail
+	
+	# Continue with next item in queue
+	_process_thumbnail_queue()
+
+func _resource_contains_mesh(resource: Resource) -> bool:
+	# Check if a .tres/.res resource contains mesh data
+	if resource is Mesh:
+		return true
+	elif resource is PackedScene:
+		# Check if the scene contains mesh instances
+		var scene_instance = resource.instantiate()
+		var has_mesh = _scene_has_mesh_recursive(scene_instance)
+		scene_instance.queue_free()
+		return has_mesh
+	elif resource is Material or resource.get_class().contains("Material"):
+		# Materials don't contain meshes
+		return false
+	elif resource.get_class().contains("Terrain") or resource.get_class().contains("terrain"):
+		# Terrain resources don't contain meshes
+		return false
+	
+	# Unknown resource type, assume it might contain a mesh
+	return false
+
+func _model_file_contains_mesh(file_path: String) -> bool:
+	# Check if a 3D model file (.fbx, .obj, .gltf, etc.) contains meshes
+	if not ResourceLoader.exists(file_path):
+		return false
+	
+	var resource = load(file_path)
+	if not resource:
+		return false
+	
+	if resource is Mesh:
+		return true
+	elif resource is PackedScene:
+		# Check if the scene contains mesh instances
+		var scene_instance = resource.instantiate()
+		var has_mesh = _scene_has_mesh_recursive(scene_instance)
+		scene_instance.queue_free()
+		return has_mesh
+	
+	return false
+
+func _scene_has_mesh_recursive(node: Node) -> bool:
+	# Check if this node or any child contains a mesh
+	if node is MeshInstance3D:
+		var mesh_instance = node as MeshInstance3D
+		if mesh_instance.mesh:
+			return true
+	
+	# Also check for ImporterMeshInstance3D (used during import process)
+	if node.get_class() == "ImporterMeshInstance3D":
+		if node.has_method("get_mesh") and node.get_mesh():
+			return true
+	
+	# Recursively check children
+	for child in node.get_children():
+		if _scene_has_mesh_recursive(child):
+			return true
+	
+	return false

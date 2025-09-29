@@ -776,6 +776,8 @@ func _on_clear_cache_pressed():
 func get_placement_settings() -> Dictionary:
 	return {
 		"snap_to_ground": snap_to_ground,
+		"snap_enabled": snap_enabled,
+		"snap_step": snap_step,
 		"random_rotation": random_rotation,
 		"scale_multiplier": scale_multiplier,
 		"add_collision": add_collision,

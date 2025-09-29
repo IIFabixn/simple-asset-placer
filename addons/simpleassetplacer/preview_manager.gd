@@ -27,7 +27,7 @@ static func create_preview_material():
 	preview_material.no_depth_test = false
 	preview_material.flags_do_not_use_vertex_lighting = true
 
-static func create_preview(asset_path: String, mesh: Mesh = null, settings: Dictionary = {}):
+static func create_preview(asset_path: String, mesh: Mesh = null, settings: Dictionary = {}, dock_instance = null):
 	"""Create preview mesh for the given asset"""
 	cleanup_preview()
 	
@@ -90,6 +90,8 @@ static func create_preview(asset_path: String, mesh: Mesh = null, settings: Dict
 	
 	# Position it at a reasonable initial location in front of the camera
 	var initial_position = get_initial_position()
+	# Apply snapping to initial position
+	initial_position = apply_editor_snapping(initial_position, dock_instance)
 	preview_mesh.global_position = initial_position
 	preview_mesh.visible = true
 	
@@ -213,12 +215,12 @@ static func apply_editor_snapping(position: Vector3, dock_instance = null) -> Ve
 	if dock_instance and dock_instance.has_method("get_placement_settings"):
 		var settings = dock_instance.get_placement_settings()
 		var snap_enabled = settings.get("snap_enabled", false)
-		var snap_size = settings.get("snap_size", 1.0)
+		var snap_step = settings.get("snap_step", 1.0)
 		
-		if snap_enabled and snap_size > 0.0:
+		if snap_enabled and snap_step > 0.0:
 			# Snap to grid
-			position.x = round(position.x / snap_size) * snap_size
-			position.z = round(position.z / snap_size) * snap_size
+			position.x = round(position.x / snap_step) * snap_step
+			position.z = round(position.z / snap_step) * snap_step
 	
 	return position
 

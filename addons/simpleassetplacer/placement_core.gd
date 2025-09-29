@@ -71,7 +71,7 @@ static func start_meshlib_placement(meshlib: MeshLibrary, item_id: int, settings
 	ScaleManager.reset_scale()
 	
 	# Create preview
-	PreviewManager.create_preview("", placement_mesh, placement_settings)
+	PreviewManager.create_preview("", placement_mesh, placement_settings, dock_instance)
 	
 	# Create rotation overlay
 	RotationManager.create_overlay()
@@ -106,7 +106,7 @@ static func start_asset_placement(asset_path: String, settings: Dictionary = {},
 	ScaleManager.reset_scale()
 	
 	# Create preview
-	PreviewManager.create_preview(asset_path, null, placement_settings)
+	PreviewManager.create_preview(asset_path, null, placement_settings, dock_instance)
 	
 	# Create rotation overlay
 	RotationManager.create_overlay()

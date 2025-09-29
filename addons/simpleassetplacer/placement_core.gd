@@ -276,11 +276,14 @@ static func handle_placement_input(event: InputEvent, viewport: Viewport, dock_i
 	
 	# Handle mouse motion for accurate preview positioning and rotation
 	if event is InputEventMouseMotion:
+		print("[PLACEMENT_CORE] Mouse motion detected, checking rotation handler...")
 		# First check if rotation manager wants to handle this (rotation key held)
 		var rotation_handled = RotationManager.handle_mouse_motion(event, dock_instance)
+		print("[PLACEMENT_CORE] Rotation handled: ", rotation_handled)
 		
 		# Always update preview position (unless rotation completely overrides it)
 		if not rotation_handled:
+			print("[PLACEMENT_CORE] Updating preview position...")
 			PreviewManager.update_position(viewport, event.position, dock_instance)
 		
 		return true
@@ -363,8 +366,12 @@ static func _on_update_timer_timeout():
 		if viewport_3d:
 			var current_mouse_pos = viewport_3d.get_mouse_position()
 			
-			# Update preview position directly
-			PreviewManager.update_position(viewport_3d, current_mouse_pos, dock_reference)
+			# Check if rotation manager wants to handle mouse motion
+			var rotation_handled = RotationManager.handle_mouse_polling(current_mouse_pos, dock_reference)
+			
+			# Update preview position (unless rotation mode is active)
+			if not rotation_handled:
+				PreviewManager.update_position(viewport_3d, current_mouse_pos, dock_reference)
 
 static func show_scene_lost_warning():
 	"""Show warning when scene root is lost"""

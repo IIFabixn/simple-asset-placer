@@ -19,11 +19,12 @@ static var last_rotation_axis: String = "Y"  # Track which axis was last used fo
 static var rotation_overlay: Control = null
 static var rotation_label: Label = null
 
-# Enhanced key state tracking for new rotation system
+# Enhanced key state tracking for mouse motion rotation system
 static var rotation_key_states: Dictionary = {}  # Track which rotation keys are currently held
 static var mouse_start_position: Vector2 = Vector2.ZERO  # Mouse position when key was first pressed
+static var mouse_motion_active: bool = false  # Whether mouse motion rotation is active
+static var active_rotation_axis: String = ""  # Which axis is being rotated by mouse
 static var rotation_start_values: Vector3 = Vector3.ZERO  # Rotation values when mouse motion started
-static var active_rotation_axis: String = ""  # Which axis is currently being rotated
 static var mouse_rotation_sensitivity: float = 0.5  # Degrees per pixel of mouse movement
 
 static func reset_rotation():
@@ -171,8 +172,8 @@ static func handle_key_input(event: InputEventKey, dock_instance = null) -> bool
 	
 
 	
-	# Key press-based rotation system with modifier support
-	if event.pressed and (event.keycode == key_x or event.keycode == key_y or event.keycode == key_z):
+	# Handle rotation keys for both press and release
+	if event.keycode == key_x or event.keycode == key_y or event.keycode == key_z:
 		var axis = ""
 		if event.keycode == key_x:
 			axis = "X"
@@ -181,7 +182,14 @@ static func handle_key_input(event: InputEventKey, dock_instance = null) -> bool
 		elif event.keycode == key_z:
 			axis = "Z"
 		
-		print("[ROTATION_MANAGER] Key detected for axis: ", axis)
+		if event.pressed:
+			# Key pressed - start mouse motion mode or apply instant rotation
+			handle_rotation_key_press(axis, event)
+		else:
+			# Key released - end mouse motion mode or apply final rotation  
+			handle_rotation_key_release(axis, event)
+		
+		return true
 		
 		# Determine increment based on modifiers
 		var base_increment = settings.get("rotation_increment", 15.0)
@@ -240,13 +248,127 @@ static func handle_rotation_key_event(event: InputEventKey, axis: String, settin
 			update_overlay()
 		else:
 			print("[ROTATION_MANAGER] Key released but no matching pressed state found for axis: ", axis)
-		return true
-	
 	return false
 
+static func handle_rotation_key_press(axis: String, event: InputEventKey):
+	"""Handle when a rotation key is pressed - start mouse motion or apply instant rotation"""
+	print("[ROTATION_MANAGER] Key pressed for axis: ", axis)
+	
+	# Update modifier states
+	shift_held = Input.is_key_pressed(KEY_SHIFT)
+	var alt_held = Input.is_key_pressed(KEY_ALT)
+	
+	# Check if any modifiers are held - if so, apply instant rotation
+	if shift_held or alt_held:
+		print("[ROTATION_MANAGER] Modifiers detected - applying instant rotation")
+		apply_instant_rotation(axis, shift_held, alt_held)
+	else:
+		# No modifiers - toggle mouse motion mode
+		if mouse_motion_active and active_rotation_axis == axis:
+			print("[ROTATION_MANAGER] Ending mouse motion mode for ", axis)
+			end_mouse_motion_rotation(axis)
+		else:
+			print("[ROTATION_MANAGER] Starting mouse motion mode for ", axis)
+			start_mouse_motion_rotation(axis)
+
+static func handle_rotation_key_release(axis: String, event: InputEventKey):
+	"""Handle when a rotation key is released - end mouse motion or apply final rotation"""
+	print("[ROTATION_MANAGER] Key released for axis: ", axis)
+	
+	if mouse_motion_active and active_rotation_axis == axis:
+		# End mouse motion rotation
+		end_mouse_motion_rotation(axis)
+	else:
+		# Apply instant rotation on release (original behavior)
+		var base_increment = 15.0
+		rotate_axis(axis, base_increment)
+
+static func start_mouse_motion_rotation(axis: String):
+	"""Start mouse motion rotation mode"""
+	print("[ROTATION_MANAGER] start_mouse_motion_rotation called for axis: ", axis)
+	var preview_mesh = PreviewManager.preview_mesh
+	print("[ROTATION_MANAGER] PreviewManager.preview_mesh exists: ", preview_mesh != null)
+	if not preview_mesh:
+		print("[ROTATION_MANAGER] ❌ Cannot start mouse motion - no preview mesh!")
+		return
+		
+	mouse_motion_active = true
+	active_rotation_axis = axis
+	mouse_start_position = get_mouse_position()
+	
+	# Store current rotation values
+	rotation_start_values = Vector3(current_rotation_x, current_rotation_y, current_rotation_z)
+	
+	print("[ROTATION_MANAGER] 🎯 Started MOUSE MOTION rotation for ", axis, " axis - move mouse to rotate!")
+	update_overlay()  # Update visual feedback
+
+static func end_mouse_motion_rotation(axis: String):
+	"""End mouse motion rotation mode"""
+	mouse_motion_active = false
+	active_rotation_axis = ""
+	
+	print("[ROTATION_MANAGER] ✅ Ended mouse motion rotation for ", axis, " axis")
+	update_overlay()  # Update visual feedback
+
+static func apply_instant_rotation(axis: String, shift_held: bool, alt_held: bool):
+	"""Apply instant rotation with modifiers"""
+	var base_increment = 15.0
+	var large_increment = 90.0
+	
+	var increment = large_increment if alt_held else base_increment
+	var direction = -1.0 if shift_held else 1.0
+	var final_increment = increment * direction
+	
+	print("[ROTATION_MANAGER] ", axis, "-axis rotation: ", final_increment, "° (Alt: ", alt_held, ", Shift: ", shift_held, ")")
+	rotate_axis(axis, final_increment)
+
+static func get_mouse_position() -> Vector2:
+	"""Get current mouse position"""
+	return DisplayServer.mouse_get_position()
+
+static func handle_mouse_polling(current_mouse_pos: Vector2, dock_instance = null) -> bool:
+	"""Handle mouse position updates from polling system for rotation"""
+	if not mouse_motion_active or active_rotation_axis == "":
+		return false
+	
+	print("[ROTATION_MANAGER] 🖱️ Mouse polling - active axis: ", active_rotation_axis, ", mouse pos: ", current_mouse_pos)
+	
+	# Calculate mouse delta from start position
+	var mouse_delta = current_mouse_pos - mouse_start_position
+	
+	# Use horizontal mouse movement for rotation
+	var rotation_delta = mouse_delta.x * mouse_rotation_sensitivity
+	
+	# Calculate final rotation value
+	var new_rotation_x = rotation_start_values.x
+	var new_rotation_y = rotation_start_values.y  
+	var new_rotation_z = rotation_start_values.z
+	
+	match active_rotation_axis:
+		"X":
+			new_rotation_x = rotation_start_values.x + rotation_delta
+		"Y":
+			new_rotation_y = rotation_start_values.y + rotation_delta
+		"Z":
+			new_rotation_z = rotation_start_values.z + rotation_delta
+	
+	# Apply the rotation
+	current_rotation_x = fmod(new_rotation_x, 360.0)
+	current_rotation_y = fmod(new_rotation_y, 360.0)
+	current_rotation_z = fmod(new_rotation_z, 360.0)
+	
+	# Update preview
+	PreviewManager.update_rotation()
+	update_overlay()
+	
+	print("[ROTATION_MANAGER] Applied rotation - ", active_rotation_axis, ": ", rotation_delta, "°")
+	return true
+
 static func handle_mouse_motion(event: InputEventMouseMotion, dock_instance = null) -> bool:
-	"""Handle mouse motion for rotation when rotation keys are held"""
-	if active_rotation_axis == "":
+	"""Handle mouse motion for rotation when rotation keys are held (legacy - now using polling)"""
+	print("[ROTATION_MANAGER] handle_mouse_motion called - mouse_motion_active: ", mouse_motion_active, ", active_rotation_axis: '", active_rotation_axis, "'")
+	if not mouse_motion_active or active_rotation_axis == "":
+		print("[ROTATION_MANAGER] Mouse motion not handled - not in rotation mode")
 		return false
 	
 	# Cache settings

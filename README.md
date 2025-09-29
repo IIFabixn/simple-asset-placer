@@ -23,10 +23,9 @@ A comprehensive asset placement tool for Godot 4 that provides thumbnail preview
 ### 🔄 **Advanced Rotation System**
 - **Multi-axis Rotation**: Rotate around X (pitch), Y (yaw), and Z (roll) axes
 - **Customizable Key Bindings**: Set your preferred keys for each rotation axis
-- **Mouse Wheel Support**: Ctrl+Scroll to rotate around the last used axis (avoids camera zoom conflict)
+- **Keyboard Rotation**: Use R/X/Z keys for precise rotation control
 - **Multiple Increment Modes**: 
   - Base increment for keyboard (default 15°)
-  - Fine increment for Ctrl+Mouse wheel (default 5°)
   - Large increment for Ctrl+Key (default 90°)
 - **Visual Feedback**: On-screen rotation display with current values
 - **Reset Function**: Quickly reset all rotations to 0°
@@ -75,10 +74,8 @@ During placement mode, you can rotate assets using:
 - **X Key** (default): Rotate around X-axis (pitch)  
 - **Z Key** (default): Rotate around Z-axis (roll)
 - **T Key** (default): Reset all rotations to 0°
-- **Ctrl + Mouse Wheel**: Rotate around the last used axis (shown in brackets in the rotation display)
 
-> **Tip**: Press R, X, or Z to set which axis Ctrl+Mouse Wheel will rotate around. The active axis is shown in brackets in the rotation overlay.  
-> **Note**: Ctrl is required with mouse wheel to avoid interfering with Godot's camera zoom.
+> **Tip**: Press R, X, or Z repeatedly to rotate in 15° increments around each axis. The current rotation values are shown in the overlay display.
 
 ### Scale Controls
 
@@ -106,7 +103,6 @@ Access the Settings tab to customize:
 
 #### Rotation Settings
 - **Base Increment**: Standard rotation step (default: 15°)
-- **Fine Increment**: Ctrl+Mouse wheel rotation step (default: 5°)
 - **Large Increment**: Ctrl+Key rotation step (default: 90°)
 
 #### Scale Settings
@@ -160,7 +156,7 @@ All settings are automatically saved to Godot's editor settings and persist betw
 ### Keyboard Shortcuts
 - **Q/E**: Adjust height during placement
 - **R/X/Z**: Rotate around Y/X/Z axes (customizable)
-- **Ctrl + Mouse Wheel**: Rotate around last used axis
+- **Ctrl + R/X/Z**: Large rotation increments (90°)
 - **T**: Reset rotation
 - **Page Up/Down**: Scale up/down
 - **Home**: Reset scale
@@ -200,14 +196,15 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ### ✅ **Fixed Rotation Controls**
 - **Updated Default Keys**: Changed from W/Q/E to R/X/Z to avoid conflicts with Godot's built-in viewport navigation
-- **Mouse Wheel Support**: Fully implemented Ctrl+Mouse wheel rotation with configurable fine increment (avoids camera zoom conflicts)
-- **Smart Axis Selection**: Mouse wheel rotates around the last axis used with keyboard controls
-- **Visual Feedback**: Active rotation axis is highlighted in brackets in the overlay display
+- **Keyboard-Only Rotation**: Removed mouse wheel rotation to prevent camera zoom conflicts
+- **Ctrl+Key Large Increments**: Hold Ctrl while pressing rotation keys for 90° increments
+- **Visual Feedback**: Current rotation values displayed in overlay during placement
 
 ### ✅ **Enhanced User Experience**
-- **Non-Conflicting Controls**: All default keys now work alongside Godot's standard editor controls
+- **Non-Conflicting Controls**: All controls work alongside Godot's standard editor navigation
 - **Customizable Bindings**: All rotation and scale keys can be rebound through the Settings tab
-- **Multiple Increment Modes**: Different step sizes for keyboard, mouse wheel, and Ctrl+Key combinations
+- **Multiple Increment Modes**: Standard (15°) and large (90°) rotation increments with Ctrl modifier
+- **Preserved Camera Zoom**: Mouse wheel works normally for camera zoom without conflicts
 
 ## Credits
 

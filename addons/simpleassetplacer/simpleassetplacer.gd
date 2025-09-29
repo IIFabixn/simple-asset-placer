@@ -22,6 +22,10 @@ func _disable_plugin() -> void:
 	pass
 
 
+func handles(object) -> bool:
+	# We want to handle input when in placement mode
+	return PlacementCore.placement_mode
+
 func _enter_tree() -> void:
 	# Initialization of the plugin goes here.
 	
@@ -62,18 +66,7 @@ func _on_asset_selected(asset_path: String, mesh_resource: Resource, settings: D
 		input_poll_timer.start()
 	print("Continuous placement started. Left-click to place multiple, Escape to exit.")
 
-func handles(object) -> bool:
-	# Debug what objects we're being asked to handle
-	print("handles() called with object: ", object, ", placement_mode: ", PlacementCore.placement_mode)
-	
-	# Return true for the scene root when we're in placement mode
-	if PlacementCore.placement_mode:
-		var scene_root = EditorInterface.get_edited_scene_root()
-		if object == scene_root:
-			print("Handling scene root for placement mode")
-			return true
-	
-	return false
+
 
 func forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 	var viewport = viewport_camera.get_viewport()
@@ -83,6 +76,9 @@ func forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 	if not scene_root:
 		return EditorPlugin.AFTER_GUI_INPUT_PASS
 	
+	# Let mouse wheel pass through to camera zoom - no special handling needed
+	
+	# Handle all other input during placement mode
 	if PlacementCore.handle_placement_input(event, viewport, dock):
 		return EditorPlugin.AFTER_GUI_INPUT_STOP
 	return EditorPlugin.AFTER_GUI_INPUT_PASS

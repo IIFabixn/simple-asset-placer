@@ -120,7 +120,8 @@ static func handle_key_input(event: InputEventKey, dock_instance = null) -> bool
 	var key_z = string_to_keycode(settings.get("rotate_z_key", "Z"))
 	var key_reset = string_to_keycode(settings.get("reset_rotation_key", "T"))
 	
-	var increment = settings.get("rotation_increment", 15.0)
+	# Choose increment based on Ctrl key
+	var increment = settings.get("large_rotation_increment", 90.0) if event.ctrl_pressed else settings.get("rotation_increment", 15.0)
 	
 	if event.keycode == key_x:
 		rotate_axis("X", increment)
@@ -151,7 +152,8 @@ static func check_keys_direct(dock_instance = null):
 	var key_z = string_to_keycode(settings.get("rotate_z_key", "Z"))
 	var key_reset = string_to_keycode(settings.get("reset_rotation_key", "T"))
 	
-	var increment = settings.get("rotation_increment", 15.0)
+	# Choose increment based on Ctrl key
+	var increment = settings.get("large_rotation_increment", 90.0) if Input.is_key_pressed(KEY_CTRL) else settings.get("rotation_increment", 15.0)
 	
 	# Check each key and track state to prevent repeated triggering
 	var current_states = {
@@ -179,25 +181,9 @@ static func check_keys_direct(dock_instance = null):
 	last_key_states = current_states
 
 static func handle_wheel_input(event: InputEventMouseButton, dock_instance = null) -> bool:
-	"""Handle mouse wheel rotation input - requires Ctrl modifier to avoid camera zoom conflict"""
-	if not (event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN):
-		return false
-	
-	# Only handle mouse wheel rotation when Ctrl is held to avoid camera zoom conflicts
-	if not event.ctrl_pressed:
-		return false
-	
-	var settings = get_rotation_settings(dock_instance)
-	var increment = settings.get("fine_rotation_increment", 5.0)  # Use fine increment for mouse wheel
-	
-	# Determine rotation direction
-	var rotation_amount = increment if event.button_index == MOUSE_BUTTON_WHEEL_UP else -increment
-	
-	# Rotate around the last used axis
-	rotate_axis(last_rotation_axis, rotation_amount)
-	update_overlay()
-	
-	return true
+	"""Mouse wheel input disabled to avoid conflicts with camera zoom"""
+	# Always return false to let camera zoom work normally
+	return false
 
 static func get_rotation_settings(dock_instance) -> Dictionary:
 	"""Get rotation settings from dock instance"""

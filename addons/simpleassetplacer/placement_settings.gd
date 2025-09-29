@@ -286,7 +286,7 @@ func setup_ui():
 	fine_rotation_increment_spin.custom_minimum_size.x = 80
 	fine_rotation_increment_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	fine_rotation_increment_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	fine_rotation_increment_spin.tooltip_text = "Ctrl+Mouse wheel rotation increment"
+	fine_rotation_increment_spin.tooltip_text = "Fine rotation increment (currently unused)"
 	key_grid.add_child(fine_rotation_increment_spin)
 	
 	# Large Increment

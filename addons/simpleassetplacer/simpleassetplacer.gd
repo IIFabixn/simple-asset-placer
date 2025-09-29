@@ -94,6 +94,9 @@ func _process(delta: float) -> void:
 		# Handle configurable cancel key
 		_handle_cancel_input()
 		
+		# Handle height adjustment keys
+		_handle_height_input()
+		
 		# Handle scale keys directly
 		_handle_scale_input()
 
@@ -191,6 +194,42 @@ func _handle_cancel_input():
 	# Check for cancel input (both ui_cancel action and configured key)
 	if Input.is_action_just_pressed("ui_cancel") or Input.is_key_pressed(cancel_keycode):
 		PlacementCore.exit_placement_mode()
+
+func _handle_height_input():
+	"""Handle configurable height adjustment input with edge detection"""
+	# Get current settings from dock
+	var settings = {}
+	if dock and dock.has_method("get_placement_settings"):
+		settings = dock.get_placement_settings()
+	
+	# Get configured height adjustment keys
+	var height_up_key = settings.get("height_up_key", "Q")
+	var height_down_key = settings.get("height_down_key", "E")
+	var height_step = settings.get("height_adjustment_step", 0.1)
+	
+	print("DEBUG: Height keys from settings: UP='", height_up_key, "' DOWN='", height_down_key, "'")
+	
+	# Convert to keycodes
+	var height_up_keycode = PreviewManager.string_to_keycode(height_up_key)
+	var height_down_keycode = PreviewManager.string_to_keycode(height_down_key)
+	
+	print("DEBUG: Converted to keycodes: UP=", height_up_keycode, " DOWN=", height_down_keycode)
+	
+	# Edge detection for height up key
+	var height_up_pressed = Input.is_key_pressed(height_up_keycode)
+	var height_up_key_name = "height_up"
+	if height_up_pressed and not _key_was_pressed.get(height_up_key_name, false):
+		PreviewManager.height_offset += height_step
+		print("HEIGHT ADJUSTED UP by ", height_step, " (total offset: ", PreviewManager.height_offset, ")")
+	_key_was_pressed[height_up_key_name] = height_up_pressed
+	
+	# Edge detection for height down key
+	var height_down_pressed = Input.is_key_pressed(height_down_keycode)
+	var height_down_key_name = "height_down"
+	if height_down_pressed and not _key_was_pressed.get(height_down_key_name, false):
+		PreviewManager.height_offset -= height_step
+		print("HEIGHT ADJUSTED DOWN by ", height_step, " (total offset: ", PreviewManager.height_offset, ")")
+	_key_was_pressed[height_down_key_name] = height_down_pressed
 
 func _string_to_keycode_simple(key_string: String) -> Key:
 	"""Simple keycode conversion for main plugin"""

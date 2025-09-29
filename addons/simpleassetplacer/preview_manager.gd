@@ -10,6 +10,7 @@ const ScaleManager = preload("res://addons/simpleassetplacer/scale_manager.gd")
 static var preview_mesh: Node3D = null
 static var placement_indicator: MeshInstance3D = null
 static var preview_material: StandardMaterial3D = null
+static var height_offset: float = 0.0  # Persistent height adjustment
 
 static func initialize():
 	"""Initialize the preview system"""
@@ -179,7 +180,7 @@ static func update_position(viewport: Viewport, mouse_pos: Vector2, dock_instanc
 			position = result.position
 			hit_geometry = true
 			# Apply configurable height adjustment
-			_apply_height_adjustment(position, dock_instance)
+			position = _apply_height_adjustment(position, dock_instance)
 	
 	if not hit_geometry:
 		# No geometry hit, intersect with ground plane (Y = 0)
@@ -188,7 +189,7 @@ static func update_position(viewport: Viewport, mouse_pos: Vector2, dock_instanc
 			if t > 0:  # Ray pointing towards ground
 				position = from + direction * t
 				# Apply configurable height adjustment
-				_apply_height_adjustment(position, dock_instance)
+				position = _apply_height_adjustment(position, dock_instance)
 			else:
 				# Fallback: place at a default distance from camera
 				position = from + direction * 10.0
@@ -282,29 +283,14 @@ static func find_first_mesh_instance(node: Node) -> MeshInstance3D:
 	
 	return null
 
-static func _apply_height_adjustment(position: Vector3, dock_instance = null):
-	"""Apply configurable height adjustment to position"""
-	if not dock_instance:
-		return
-		
-	var settings = {}
-	if dock_instance.has_method("get_placement_settings"):
-		settings = dock_instance.get_placement_settings()
-	
-	# Get configured height adjustment keys
-	var height_up_key = settings.get("height_up_key", "Q")
-	var height_down_key = settings.get("height_down_key", "E")
-	var height_step = settings.get("height_adjustment_step", 0.1)
-	
-	# Convert to keycodes
-	var height_up_keycode = string_to_keycode(height_up_key)
-	var height_down_keycode = string_to_keycode(height_down_key)
-	
-	# Apply height adjustment
-	if Input.is_key_pressed(height_up_keycode):
-		position.y += height_step
-	elif Input.is_key_pressed(height_down_keycode):
-		position.y -= height_step
+static func _apply_height_adjustment(position: Vector3, dock_instance = null) -> Vector3:
+	"""Apply persistent height offset to position (input handling done in main plugin)"""
+	# Simply apply the persistent height offset to the position
+	return position + Vector3(0, height_offset, 0)
+
+static func adjust_height_offset(delta: float):
+	"""Adjust the persistent height offset by the given amount"""
+	height_offset += delta
 
 static func string_to_keycode(key_string: String) -> Key:
 	"""Convert string representation to Key enum"""
@@ -326,7 +312,7 @@ static func string_to_keycode(key_string: String) -> Key:
 		"I": return KEY_I
 		"K": return KEY_K
 		"O": return KEY_O
-		"L": return KEY_L
+		"L": return KEY_L  
 		"P": return KEY_P
 		"Z": return KEY_Z
 		"X": return KEY_X

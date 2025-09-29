@@ -691,6 +691,16 @@ func _input(event: InputEvent):
 				scale_down_key = key_string
 			"scale_reset_key":
 				scale_reset_key = key_string
+			"height_up_key":
+				height_up_key = key_string
+			"height_down_key":
+				height_down_key = key_string
+			"reverse_modifier_key":
+				reverse_modifier_key = key_string
+			"large_increment_modifier_key":
+				large_increment_modifier_key = key_string
+			"cancel_key":
+				cancel_key = key_string
 		
 		# Update button display
 		listening_button.text = key_string
@@ -724,6 +734,16 @@ func _cancel_key_binding():
 			listening_button.text = scale_down_key
 		"scale_reset_key":
 			listening_button.text = scale_reset_key
+		"height_up_key":
+			listening_button.text = height_up_key
+		"height_down_key":
+			listening_button.text = height_down_key
+		"reverse_modifier_key":
+			listening_button.text = reverse_modifier_key
+		"large_increment_modifier_key":
+			listening_button.text = large_increment_modifier_key
+		"cancel_key":
+			listening_button.text = cancel_key
 	
 	listening_button.modulate = Color.WHITE
 	listening_button = null

@@ -82,7 +82,8 @@ static func start_meshlib_placement(meshlib: MeshLibrary, item_id: int, settings
 	# Start update timer for continuous input polling
 	start_placement_updates()
 	
-	print("PlacementCore: Starting meshlib placement mode with item_id: ", item_id)
+	print("[PLACEMENT_CORE] Starting meshlib placement mode with item_id: ", item_id)
+	print("[PLACEMENT_CORE] Placement mode active: ", placement_mode)
 
 static func start_asset_placement(asset_path: String, settings: Dictionary = {}, dock_instance = null):
 	"""Start placement mode for a direct asset file"""
@@ -116,7 +117,8 @@ static func start_asset_placement(asset_path: String, settings: Dictionary = {},
 	# Start update timer for continuous input polling
 	start_placement_updates()
 	
-	print("PlacementCore: Starting asset placement mode with asset: ", asset_path)
+	print("[PLACEMENT_CORE] Starting asset placement mode with asset: ", asset_path)
+	print("[PLACEMENT_CORE] Placement mode active: ", placement_mode)
 
 static func exit_placement_mode():
 	"""Exit placement mode and clean up"""
@@ -147,9 +149,11 @@ static func exit_placement_mode():
 	
 	# Reset rotation state
 	RotationManager.reset_rotation()
-	RotationManager.last_key_states.clear()
+	RotationManager.rotation_key_states.clear()
+	RotationManager.active_rotation_axis = ""
 	
-	print("PlacementCore: Placement mode cancelled.")
+	print("[PLACEMENT_CORE] Placement mode cancelled/exited.")
+	print("[PLACEMENT_CORE] Placement mode active: ", placement_mode)
 
 static func place_at_preview_position():
 	"""Place the asset at the current preview position"""
@@ -265,9 +269,20 @@ static func handle_placement_input(event: InputEvent, viewport: Viewport, dock_i
 	if not placement_mode:
 		return false
 	
-	# Handle mouse motion for accurate preview positioning
+	# Debug logging for significant events
+	if event is InputEventKey and event.pressed:
+		var key_name = OS.get_keycode_string(event.keycode)
+		print("[PLACEMENT_CORE] Key event in handle_placement_input: ", key_name, " (Ctrl: ", event.ctrl_pressed, ")")
+	
+	# Handle mouse motion for accurate preview positioning and rotation
 	if event is InputEventMouseMotion:
-		PreviewManager.update_position(viewport, event.position, dock_instance)
+		# First check if rotation manager wants to handle this (rotation key held)
+		var rotation_handled = RotationManager.handle_mouse_motion(event, dock_instance)
+		
+		# Always update preview position (unless rotation completely overrides it)
+		if not rotation_handled:
+			PreviewManager.update_position(viewport, event.position, dock_instance)
+		
 		return true
 	
 	# Handle mouse button events for placement and rotation
@@ -277,12 +292,6 @@ static func handle_placement_input(event: InputEvent, viewport: Viewport, dock_i
 				# Confirm placement
 				place_at_preview_position()
 				return true
-			elif event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-				# Handle mouse wheel for rotation
-				var handled = RotationManager.handle_wheel_input(event, dock_instance)
-				if handled:
-					PreviewManager.update_rotation()
-					return true
 	
 	elif event is InputEventKey:
 		if event.pressed and event.keycode == KEY_ESCAPE:
@@ -290,17 +299,16 @@ static func handle_placement_input(event: InputEvent, viewport: Viewport, dock_i
 			exit_placement_mode()
 			return true
 		
-		# Handle rotation keys
-		if event.pressed:
-			var handled = RotationManager.handle_key_input(event, dock_instance)
-			if handled:
-				PreviewManager.update_rotation()
-				return true
+		# Handle rotation keys (key press events with modifiers)
+		var handled = RotationManager.handle_key_input(event, dock_instance)
+		if handled:
+			PreviewManager.update_rotation()
+			return true
 		
 		# Handle scaling keys
 		if event.pressed:
-			var handled = ScaleManager.handle_key_input(event, placement_settings)
-			if handled:
+			var scale_handled = ScaleManager.handle_key_input(event, placement_settings)
+			if scale_handled:
 				PreviewManager.update_scale()
 				return true
 		

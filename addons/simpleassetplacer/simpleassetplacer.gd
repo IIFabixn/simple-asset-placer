@@ -76,9 +76,7 @@ func forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 	if not scene_root:
 		return EditorPlugin.AFTER_GUI_INPUT_PASS
 	
-	# Let mouse wheel pass through to camera zoom - no special handling needed
-	
-	# Handle all other input during placement mode
+	# Handle all input during placement mode
 	if PlacementCore.handle_placement_input(event, viewport, dock):
 		return EditorPlugin.AFTER_GUI_INPUT_STOP
 	return EditorPlugin.AFTER_GUI_INPUT_PASS

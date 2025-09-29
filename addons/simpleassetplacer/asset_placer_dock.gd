@@ -500,3 +500,9 @@ func _scene_has_mesh_recursive(node: Node) -> bool:
 			return true
 	
 	return false
+
+func get_placement_settings() -> Dictionary:
+	"""Get current placement settings from the settings component"""
+	if placement_settings and placement_settings.has_method("get_placement_settings"):
+		return placement_settings.get_placement_settings()
+	return {}

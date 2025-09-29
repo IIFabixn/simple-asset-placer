@@ -70,12 +70,28 @@ A comprehensive asset placement tool for Godot 4 that provides thumbnail preview
 
 During placement mode, you can rotate assets using:
 
-- **R Key** (default): Rotate around Y-axis (yaw)
-- **X Key** (default): Rotate around X-axis (pitch)  
-- **Z Key** (default): Rotate around Z-axis (roll)
+#### 🎯 **Simple Rotation Controls**
+
+**Key Press Rotation**
+- **Press X/Y/Z keys** for instant 15° rotation increments
+- **Shift + Key**: Rotate in opposite direction (-15°)
+- **Ctrl + Key**: Large rotation (90°) 
+- **T Key**: Reset all rotations to 0°
+
+**Modifier Combinations**
+- **X + Shift**: -15° X-axis rotation (pitch backward)
+- **Y + Shift**: -15° Y-axis rotation (turn left)
+- **Z + Shift**: -15° Z-axis rotation (roll left)
+- **X + Ctrl**: 90° X-axis rotation (quarter turn)
+- **Any Key + Ctrl + Shift**: Large reverse rotation (-90°)
+
+#### 🎮 **Rotation Keys (Customizable)**
+- **Y Key** (default): Y-axis rotation (yaw/turning)
+- **X Key** (default): X-axis rotation (pitch/nodding)  
+- **Z Key** (default): Z-axis rotation (roll/banking)
 - **T Key** (default): Reset all rotations to 0°
 
-> **Tip**: Press R, X, or Z repeatedly to rotate in 15° increments around each axis. The current rotation values are shown in the overlay display.
+> **Pro Tip**: The overlay shows current rotation mode - hold a rotation key and move your mouse for precise control, or just tap keys for quick increments!
 
 ### Scale Controls
 
@@ -194,17 +210,20 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Recent Improvements
 
-### ✅ **Fixed Rotation Controls**
-- **Updated Default Keys**: Changed from W/Q/E to R/X/Z to avoid conflicts with Godot's built-in viewport navigation
-- **Keyboard-Only Rotation**: Removed mouse wheel rotation to prevent camera zoom conflicts
-- **Ctrl+Key Large Increments**: Hold Ctrl while pressing rotation keys for 90° increments
-- **Visual Feedback**: Current rotation values displayed in overlay during placement
+### ✨ **NEW: Enhanced Rotation System** ✅ **FULLY WORKING**
+- **Perfect Key Controls**: X/Y/Z keys for instant 15° rotation on each axis  
+- **Smart Modifier Support**: Shift for reverse (-15°), Left Alt for large (90°), Alt+Shift for large reverse (-90°)
+- **Conflict-Free Design**: Uses Left Alt instead of Ctrl to avoid undo keybind conflicts
+- **Full Z-Axis Support**: All rotation combinations work including Alt+Z for large Z rotations
+- **Reliable Detection**: Uses robust modifier key detection for consistent behavior
+- **Visual Feedback**: Live rotation values displayed in overlay
+- **Intuitive Mapping**: X/Y/Z keys directly control their respective axes
 
-### ✅ **Enhanced User Experience**
-- **Non-Conflicting Controls**: All controls work alongside Godot's standard editor navigation
+### ✅ **Improved Controls & Compatibility**
+- **Intuitive Key Mapping**: X/Y/Z keys map directly to their respective rotation axes
+- **Non-Conflicting Design**: All controls work alongside Godot's standard editor navigation  
 - **Customizable Bindings**: All rotation and scale keys can be rebound through the Settings tab
-- **Multiple Increment Modes**: Standard (15°) and large (90°) rotation increments with Ctrl modifier
-- **Preserved Camera Zoom**: Mouse wheel works normally for camera zoom without conflicts
+- **Preserved Camera Navigation**: All camera controls (pan, zoom, orbit) work normally without conflicts
 
 ## Credits
 

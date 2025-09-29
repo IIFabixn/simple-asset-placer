@@ -1,3 +1,20 @@
-[gd_scene format=3 uid="uid://cnk2n84e48paw"]
+[gd_scene load_steps=2 format=3 uid="uid://cnk2n84e48paw"]
+
+[ext_resource type="PackedScene" uid="uid://75ofg1lljs1a" path="res://sample/assets/arrow.fbx" id="1_iki8g"]
 
 [node name="Node3D" type="Node3D"]
+
+[node name="arrow" type="Node3D" parent="." instance=ExtResource("1_iki8g")]
+transform = Transform3D(-1, 8.742278e-08, 0, 3.821371e-15, 4.371139e-08, -1, -8.742278e-08, -1, -4.371139e-08, 3.9204211, -4.7683716e-07, 3.8995295)
+
+[node name="arrow_2" type="Node3D" parent="." instance=ExtResource("1_iki8g")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.041503, 0, 6.0174522)
+
+[node name="arrow_3" type="Node3D" parent="." instance=ExtResource("1_iki8g")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1862745, -4.7683716e-07, 2.7301674)
+
+[node name="arrow_4" type="Node3D" parent="." instance=ExtResource("1_iki8g")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5474358, 0, 0.70077896)
+
+[node name="arrow_5" type="Node3D" parent="." instance=ExtResource("1_iki8g")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.117694, 0, 8.798541)

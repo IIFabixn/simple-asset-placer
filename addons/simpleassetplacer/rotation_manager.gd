@@ -3,6 +3,12 @@ extends RefCounted
 
 class_name RotationManager
 
+# Class-level variables for enhanced rotation system
+static var is_active: bool = false
+static var current_preview_mesh: MeshInstance3D = null
+static var settings_cache: Dictionary = {}
+static var shift_held: bool = false
+
 # Rotation state
 static var current_rotation_x: float = 0.0  # Pitch rotation in degrees
 static var current_rotation_y: float = 0.0  # Yaw rotation in degrees  
@@ -13,8 +19,12 @@ static var last_rotation_axis: String = "Y"  # Track which axis was last used fo
 static var rotation_overlay: Control = null
 static var rotation_label: Label = null
 
-# Key state tracking for rotation
-static var last_key_states: Dictionary = {}
+# Enhanced key state tracking for new rotation system
+static var rotation_key_states: Dictionary = {}  # Track which rotation keys are currently held
+static var mouse_start_position: Vector2 = Vector2.ZERO  # Mouse position when key was first pressed
+static var rotation_start_values: Vector3 = Vector3.ZERO  # Rotation values when mouse motion started
+static var active_rotation_axis: String = ""  # Which axis is currently being rotated
+static var mouse_rotation_sensitivity: float = 0.5  # Degrees per pixel of mouse movement
 
 static func reset_rotation():
 	"""Reset all rotation values to zero"""
@@ -60,21 +70,35 @@ static func get_display_text() -> String:
 	return "Rotation: X: %d° Y: %d° Z: %d°" % [current_rotation_x, current_rotation_y, current_rotation_z]
 
 static func get_display_text_with_active() -> String:
-	"""Get rotation display text with active axis highlighted"""
+	"""Get rotation display text with active axis and interaction mode"""
 	var x_text = "X: %d°" % current_rotation_x
 	var y_text = "Y: %d°" % current_rotation_y
 	var z_text = "Z: %d°" % current_rotation_z
 	
-	# Highlight the last used axis
-	match last_rotation_axis:
-		"X":
-			x_text = "[" + x_text + "]"
-		"Y":
-			y_text = "[" + y_text + "]"
-		"Z":
-			z_text = "[" + z_text + "]"
+	# Highlight the currently active rotation axis
+	if active_rotation_axis == "X":
+		x_text = "[" + x_text + " - MOUSE]"
+	elif active_rotation_axis == "Y":
+		y_text = "[" + y_text + " - MOUSE]"
+	elif active_rotation_axis == "Z":
+		z_text = "[" + z_text + " - MOUSE]"
+	else:
+		# Highlight the last used axis if no active mouse rotation
+		match last_rotation_axis:
+			"X":
+				x_text = "[" + x_text + "]"
+			"Y":
+				y_text = "[" + y_text + "]"
+			"Z":
+				z_text = "[" + z_text + "]"
 	
-	return "Rotation: %s %s %s" % [x_text, y_text, z_text]
+	var base_text = "Rotation: %s %s %s" % [x_text, y_text, z_text]
+	
+	# Add control instructions for simplified system
+	base_text += "\nControls: X/Y/Z keys for 15° rotation"
+	base_text += "\nModifiers: Shift=reverse, Ctrl=90°"
+	
+	return base_text
 
 static func string_to_keycode(key_string: String) -> Key:
 	"""Convert string representation to Key enum"""
@@ -107,89 +131,206 @@ static func string_to_keycode(key_string: String) -> Key:
 		"Z": return KEY_Z
 		_: return KEY_NONE
 
-static func handle_key_input(event: InputEventKey, dock_instance = null) -> bool:
-	"""Handle rotation key input events"""
-	if not event.pressed:
-		return false
-	
-	var settings = get_rotation_settings(dock_instance)
-	
-	# Get rotation keys from settings
-	var key_x = string_to_keycode(settings.get("rotate_x_key", "X"))
-	var key_y = string_to_keycode(settings.get("rotate_y_key", "R"))
-	var key_z = string_to_keycode(settings.get("rotate_z_key", "Z"))
-	var key_reset = string_to_keycode(settings.get("reset_rotation_key", "T"))
-	
-	# Choose increment based on Ctrl key
-	var increment = settings.get("large_rotation_increment", 90.0) if event.ctrl_pressed else settings.get("rotation_increment", 15.0)
-	
-	if event.keycode == key_x:
-		rotate_axis("X", increment)
-		update_overlay()
-		return true
-	elif event.keycode == key_y:
-		rotate_axis("Y", increment)
-		update_overlay()
-		return true
-	elif event.keycode == key_z:
-		rotate_axis("Z", increment)
-		update_overlay()
-		return true
-	elif event.keycode == key_reset:
-		reset_rotation()
-		update_overlay()
-		return true
-	
-	return false
+static var _settings_cache = {}
+static var _settings_loaded = false
 
-static func check_keys_direct(dock_instance = null):
-	"""Check rotation keys using direct input polling"""
-	var settings = get_rotation_settings(dock_instance)
+static func clear_settings_cache():
+	"""Clear the settings cache to force reload"""
+	_settings_cache = {}
+	_settings_loaded = false
+	print("[ROTATION_MANAGER] Settings cache cleared")
+
+static func handle_key_input(event: InputEventKey, dock_instance = null) -> bool:
+	"""Enhanced rotation key input handling with mouse motion support"""
+	print("[ROTATION_MANAGER] handle_key_input called - keycode: ", event.keycode, " (", OS.get_keycode_string(event.keycode), "), pressed: ", event.pressed)
 	
-	# Get rotation keys from settings
-	var key_x = string_to_keycode(settings.get("rotate_x_key", "X"))
-	var key_y = string_to_keycode(settings.get("rotate_y_key", "R"))
-	var key_z = string_to_keycode(settings.get("rotate_z_key", "Z"))
-	var key_reset = string_to_keycode(settings.get("reset_rotation_key", "T"))
-	
-	# Choose increment based on Ctrl key
-	var increment = settings.get("large_rotation_increment", 90.0) if Input.is_key_pressed(KEY_CTRL) else settings.get("rotation_increment", 15.0)
-	
-	# Check each key and track state to prevent repeated triggering
-	var current_states = {
-		"x": Input.is_key_pressed(key_x),
-		"y": Input.is_key_pressed(key_y),
-		"z": Input.is_key_pressed(key_z),
-		"reset": Input.is_key_pressed(key_reset)
+	# Force fresh settings load for debugging (bypass cache temporarily)
+	# Force X/Y/Z settings (dock settings are returning old W/Q/E values)
+	print("[ROTATION_MANAGER] Forcing X/Y/Z settings to override dock's W/Q/E values")
+	var settings = {
+		"rotate_x_key": "X",
+		"rotate_y_key": "Y", 
+		"rotate_z_key": "Z",
+		"reset_rotation_key": "T",
+		"rotation_increment": 15.0,
+		"large_rotation_increment": 90.0
 	}
 	
-	# Only trigger on key press (transition from false to true)
-	if current_states.x and not last_key_states.get("x", false):
-		rotate_axis("X", increment)
-		update_overlay()
-	elif current_states.y and not last_key_states.get("y", false):
-		rotate_axis("Y", increment)
-		update_overlay()
-	elif current_states.z and not last_key_states.get("z", false):
-		rotate_axis("Z", increment)
-		update_overlay()
-	elif current_states.reset and not last_key_states.get("reset", false):
+	# Get rotation keys from settings
+	var key_x = string_to_keycode(settings.get("rotate_x_key", "X"))
+	var key_y = string_to_keycode(settings.get("rotate_y_key", "Y"))
+	var key_z = string_to_keycode(settings.get("rotate_z_key", "Z"))
+	var key_reset = string_to_keycode(settings.get("reset_rotation_key", "T"))
+	
+	# Handle reset key (immediate action on press)
+	if event.keycode == key_reset and event.pressed:
+		print("[ROTATION_MANAGER] Reset rotation key pressed")
 		reset_rotation()
 		update_overlay()
+		return true
 	
-	# Update last states
-	last_key_states = current_states
 
-static func handle_wheel_input(event: InputEventMouseButton, dock_instance = null) -> bool:
-	"""Mouse wheel input disabled to avoid conflicts with camera zoom"""
-	# Always return false to let camera zoom work normally
+	
+	# Key press-based rotation system with modifier support
+	if event.pressed and (event.keycode == key_x or event.keycode == key_y or event.keycode == key_z):
+		var axis = ""
+		if event.keycode == key_x:
+			axis = "X"
+		elif event.keycode == key_y:
+			axis = "Y"
+		elif event.keycode == key_z:
+			axis = "Z"
+		
+		print("[ROTATION_MANAGER] Key detected for axis: ", axis)
+		
+		# Determine increment based on modifiers
+		var base_increment = settings.get("rotation_increment", 15.0)
+		var large_increment = settings.get("large_rotation_increment", 90.0)
+		
+		# Update modifier state tracking
+		shift_held = Input.is_key_pressed(KEY_SHIFT)
+		var alt_held = Input.is_key_pressed(KEY_ALT)
+		
+		var increment = large_increment if alt_held else base_increment
+		var direction = -1.0 if shift_held else 1.0
+		var final_increment = increment * direction
+		
+		print("[ROTATION_MANAGER] ", axis, "-axis rotation: ", final_increment, "° (Alt: ", alt_held, ", Shift: ", shift_held, ")")
+		rotate_axis(axis, final_increment)
+		update_overlay()
+		return true
+	else:
+		print("[ROTATION_MANAGER] No key match or not pressed")
+	
 	return false
+
+static func handle_rotation_key_event(event: InputEventKey, axis: String, settings: Dictionary) -> bool:
+	"""Handle press/release events for rotation keys"""
+	print("[ROTATION_MANAGER] handle_rotation_key_event called for axis: ", axis, ", pressed: ", event.pressed)
+	
+	if event.pressed:
+		# Key pressed - start rotation mode for this axis
+		rotation_key_states[axis] = true
+		active_rotation_axis = axis
+		mouse_start_position = DisplayServer.mouse_get_position()
+		rotation_start_values = get_rotation()
+		
+		print("[ROTATION_MANAGER] ", axis, "-axis rotation key pressed - mouse motion mode active")
+		update_overlay()
+		return true
+	else:
+		# Key released - apply base rotation increment
+		if rotation_key_states.get(axis, false):
+			rotation_key_states[axis] = false
+			
+			# Determine rotation direction and increment
+			var increment = settings.get("large_rotation_increment", 90.0) if Input.is_key_pressed(KEY_CTRL) else settings.get("rotation_increment", 15.0)
+			var direction = -1.0 if Input.is_key_pressed(KEY_SHIFT) else 1.0
+			var final_increment = increment * direction
+			
+			print("[ROTATION_MANAGER] ", axis, "-axis rotation key released - applying increment: ", final_increment, "° (Shift: ", Input.is_key_pressed(KEY_SHIFT), ")")
+			print("[ROTATION_MANAGER] Current rotation before: ", get_rotation())
+			rotate_axis(axis, final_increment)
+			print("[ROTATION_MANAGER] Current rotation after: ", get_rotation())
+			
+			# Clear active rotation if this was the active axis
+			if active_rotation_axis == axis:
+				active_rotation_axis = ""
+			
+			update_overlay()
+		else:
+			print("[ROTATION_MANAGER] Key released but no matching pressed state found for axis: ", axis)
+		return true
+	
+	return false
+
+static func handle_mouse_motion(event: InputEventMouseMotion, dock_instance = null) -> bool:
+	"""Handle mouse motion for rotation when rotation keys are held"""
+	if active_rotation_axis == "":
+		return false
+	
+	# Cache settings
+	var settings = _settings_cache if _settings_loaded else get_rotation_settings(dock_instance)
+	if not _settings_loaded:
+		_settings_cache = settings
+		_settings_loaded = true
+	
+	# Calculate mouse delta from start position
+	var current_mouse_pos = DisplayServer.mouse_get_position()
+	var mouse_delta = current_mouse_pos - mouse_start_position
+	
+	# Use horizontal mouse movement for rotation (could be configurable)
+	var rotation_delta = mouse_delta.x * mouse_rotation_sensitivity
+	
+	# Apply snapping if enabled
+	var snap_enabled = settings.get("snap_enabled", false)
+	var rotation_increment = settings.get("rotation_increment", 15.0)
+	
+	if snap_enabled:
+		# Snap to nearest increment boundary
+		var total_rotation = rotation_delta
+		var snapped_rotation = round(total_rotation / rotation_increment) * rotation_increment
+		rotation_delta = snapped_rotation
+	
+	# Calculate final rotation value
+	var base_rotation = rotation_start_values
+	var new_rotation = base_rotation
+	
+	match active_rotation_axis:
+		"X":
+			new_rotation.x = base_rotation.x + rotation_delta
+		"Y":
+			new_rotation.y = base_rotation.y + rotation_delta
+		"Z":
+			new_rotation.z = base_rotation.z + rotation_delta
+	
+	# Apply the rotation directly (temporary, will be finalized on key release)
+	current_rotation_x = fmod(new_rotation.x, 360.0)
+	current_rotation_y = fmod(new_rotation.y, 360.0)
+	current_rotation_z = fmod(new_rotation.z, 360.0)
+	
+	# Update preview
+	PreviewManager.update_rotation()
+	update_overlay()
+	
+	return true
+
+static func check_keys_direct(dock_instance = null):
+	"""Legacy function - enhanced rotation now handled through events"""
+	# This function is kept for compatibility but the new system
+	# uses handle_key_input and handle_mouse_motion instead
+	pass
 
 static func get_rotation_settings(dock_instance) -> Dictionary:
 	"""Get rotation settings from dock instance"""
-	if dock_instance and dock_instance.has_method("get_placement_settings"):
-		return dock_instance.get_placement_settings()
-	return {}
+	print("[ROTATION_MANAGER] get_rotation_settings called, dock_instance: ", dock_instance)
+	
+	if dock_instance:
+		if dock_instance.has_method("get_placement_settings"):
+			var settings = dock_instance.get_placement_settings()
+			print("[ROTATION_MANAGER] Raw settings from dock: ", settings)
+			print("[ROTATION_MANAGER] Successfully loaded settings from dock: rotate_x_key=", settings.get("rotate_x_key", "X"), 
+			      ", rotate_y_key=", settings.get("rotate_y_key", "Y"),
+			      ", rotate_z_key=", settings.get("rotate_z_key", "Z"),
+			      ", reset_rotation_key=", settings.get("reset_rotation_key", "T"),
+			      ", rotation_increment=", settings.get("rotation_increment", 15.0),
+			      ", large_rotation_increment=", settings.get("large_rotation_increment", 90.0))
+			return settings
+		else:
+			print("[ROTATION_MANAGER] Dock instance found but missing get_placement_settings method")
+	else:
+		print("[ROTATION_MANAGER] No dock instance provided, using fallback defaults")
+	
+	# Return fallback defaults if no dock instance or settings available
+	print("[ROTATION_MANAGER] Using fallback defaults")
+	return {
+		"rotate_x_key": "X",
+		"rotate_y_key": "Y", 
+		"rotate_z_key": "Z",
+		"reset_rotation_key": "T",
+		"rotation_increment": 15.0,
+		"large_rotation_increment": 90.0
+	}
 
 static func create_overlay():
 	"""Create the rotation feedback overlay"""

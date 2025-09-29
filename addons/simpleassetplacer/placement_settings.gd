@@ -44,7 +44,7 @@ var add_collision: bool = false
 var group_instances: bool = false
 
 # Rotation Settings
-var rotate_y_key: String = "R"  # Y-axis rotation (yaw) - R for Rotate
+var rotate_y_key: String = "Y"  # Y-axis rotation (yaw) - Y axis
 var rotate_x_key: String = "X"  # X-axis rotation (pitch) - X axis
 var rotate_z_key: String = "Z"  # Z-axis rotation (roll) - Z axis  
 var reset_rotation_key: String = "T"  # T for reset (sTarT over)

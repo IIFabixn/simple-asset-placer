@@ -128,8 +128,12 @@ func _poll_input():
 		# Get mouse position from the viewport directly
 		var current_mouse_pos = viewport_3d.get_mouse_position()
 		
-		# Update preview position directly without creating synthetic events
-		PreviewManager.update_position(viewport_3d, current_mouse_pos, dock)
+		# Check if rotation manager wants to handle mouse motion first
+		var rotation_handled = RotationManager.handle_mouse_polling(current_mouse_pos, dock)
+		
+		# Only update position if not in rotation mode
+		if not rotation_handled:
+			PreviewManager.update_position(viewport_3d, current_mouse_pos, dock)
 	
 	# Check for mouse button and key input
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):

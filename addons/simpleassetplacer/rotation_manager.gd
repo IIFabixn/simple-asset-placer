@@ -115,10 +115,10 @@ static func handle_key_input(event: InputEventKey, dock_instance = null) -> bool
 	var settings = get_rotation_settings(dock_instance)
 	
 	# Get rotation keys from settings
-	var key_x = string_to_keycode(settings.get("rotation_key_x", "X"))
-	var key_y = string_to_keycode(settings.get("rotation_key_y", "R"))
-	var key_z = string_to_keycode(settings.get("rotation_key_z", "Z"))
-	var key_reset = string_to_keycode(settings.get("rotation_key_reset", "T"))
+	var key_x = string_to_keycode(settings.get("rotate_x_key", "X"))
+	var key_y = string_to_keycode(settings.get("rotate_y_key", "R"))
+	var key_z = string_to_keycode(settings.get("rotate_z_key", "Z"))
+	var key_reset = string_to_keycode(settings.get("reset_rotation_key", "T"))
 	
 	var increment = settings.get("rotation_increment", 15.0)
 	
@@ -146,10 +146,10 @@ static func check_keys_direct(dock_instance = null):
 	var settings = get_rotation_settings(dock_instance)
 	
 	# Get rotation keys from settings
-	var key_x = string_to_keycode(settings.get("rotation_key_x", "X"))
-	var key_y = string_to_keycode(settings.get("rotation_key_y", "R"))
-	var key_z = string_to_keycode(settings.get("rotation_key_z", "Z"))
-	var key_reset = string_to_keycode(settings.get("rotation_key_reset", "T"))
+	var key_x = string_to_keycode(settings.get("rotate_x_key", "X"))
+	var key_y = string_to_keycode(settings.get("rotate_y_key", "R"))
+	var key_z = string_to_keycode(settings.get("rotate_z_key", "Z"))
+	var key_reset = string_to_keycode(settings.get("reset_rotation_key", "T"))
 	
 	var increment = settings.get("rotation_increment", 15.0)
 	
@@ -179,12 +179,16 @@ static func check_keys_direct(dock_instance = null):
 	last_key_states = current_states
 
 static func handle_wheel_input(event: InputEventMouseButton, dock_instance = null) -> bool:
-	"""Handle mouse wheel rotation input"""
+	"""Handle mouse wheel rotation input - requires Ctrl modifier to avoid camera zoom conflict"""
 	if not (event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN):
 		return false
 	
+	# Only handle mouse wheel rotation when Ctrl is held to avoid camera zoom conflicts
+	if not event.ctrl_pressed:
+		return false
+	
 	var settings = get_rotation_settings(dock_instance)
-	var increment = settings.get("rotation_increment", 15.0)
+	var increment = settings.get("fine_rotation_increment", 5.0)  # Use fine increment for mouse wheel
 	
 	# Determine rotation direction
 	var rotation_amount = increment if event.button_index == MOUSE_BUTTON_WHEEL_UP else -increment

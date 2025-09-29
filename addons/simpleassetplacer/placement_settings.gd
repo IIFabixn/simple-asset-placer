@@ -44,10 +44,10 @@ var add_collision: bool = false
 var group_instances: bool = false
 
 # Rotation Settings
-var rotate_y_key: String = "W"  # Changed from R to avoid Godot's scale tool
-var rotate_x_key: String = "Q"  # Changed from X to avoid conflicts
-var rotate_z_key: String = "E"  # Changed from Z to avoid conflicts
-var reset_rotation_key: String = "T"
+var rotate_y_key: String = "R"  # Y-axis rotation (yaw) - R for Rotate
+var rotate_x_key: String = "X"  # X-axis rotation (pitch) - X axis
+var rotate_z_key: String = "Z"  # Z-axis rotation (roll) - Z axis  
+var reset_rotation_key: String = "T"  # T for reset (sTarT over)
 var rotation_increment: float = 15.0
 var fine_rotation_increment: float = 5.0
 var large_rotation_increment: float = 90.0
@@ -286,7 +286,7 @@ func setup_ui():
 	fine_rotation_increment_spin.custom_minimum_size.x = 80
 	fine_rotation_increment_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	fine_rotation_increment_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	fine_rotation_increment_spin.tooltip_text = "Mouse wheel rotation increment"
+	fine_rotation_increment_spin.tooltip_text = "Ctrl+Mouse wheel rotation increment"
 	key_grid.add_child(fine_rotation_increment_spin)
 	
 	# Large Increment

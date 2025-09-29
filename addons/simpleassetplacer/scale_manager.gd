@@ -74,17 +74,29 @@ static func handle_key_input(event: InputEventKey, settings: Dictionary) -> bool
 	var scale_down_keycode = string_to_keycode(scale_down_key)
 	var scale_reset_keycode = string_to_keycode(scale_reset_key)
 	
+	# Get modifier key settings
+	var large_increment_key = settings.get("large_increment_modifier_key", "ALT")
+	var reverse_key = settings.get("reverse_modifier_key", "SHIFT")
+	
+	# Check if modifiers are pressed (need to check Input directly since event doesn't have all modifiers)
+	var large_increment_pressed = _is_modifier_pressed(large_increment_key)
+	var reverse_pressed = _is_modifier_pressed(reverse_key)
+	
 	# Check for scale up
 	if event.keycode == scale_up_keycode:
-		var increment = large_scale_increment if event.ctrl_pressed else scale_increment
-		adjust_scale(increment)
+		var increment = large_scale_increment if large_increment_pressed else scale_increment
+		# Apply reverse modifier (swap up/down behavior)
+		var final_increment = increment if not reverse_pressed else -increment
+		adjust_scale(final_increment)
 		show_scale_overlay()
 		return true
 	
 	# Check for scale down
 	if event.keycode == scale_down_keycode:
-		var increment = large_scale_increment if event.ctrl_pressed else scale_increment
-		adjust_scale(-increment)
+		var increment = large_scale_increment if large_increment_pressed else scale_increment
+		# Apply reverse modifier (swap up/down behavior)
+		var final_increment = -increment if not reverse_pressed else increment
+		adjust_scale(final_increment)
 		show_scale_overlay()
 		return true
 	
@@ -206,3 +218,12 @@ static func cleanup_overlay():
 	
 	scale_overlay = null
 	scale_label = null
+
+static func _is_modifier_pressed(modifier_key: String) -> bool:
+	"""Check if a modifier key is currently pressed"""
+	match modifier_key.to_upper():
+		"SHIFT": return Input.is_key_pressed(KEY_SHIFT)
+		"CTRL": return Input.is_key_pressed(KEY_CTRL)
+		"ALT": return Input.is_key_pressed(KEY_ALT)
+		"META": return Input.is_key_pressed(KEY_META)
+		_: return false

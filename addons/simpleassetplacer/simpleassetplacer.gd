@@ -5,6 +5,7 @@ const AssetPlacerDock = preload("res://addons/simpleassetplacer/asset_placer_doc
 const PlacementCore = preload("res://addons/simpleassetplacer/placement_core.gd")
 const PreviewManager = preload("res://addons/simpleassetplacer/preview_manager.gd")
 const RotationManager = preload("res://addons/simpleassetplacer/rotation_manager.gd")
+const ScaleManager = preload("res://addons/simpleassetplacer/scale_manager.gd")
 const ThumbnailGenerator = preload("res://addons/simpleassetplacer/thumbnail_generator.gd")
 var dock: AssetPlacerDock
 var input_overlay: Control
@@ -61,12 +62,40 @@ func _exit_tree() -> void:
 func _on_asset_selected(asset_path: String, mesh_resource: Resource, settings: Dictionary):
 	# Start interactive placement mode instead of immediate placement
 	PlacementCore.start_asset_placement(asset_path, settings, dock)
-	# Start input polling
-	if input_poll_timer:
-		input_poll_timer.start()
+	# Input polling is now handled in _process function
 	print("Continuous placement started. Left-click to place multiple, Escape to exit.")
 
-
+func _process(delta: float) -> void:
+	# Handle all input during placement mode with precise timing
+	if PlacementCore.placement_mode:
+		# Handle rotation keys
+		RotationManager.process_key_input(delta, dock)
+		
+		# Handle mouse motion for preview positioning (unless in rotation mode)
+		var viewport_3d = EditorInterface.get_editor_viewport_3d(0)
+		if viewport_3d:
+			var current_mouse_pos = viewport_3d.get_mouse_position()
+			
+			# Check if rotation manager wants to handle mouse motion first
+			var rotation_handled = RotationManager.handle_mouse_polling(current_mouse_pos, dock)
+			
+			# Only update preview position if not in rotation mode
+			if not rotation_handled:
+				PreviewManager.update_position(viewport_3d, current_mouse_pos, dock)
+		
+		# Handle mouse clicks
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			if not PlacementCore.left_was_pressed:
+				PlacementCore.place_at_preview_position()
+				PlacementCore.left_was_pressed = true
+		else:
+			PlacementCore.left_was_pressed = false
+		
+		# Handle configurable cancel key
+		_handle_cancel_input()
+		
+		# Handle scale keys directly
+		_handle_scale_input()
 
 func forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 	var viewport = viewport_camera.get_viewport()
@@ -76,21 +105,21 @@ func forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 	if not scene_root:
 		return EditorPlugin.AFTER_GUI_INPUT_PASS
 	
-	# Handle all input during placement mode
-	if PlacementCore.handle_placement_input(event, viewport, dock):
-		return EditorPlugin.AFTER_GUI_INPUT_STOP
+	# Only handle specific events that aren't handled in _process
+	# Mouse clicks for placement are now handled in _process
+	# This function now only handles events that need immediate processing
+	if PlacementCore.placement_mode and event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			# Left click handled in _process for better timing
+			return EditorPlugin.AFTER_GUI_INPUT_STOP
+	
 	return EditorPlugin.AFTER_GUI_INPUT_PASS
 
 func _on_meshlib_item_selected(meshlib: MeshLibrary, item_id: int, settings: Dictionary):
 	print("Meshlib item selected: ", item_id)
 	# Start interactive placement mode instead of immediate placement
 	PlacementCore.start_meshlib_placement(meshlib, item_id, settings, dock)
-	# Start input polling
-	if input_poll_timer:
-		print("Starting input polling timer for meshlib")
-		input_poll_timer.start()
-	else:
-		print("ERROR: input_poll_timer is null for meshlib!")
+	# Input polling is now handled in _process function
 	print("Interactive placement started. Move mouse to position, left-click to place, ESC to cancel.")
 
 func _can_drop_data(position: Vector2, data) -> bool:
@@ -109,75 +138,67 @@ func _drop_data(position: Vector2, data):
 			PlacementCore.start_meshlib_placement(data.meshlib, data.item_id, {}, dock)
 
 func _poll_input():
+	# This function is no longer needed as all input is handled in _process
 	if not PlacementCore.placement_mode:
 		print("Stopping input polling timer")
 		input_poll_timer.stop()
-		return
+
+func _handle_scale_input():
+	"""Handle scale input keys in _process function"""
+	# Get current settings from dock
+	var settings = {}
+	if dock and dock.has_method("get_placement_settings"):
+		settings = dock.get_placement_settings()
 	
-	# Get the 3D viewport
-	var viewport_3d = EditorInterface.get_editor_viewport_3d(0)
-	if not viewport_3d:
-		return
+	# Get configured scale keys from settings
+	var scale_up_key = settings.get("scale_up_key", "PAGE_UP")
+	var scale_down_key = settings.get("scale_down_key", "PAGE_DOWN")
+	var scale_reset_key = settings.get("scale_reset_key", "HOME")
 	
-	# Check for rotation keys directly (bypasses event system issues)
-	RotationManager.check_keys_direct(dock)
+	# Convert to keycodes
+	var scale_up_keycode = ScaleManager.string_to_keycode(scale_up_key)
+	var scale_down_keycode = ScaleManager.string_to_keycode(scale_down_key)
+	var scale_reset_keycode = ScaleManager.string_to_keycode(scale_reset_key)
 	
-	# Since forward_3d_gui_input doesn't receive mouse motion consistently during placement, 
-	# we need to update preview position in the polling loop
-	if PlacementCore.placement_mode:
-		# Get mouse position from the viewport directly
-		var current_mouse_pos = viewport_3d.get_mouse_position()
-		
-		# Check if rotation manager wants to handle mouse motion first
-		var rotation_handled = RotationManager.handle_mouse_polling(current_mouse_pos, dock)
-		
-		# Only update position if not in rotation mode
-		if not rotation_handled:
-			PreviewManager.update_position(viewport_3d, current_mouse_pos, dock)
-	
-	# Check for mouse button and key input
-	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-		if not PlacementCore.left_was_pressed:
-			var current_mouse_pos_for_click = viewport_3d.get_mouse_position()
-			var click_event = InputEventMouseButton.new()
-			click_event.button_index = MOUSE_BUTTON_LEFT
-			click_event.pressed = true
-			click_event.position = current_mouse_pos_for_click
-			PlacementCore.handle_placement_input(click_event, viewport_3d, dock)
-			PlacementCore.left_was_pressed = true
-	else:
-		PlacementCore.left_was_pressed = false
-	
-	# Check for escape key
-	if Input.is_action_just_pressed("ui_cancel"):
-		var key_event = InputEventKey.new()
-		key_event.keycode = KEY_ESCAPE
-		key_event.pressed = true
-		PlacementCore.handle_placement_input(key_event, viewport_3d, dock)
-	
-	# Poll for all key inputs during placement
-	for keycode in range(KEY_A, KEY_Z + 1):  # A-Z keys
-		if Input.is_key_pressed(keycode):
-			if not _key_was_pressed.get(keycode, false):  # Only on press, not hold
+	# Check each configured key
+	var scale_keys = [scale_up_keycode, scale_down_keycode, scale_reset_keycode]
+	for key in scale_keys:
+		if key != KEY_NONE and Input.is_key_pressed(key):
+			if not _key_was_pressed.get(key, false):  # Only on first press
 				var key_event = InputEventKey.new()
-				key_event.keycode = keycode
+				key_event.keycode = key
 				key_event.pressed = true
-				key_event.ctrl_pressed = Input.is_key_pressed(KEY_CTRL)
-				PlacementCore.handle_placement_input(key_event, viewport_3d, dock)
-			_key_was_pressed[keycode] = true
+				key_event.alt_pressed = Input.is_key_pressed(KEY_ALT)
+				
+				var scale_handled = ScaleManager.handle_key_input(key_event, settings)
+				if scale_handled:
+					PreviewManager.update_scale()
+			_key_was_pressed[key] = true
 		else:
-			_key_was_pressed[keycode] = false
+			_key_was_pressed[key] = false
+
+func _handle_cancel_input():
+	"""Handle configurable cancel key input"""
+	# Get current settings from dock
+	var settings = {}
+	if dock and dock.has_method("get_placement_settings"):
+		settings = dock.get_placement_settings()
 	
-	# Poll for special keys (Page Up, Page Down, Home, etc.)
-	var special_keys = [KEY_PAGEUP, KEY_PAGEDOWN, KEY_HOME, KEY_END, KEY_INSERT, KEY_DELETE]
-	for keycode in special_keys:
-		if Input.is_key_pressed(keycode):
-			if not _key_was_pressed.get(keycode, false):  # Only on press, not hold
-				var key_event = InputEventKey.new()
-				key_event.keycode = keycode
-				key_event.pressed = true
-				key_event.ctrl_pressed = Input.is_key_pressed(KEY_CTRL)
-				PlacementCore.handle_placement_input(key_event, viewport_3d, dock)
-			_key_was_pressed[keycode] = true
-		else:
-			_key_was_pressed[keycode] = false
+	# Get configured cancel key
+	var cancel_key_string = settings.get("cancel_key", "ESCAPE")
+	var cancel_keycode = _string_to_keycode_simple(cancel_key_string)
+	
+	# Check for cancel input (both ui_cancel action and configured key)
+	if Input.is_action_just_pressed("ui_cancel") or Input.is_key_pressed(cancel_keycode):
+		PlacementCore.exit_placement_mode()
+
+func _string_to_keycode_simple(key_string: String) -> Key:
+	"""Simple keycode conversion for main plugin"""
+	match key_string.to_upper():
+		"ESCAPE": return KEY_ESCAPE
+		"TAB": return KEY_TAB
+		"ENTER": return KEY_ENTER
+		"SPACE": return KEY_SPACE
+		"BACKSPACE": return KEY_BACKSPACE
+		"DELETE": return KEY_DELETE
+		_: return KEY_ESCAPE  # Default fallback

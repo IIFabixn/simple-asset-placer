@@ -34,6 +34,18 @@ var scale_reset_key_button: Button
 var scale_increment_spin: SpinBox
 var large_scale_increment_spin: SpinBox
 
+# Height Adjustment Controls
+var height_up_key_button: Button
+var height_down_key_button: Button
+var height_step_spin: SpinBox
+
+# Modifier Key Controls
+var reverse_modifier_key_button: Button
+var large_increment_modifier_key_button: Button
+
+# Control Key Controls
+var cancel_key_button: Button
+
 # Settings
 var snap_to_ground: bool = false
 var snap_enabled: bool = false  # User can enable when desired
@@ -58,6 +70,18 @@ var scale_down_key: String = "PAGE_DOWN"
 var scale_reset_key: String = "HOME"
 var scale_increment: float = 0.1
 var large_scale_increment: float = 0.5
+
+# Height Adjustment Settings
+var height_up_key: String = "Q"      # Raise preview height
+var height_down_key: String = "E"    # Lower preview height
+var height_adjustment_step: float = 0.1
+
+# Modifier Key Settings
+var reverse_modifier_key: String = "SHIFT"    # Reverse rotation direction
+var large_increment_modifier_key: String = "ALT"  # Large increments
+
+# Control Settings
+var cancel_key: String = "ESCAPE"    # Cancel placement mode
 
 func _ready():
 	setup_ui()
@@ -398,8 +422,150 @@ func setup_ui():
 	large_scale_increment_spin.custom_minimum_size.x = 80
 	large_scale_increment_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	large_scale_increment_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	large_scale_increment_spin.tooltip_text = "Ctrl+Key scale increment"
+	large_scale_increment_spin.tooltip_text = "Alt+Key scale increment"
 	scale_grid.add_child(large_scale_increment_spin)
+	
+	# Add separator for height adjustment settings
+	var height_separator = HSeparator.new()
+	height_separator.add_theme_constant_override("separation", 8)
+	vbox.add_child(height_separator)
+	
+	# Height Adjustment section
+	var height_label = Label.new()
+	height_label.text = "Height Adjustment"
+	height_label.add_theme_font_size_override("font_size", 14)
+	height_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.9))
+	vbox.add_child(height_label)
+	
+	# Height key grid
+	var height_grid = GridContainer.new()
+	height_grid.columns = 2
+	height_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	height_grid.add_theme_constant_override("h_separation", 8)
+	height_grid.add_theme_constant_override("v_separation", 4)
+	vbox.add_child(height_grid)
+	
+	# Height Up Key
+	var height_up_label = Label.new()
+	height_up_label.text = "Raise Height:"
+	height_up_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	height_grid.add_child(height_up_label)
+	
+	height_up_key_button = Button.new()
+	height_up_key_button.text = height_up_key
+	height_up_key_button.custom_minimum_size.x = 80
+	height_up_key_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	height_up_key_button.tooltip_text = "Click to set key for raising preview height. Press ESC to cancel."
+	height_grid.add_child(height_up_key_button)
+	
+	# Height Down Key
+	var height_down_label = Label.new()
+	height_down_label.text = "Lower Height:"
+	height_down_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	height_grid.add_child(height_down_label)
+	
+	height_down_key_button = Button.new()
+	height_down_key_button.text = height_down_key
+	height_down_key_button.custom_minimum_size.x = 80
+	height_down_key_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	height_down_key_button.tooltip_text = "Click to set key for lowering preview height. Press ESC to cancel."
+	height_grid.add_child(height_down_key_button)
+	
+	# Height Step
+	var height_step_label = Label.new()
+	height_step_label.text = "Height Step:"
+	height_step_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	height_grid.add_child(height_step_label)
+	
+	height_step_spin = SpinBox.new()
+	height_step_spin.min_value = 0.01
+	height_step_spin.max_value = 5.0
+	height_step_spin.step = 0.01
+	height_step_spin.value = height_adjustment_step
+	height_step_spin.custom_minimum_size.x = 80
+	height_step_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	height_step_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	height_step_spin.tooltip_text = "Step size for height adjustment"
+	height_grid.add_child(height_step_spin)
+	
+	# Add separator for modifier keys
+	var modifier_separator = HSeparator.new()
+	modifier_separator.add_theme_constant_override("separation", 8)
+	vbox.add_child(modifier_separator)
+	
+	# Modifier Keys section
+	var modifier_label = Label.new()
+	modifier_label.text = "Modifier Keys"
+	modifier_label.add_theme_font_size_override("font_size", 14)
+	modifier_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.9))
+	vbox.add_child(modifier_label)
+	
+	# Modifier key grid
+	var modifier_grid = GridContainer.new()
+	modifier_grid.columns = 2
+	modifier_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	modifier_grid.add_theme_constant_override("h_separation", 8)
+	modifier_grid.add_theme_constant_override("v_separation", 4)
+	vbox.add_child(modifier_grid)
+	
+	# Reverse Modifier Key
+	var reverse_modifier_label = Label.new()
+	reverse_modifier_label.text = "Reverse Direction:"
+	reverse_modifier_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	modifier_grid.add_child(reverse_modifier_label)
+	
+	reverse_modifier_key_button = Button.new()
+	reverse_modifier_key_button.text = reverse_modifier_key
+	reverse_modifier_key_button.custom_minimum_size.x = 80
+	reverse_modifier_key_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reverse_modifier_key_button.tooltip_text = "Click to set modifier key for reverse rotation direction. Press ESC to cancel."
+	modifier_grid.add_child(reverse_modifier_key_button)
+	
+	# Large Increment Modifier Key
+	var large_increment_modifier_label = Label.new()
+	large_increment_modifier_label.text = "Large Increment:"
+	large_increment_modifier_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	modifier_grid.add_child(large_increment_modifier_label)
+	
+	large_increment_modifier_key_button = Button.new()
+	large_increment_modifier_key_button.text = large_increment_modifier_key
+	large_increment_modifier_key_button.custom_minimum_size.x = 80
+	large_increment_modifier_key_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	large_increment_modifier_key_button.tooltip_text = "Click to set modifier key for large increments. Press ESC to cancel."
+	modifier_grid.add_child(large_increment_modifier_key_button)
+	
+	# Add separator for control settings
+	var control_separator = HSeparator.new()
+	control_separator.add_theme_constant_override("separation", 8)
+	vbox.add_child(control_separator)
+	
+	# Control Keys section
+	var control_label = Label.new()
+	control_label.text = "Control Keys"
+	control_label.add_theme_font_size_override("font_size", 14)
+	control_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.9))
+	vbox.add_child(control_label)
+	
+	# Control key grid
+	var control_grid = GridContainer.new()
+	control_grid.columns = 2
+	control_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	control_grid.add_theme_constant_override("h_separation", 8)
+	control_grid.add_theme_constant_override("v_separation", 4)
+	vbox.add_child(control_grid)
+	
+	# Cancel Key
+	var cancel_label = Label.new()
+	cancel_label.text = "Cancel Placement:"
+	cancel_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	control_grid.add_child(cancel_label)
+	
+	cancel_key_button = Button.new()
+	cancel_key_button.text = cancel_key
+	cancel_key_button.custom_minimum_size.x = 80
+	cancel_key_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cancel_key_button.tooltip_text = "Click to set key for canceling placement mode. Press ESC to cancel."
+	control_grid.add_child(cancel_key_button)
 	
 	# Add separator for thumbnail settings
 	var thumbnail_separator = HSeparator.new()
@@ -450,6 +616,18 @@ func setup_ui():
 	scale_reset_key_button.pressed.connect(_on_key_binding_button_pressed.bind(scale_reset_key_button, "scale_reset_key"))
 	scale_increment_spin.value_changed.connect(_on_scale_increment_changed)
 	large_scale_increment_spin.value_changed.connect(_on_scale_increment_changed)
+	
+	# Connect height adjustment control signals
+	height_up_key_button.pressed.connect(_on_key_binding_button_pressed.bind(height_up_key_button, "height_up_key"))
+	height_down_key_button.pressed.connect(_on_key_binding_button_pressed.bind(height_down_key_button, "height_down_key"))
+	height_step_spin.value_changed.connect(_on_height_step_changed)
+	
+	# Connect modifier key control signals
+	reverse_modifier_key_button.pressed.connect(_on_key_binding_button_pressed.bind(reverse_modifier_key_button, "reverse_modifier_key"))
+	large_increment_modifier_key_button.pressed.connect(_on_key_binding_button_pressed.bind(large_increment_modifier_key_button, "large_increment_modifier_key"))
+	
+	# Connect control key signals
+	cancel_key_button.pressed.connect(_on_key_binding_button_pressed.bind(cancel_key_button, "cancel_key"))
 	
 	clear_cache_button.pressed.connect(_on_clear_cache_pressed)
 
@@ -563,6 +741,11 @@ func _on_scale_increment_changed(value: float):
 	large_scale_increment = large_scale_increment_spin.value
 	settings_changed.emit()
 
+func _on_height_step_changed(value: float):
+	# Update height adjustment step
+	height_adjustment_step = value
+	settings_changed.emit()
+
 func _on_clear_cache_pressed():
 	# Clear the thumbnail cache in ThumbnailGenerator
 	ThumbnailGenerator.clear_cache()
@@ -588,7 +771,13 @@ func get_placement_settings() -> Dictionary:
 		"scale_down_key": scale_down_key,
 		"scale_reset_key": scale_reset_key,
 		"scale_increment": scale_increment,
-		"large_scale_increment": large_scale_increment
+		"large_scale_increment": large_scale_increment,
+		"height_up_key": height_up_key,
+		"height_down_key": height_down_key,
+		"height_adjustment_step": height_adjustment_step,
+		"reverse_modifier_key": reverse_modifier_key,
+		"large_increment_modifier_key": large_increment_modifier_key,
+		"cancel_key": cancel_key
 	}
 
 func save_settings():
@@ -617,6 +806,18 @@ func save_settings():
 	editor_settings.set_setting("simple_asset_placer/scale_reset_key", scale_reset_key)
 	editor_settings.set_setting("simple_asset_placer/scale_increment", scale_increment)
 	editor_settings.set_setting("simple_asset_placer/large_scale_increment", large_scale_increment)
+	
+	# Save height adjustment settings
+	editor_settings.set_setting("simple_asset_placer/height_up_key", height_up_key)
+	editor_settings.set_setting("simple_asset_placer/height_down_key", height_down_key)
+	editor_settings.set_setting("simple_asset_placer/height_adjustment_step", height_adjustment_step)
+	
+	# Save modifier key settings
+	editor_settings.set_setting("simple_asset_placer/reverse_modifier_key", reverse_modifier_key)
+	editor_settings.set_setting("simple_asset_placer/large_increment_modifier_key", large_increment_modifier_key)
+	
+	# Save control settings
+	editor_settings.set_setting("simple_asset_placer/cancel_key", cancel_key)
 
 func load_settings():
 	# Load settings from editor settings
@@ -666,6 +867,24 @@ func load_settings():
 	if editor_settings.has_setting("simple_asset_placer/large_scale_increment"):
 		large_scale_increment = editor_settings.get_setting("simple_asset_placer/large_scale_increment")
 	
+	# Load height adjustment settings
+	if editor_settings.has_setting("simple_asset_placer/height_up_key"):
+		height_up_key = editor_settings.get_setting("simple_asset_placer/height_up_key")
+	if editor_settings.has_setting("simple_asset_placer/height_down_key"):
+		height_down_key = editor_settings.get_setting("simple_asset_placer/height_down_key")
+	if editor_settings.has_setting("simple_asset_placer/height_adjustment_step"):
+		height_adjustment_step = editor_settings.get_setting("simple_asset_placer/height_adjustment_step")
+	
+	# Load modifier key settings
+	if editor_settings.has_setting("simple_asset_placer/reverse_modifier_key"):
+		reverse_modifier_key = editor_settings.get_setting("simple_asset_placer/reverse_modifier_key")
+	if editor_settings.has_setting("simple_asset_placer/large_increment_modifier_key"):
+		large_increment_modifier_key = editor_settings.get_setting("simple_asset_placer/large_increment_modifier_key")
+	
+	# Load control settings
+	if editor_settings.has_setting("simple_asset_placer/cancel_key"):
+		cancel_key = editor_settings.get_setting("simple_asset_placer/cancel_key")
+	
 	# Update UI to reflect loaded settings
 	update_ui_from_settings()
 
@@ -713,3 +932,21 @@ func update_ui_from_settings():
 		scale_increment_spin.value = scale_increment
 	if large_scale_increment_spin:
 		large_scale_increment_spin.value = large_scale_increment
+	
+	# Update height adjustment controls
+	if height_up_key_button:
+		height_up_key_button.text = height_up_key
+	if height_down_key_button:
+		height_down_key_button.text = height_down_key
+	if height_step_spin:
+		height_step_spin.value = height_adjustment_step
+	
+	# Update modifier key controls
+	if reverse_modifier_key_button:
+		reverse_modifier_key_button.text = reverse_modifier_key
+	if large_increment_modifier_key_button:
+		large_increment_modifier_key_button.text = large_increment_modifier_key
+	
+	# Update control key controls
+	if cancel_key_button:
+		cancel_key_button.text = cancel_key

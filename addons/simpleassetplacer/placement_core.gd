@@ -149,7 +149,10 @@ static func exit_placement_mode():
 	
 	# Reset rotation state
 	RotationManager.reset_rotation()
-	RotationManager.rotation_key_states.clear()
+	# Clear new state tracking variables
+	RotationManager.key_states.clear()
+	RotationManager.key_press_times.clear()
+	RotationManager.mouse_motion_active = false
 	RotationManager.active_rotation_axis = ""
 	
 	print("[PLACEMENT_CORE] Placement mode cancelled/exited.")
@@ -272,21 +275,12 @@ static func handle_placement_input(event: InputEvent, viewport: Viewport, dock_i
 	# Debug logging for significant events
 	if event is InputEventKey and event.pressed:
 		var key_name = OS.get_keycode_string(event.keycode)
-		print("[PLACEMENT_CORE] Key event in handle_placement_input: ", key_name, " (Ctrl: ", event.ctrl_pressed, ")")
+		print("[PLACEMENT_CORE] Key event in handle_placement_input: ", key_name, " (Alt: ", event.alt_pressed, ")")
 	
-	# Handle mouse motion for accurate preview positioning and rotation
+	# Mouse motion is now handled in main plugin's _process function
 	if event is InputEventMouseMotion:
-		print("[PLACEMENT_CORE] Mouse motion detected, checking rotation handler...")
-		# First check if rotation manager wants to handle this (rotation key held)
-		var rotation_handled = RotationManager.handle_mouse_motion(event, dock_instance)
-		print("[PLACEMENT_CORE] Rotation handled: ", rotation_handled)
-		
-		# Always update preview position (unless rotation completely overrides it)
-		if not rotation_handled:
-			print("[PLACEMENT_CORE] Updating preview position...")
-			PreviewManager.update_position(viewport, event.position, dock_instance)
-		
-		return true
+		# No longer handle mouse motion here - it's handled in main plugin
+		return false
 	
 	# Handle mouse button events for placement and rotation
 	elif event is InputEventMouseButton:
@@ -302,18 +296,7 @@ static func handle_placement_input(event: InputEvent, viewport: Viewport, dock_i
 			exit_placement_mode()
 			return true
 		
-		# Handle rotation keys (key press events with modifiers)
-		var handled = RotationManager.handle_key_input(event, dock_instance)
-		if handled:
-			PreviewManager.update_rotation()
-			return true
-		
-		# Handle scaling keys
-		if event.pressed:
-			var scale_handled = ScaleManager.handle_key_input(event, placement_settings)
-			if scale_handled:
-				PreviewManager.update_scale()
-				return true
+		# Rotation and scale keys are now handled in the main plugin's _process function
 		
 		# Check for ui_cancel action (typically Escape key)
 		if event.is_action_pressed("ui_cancel"):
@@ -351,27 +334,10 @@ static func stop_placement_updates():
 	update_timer = null
 
 static func _on_update_timer_timeout():
-	"""Handle timer timeout for continuous input polling"""
+	"""Handle timer timeout for continuous input polling - DEPRECATED"""
+	# This function is no longer used as all input is handled in main plugin's _process function
 	if not placement_mode:
 		return
-	
-	# Check for rotation keys directly (bypasses event system issues)
-	RotationManager.check_keys_direct(dock_reference)
-	
-	# Since forward_3d_gui_input doesn't receive mouse motion consistently during placement, 
-	# we need to update preview position in the polling loop
-	if placement_mode:
-		# Get mouse position from the viewport directly
-		var viewport_3d = EditorInterface.get_editor_viewport_3d(0)
-		if viewport_3d:
-			var current_mouse_pos = viewport_3d.get_mouse_position()
-			
-			# Check if rotation manager wants to handle mouse motion
-			var rotation_handled = RotationManager.handle_mouse_polling(current_mouse_pos, dock_reference)
-			
-			# Update preview position (unless rotation mode is active)
-			if not rotation_handled:
-				PreviewManager.update_position(viewport_3d, current_mouse_pos, dock_reference)
 
 static func show_scene_lost_warning():
 	"""Show warning when scene root is lost"""

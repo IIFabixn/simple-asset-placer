@@ -178,11 +178,8 @@ static func update_position(viewport: Viewport, mouse_pos: Vector2, dock_instanc
 		if result:
 			position = result.position
 			hit_geometry = true
-			# Apply Q/E height adjustment
-			if Input.is_key_pressed(KEY_Q):
-				position.y += 0.1
-			elif Input.is_key_pressed(KEY_E):
-				position.y -= 0.1
+			# Apply configurable height adjustment
+			_apply_height_adjustment(position, dock_instance)
 	
 	if not hit_geometry:
 		# No geometry hit, intersect with ground plane (Y = 0)
@@ -190,11 +187,8 @@ static func update_position(viewport: Viewport, mouse_pos: Vector2, dock_instanc
 			var t = -from.y / direction.y  # Distance to Y=0 plane
 			if t > 0:  # Ray pointing towards ground
 				position = from + direction * t
-				# Apply Q/E height adjustment
-				if Input.is_key_pressed(KEY_Q):
-					position.y += 0.1
-				elif Input.is_key_pressed(KEY_E):
-					position.y -= 0.1
+				# Apply configurable height adjustment
+				_apply_height_adjustment(position, dock_instance)
 			else:
 				# Fallback: place at a default distance from camera
 				position = from + direction * 10.0
@@ -287,3 +281,58 @@ static func find_first_mesh_instance(node: Node) -> MeshInstance3D:
 			return found
 	
 	return null
+
+static func _apply_height_adjustment(position: Vector3, dock_instance = null):
+	"""Apply configurable height adjustment to position"""
+	if not dock_instance:
+		return
+		
+	var settings = {}
+	if dock_instance.has_method("get_placement_settings"):
+		settings = dock_instance.get_placement_settings()
+	
+	# Get configured height adjustment keys
+	var height_up_key = settings.get("height_up_key", "Q")
+	var height_down_key = settings.get("height_down_key", "E")
+	var height_step = settings.get("height_adjustment_step", 0.1)
+	
+	# Convert to keycodes
+	var height_up_keycode = string_to_keycode(height_up_key)
+	var height_down_keycode = string_to_keycode(height_down_key)
+	
+	# Apply height adjustment
+	if Input.is_key_pressed(height_up_keycode):
+		position.y += height_step
+	elif Input.is_key_pressed(height_down_keycode):
+		position.y -= height_step
+
+static func string_to_keycode(key_string: String) -> Key:
+	"""Convert string representation to Key enum"""
+	match key_string.to_upper():
+		"Q": return KEY_Q
+		"E": return KEY_E
+		"W": return KEY_W
+		"A": return KEY_A
+		"S": return KEY_S
+		"D": return KEY_D
+		"R": return KEY_R
+		"F": return KEY_F
+		"T": return KEY_T
+		"G": return KEY_G
+		"Y": return KEY_Y
+		"H": return KEY_H
+		"U": return KEY_U
+		"J": return KEY_J
+		"I": return KEY_I
+		"K": return KEY_K
+		"O": return KEY_O
+		"L": return KEY_L
+		"P": return KEY_P
+		"Z": return KEY_Z
+		"X": return KEY_X
+		"C": return KEY_C
+		"V": return KEY_V
+		"B": return KEY_B
+		"N": return KEY_N
+		"M": return KEY_M
+		_: return KEY_NONE

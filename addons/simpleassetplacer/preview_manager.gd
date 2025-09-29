@@ -36,7 +36,7 @@ static func create_preview(asset_path: String, mesh: Mesh = null, settings: Dict
 		print("PreviewManager: No scene available for preview")
 		return
 	
-	print("PreviewManager: Creating preview mesh...")
+
 	
 	# If we have a direct mesh, use it
 	if mesh:
@@ -95,7 +95,7 @@ static func create_preview(asset_path: String, mesh: Mesh = null, settings: Dict
 	preview_mesh.global_position = initial_position
 	preview_mesh.visible = true
 	
-	print("PreviewManager: Preview mesh created and positioned at: ", initial_position)
+
 
 static func apply_transparency_to_all_meshes(node: Node):
 	"""Apply transparency to all MeshInstance3D nodes while preserving original materials"""

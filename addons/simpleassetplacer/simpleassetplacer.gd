@@ -119,11 +119,8 @@ func forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 	return EditorPlugin.AFTER_GUI_INPUT_PASS
 
 func _on_meshlib_item_selected(meshlib: MeshLibrary, item_id: int, settings: Dictionary):
-	print("Meshlib item selected: ", item_id)
 	# Start interactive placement mode instead of immediate placement
 	PlacementCore.start_meshlib_placement(meshlib, item_id, settings, dock)
-	# Input polling is now handled in _process function
-	print("Interactive placement started. Move mouse to position, left-click to place, ESC to cancel.")
 
 func _can_drop_data(position: Vector2, data) -> bool:
 	if data is Dictionary:
@@ -143,7 +140,7 @@ func _drop_data(position: Vector2, data):
 func _poll_input():
 	# This function is no longer needed as all input is handled in _process
 	if not PlacementCore.placement_mode:
-		print("Stopping input polling timer")
+
 		input_poll_timer.stop()
 
 func _handle_scale_input():
@@ -207,20 +204,16 @@ func _handle_height_input():
 	var height_down_key = settings.get("height_down_key", "E")
 	var height_step = settings.get("height_adjustment_step", 0.1)
 	
-	print("DEBUG: Height keys from settings: UP='", height_up_key, "' DOWN='", height_down_key, "'")
-	
 	# Convert to keycodes
 	var height_up_keycode = PreviewManager.string_to_keycode(height_up_key)
 	var height_down_keycode = PreviewManager.string_to_keycode(height_down_key)
-	
-	print("DEBUG: Converted to keycodes: UP=", height_up_keycode, " DOWN=", height_down_keycode)
 	
 	# Edge detection for height up key
 	var height_up_pressed = Input.is_key_pressed(height_up_keycode)
 	var height_up_key_name = "height_up"
 	if height_up_pressed and not _key_was_pressed.get(height_up_key_name, false):
 		PreviewManager.height_offset += height_step
-		print("HEIGHT ADJUSTED UP by ", height_step, " (total offset: ", PreviewManager.height_offset, ")")
+
 	_key_was_pressed[height_up_key_name] = height_up_pressed
 	
 	# Edge detection for height down key
@@ -228,7 +221,7 @@ func _handle_height_input():
 	var height_down_key_name = "height_down"
 	if height_down_pressed and not _key_was_pressed.get(height_down_key_name, false):
 		PreviewManager.height_offset -= height_step
-		print("HEIGHT ADJUSTED DOWN by ", height_step, " (total offset: ", PreviewManager.height_offset, ")")
+
 	_key_was_pressed[height_down_key_name] = height_down_pressed
 
 func _string_to_keycode_simple(key_string: String) -> Key:

@@ -144,15 +144,10 @@ static func clear_settings_cache():
 	"""Clear the settings cache to force reload"""
 	_settings_cache = {}
 	_settings_loaded = false
-	print("[ROTATION_MANAGER] Settings cache cleared")
+
 
 static func handle_key_input(event: InputEventKey, dock_instance = null) -> bool:
 	"""Enhanced rotation key input handling with mouse motion support"""
-	print("[ROTATION_MANAGER] handle_key_input called - keycode: ", event.keycode, " (", OS.get_keycode_string(event.keycode), "), pressed: ", event.pressed)
-	
-	# Force fresh settings load for debugging (bypass cache temporarily)
-	# Force X/Y/Z settings (dock settings are returning old W/Q/E values)
-	print("[ROTATION_MANAGER] Forcing X/Y/Z settings to override dock's W/Q/E values")
 	var settings = {
 		"rotate_x_key": "X",
 		"rotate_y_key": "Y", 
@@ -170,7 +165,6 @@ static func handle_key_input(event: InputEventKey, dock_instance = null) -> bool
 	
 	# Handle reset key (immediate action on press)
 	if event.keycode == key_reset and event.pressed:
-		print("[ROTATION_MANAGER] Reset rotation key pressed")
 		reset_rotation()
 		update_overlay()
 		return true
@@ -208,18 +202,16 @@ static func handle_key_input(event: InputEventKey, dock_instance = null) -> bool
 		var direction = -1.0 if shift_held else 1.0
 		var final_increment = increment * direction
 		
-		print("[ROTATION_MANAGER] ", axis, "-axis rotation: ", final_increment, "° (Alt: ", alt_held, ", Shift: ", shift_held, ")")
+
 		rotate_axis(axis, final_increment)
 		update_overlay()
 		return true
-	else:
-		print("[ROTATION_MANAGER] No key match or not pressed")
 	
 	return false
 
 static func handle_rotation_key_event(event: InputEventKey, axis: String, settings: Dictionary) -> bool:
 	"""Handle press/release events for rotation keys"""
-	print("[ROTATION_MANAGER] handle_rotation_key_event called for axis: ", axis, ", pressed: ", event.pressed)
+
 	
 	if event.pressed:
 		# Key pressed - start rotation mode for this axis
@@ -228,7 +220,7 @@ static func handle_rotation_key_event(event: InputEventKey, axis: String, settin
 		mouse_start_position = DisplayServer.mouse_get_position()
 		rotation_start_values = get_rotation()
 		
-		print("[ROTATION_MANAGER] ", axis, "-axis rotation key pressed - mouse motion mode active")
+
 		update_overlay()
 		return true
 	else:
@@ -241,10 +233,7 @@ static func handle_rotation_key_event(event: InputEventKey, axis: String, settin
 			var direction = -1.0 if Input.is_key_pressed(KEY_SHIFT) else 1.0
 			var final_increment = increment * direction
 			
-			print("[ROTATION_MANAGER] ", axis, "-axis rotation key released - applying increment: ", final_increment, "° (Shift: ", Input.is_key_pressed(KEY_SHIFT), ", Alt: ", Input.is_key_pressed(KEY_ALT), ")")
-			print("[ROTATION_MANAGER] Current rotation before: ", get_rotation())
 			rotate_axis(axis, final_increment)
-			print("[ROTATION_MANAGER] Current rotation after: ", get_rotation())
 			
 			# Clear active rotation if this was the active axis
 			if active_rotation_axis == axis:
@@ -252,12 +241,13 @@ static func handle_rotation_key_event(event: InputEventKey, axis: String, settin
 			
 			update_overlay()
 		else:
-			print("[ROTATION_MANAGER] Key released but no matching pressed state found for axis: ", axis)
+			pass
+
 	return false
 
 static func handle_rotation_key_press(axis: String, event: InputEventKey):
 	"""Handle when a rotation key is pressed - start tracking for tap vs hold"""
-	print("[ROTATION_MANAGER] Key pressed for axis: ", axis)
+
 	
 	# Update modifier states
 	shift_held = Input.is_key_pressed(KEY_SHIFT)
@@ -454,18 +444,10 @@ static func check_keys_direct(dock_instance = null):
 
 static func get_rotation_settings(dock_instance) -> Dictionary:
 	"""Get rotation settings from dock instance"""
-	print("[ROTATION_MANAGER] get_rotation_settings called, dock_instance: ", dock_instance)
 	
 	if dock_instance:
 		if dock_instance.has_method("get_placement_settings"):
 			var settings = dock_instance.get_placement_settings()
-			print("[ROTATION_MANAGER] Raw settings from dock: ", settings)
-			print("[ROTATION_MANAGER] Successfully loaded settings from dock: rotate_x_key=", settings.get("rotate_x_key", "X"), 
-			      ", rotate_y_key=", settings.get("rotate_y_key", "Y"),
-			      ", rotate_z_key=", settings.get("rotate_z_key", "Z"),
-			      ", reset_rotation_key=", settings.get("reset_rotation_key", "T"),
-			      ", rotation_increment=", settings.get("rotation_increment", 15.0),
-			      ", large_rotation_increment=", settings.get("large_rotation_increment", 90.0))
 			return settings
 		else:
 			print("[ROTATION_MANAGER] Dock instance found but missing get_placement_settings method")

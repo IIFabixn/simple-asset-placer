@@ -82,8 +82,7 @@ static func start_meshlib_placement(meshlib: MeshLibrary, item_id: int, settings
 	# Start update timer for continuous input polling
 	start_placement_updates()
 	
-	print("[PLACEMENT_CORE] Starting meshlib placement mode with item_id: ", item_id)
-	print("[PLACEMENT_CORE] Placement mode active: ", placement_mode)
+
 
 static func start_asset_placement(asset_path: String, settings: Dictionary = {}, dock_instance = null):
 	"""Start placement mode for a direct asset file"""
@@ -117,8 +116,7 @@ static func start_asset_placement(asset_path: String, settings: Dictionary = {},
 	# Start update timer for continuous input polling
 	start_placement_updates()
 	
-	print("[PLACEMENT_CORE] Starting asset placement mode with asset: ", asset_path)
-	print("[PLACEMENT_CORE] Placement mode active: ", placement_mode)
+
 
 static func exit_placement_mode():
 	"""Exit placement mode and clean up"""
@@ -155,8 +153,7 @@ static func exit_placement_mode():
 	RotationManager.mouse_motion_active = false
 	RotationManager.active_rotation_axis = ""
 	
-	print("[PLACEMENT_CORE] Placement mode cancelled/exited.")
-	print("[PLACEMENT_CORE] Placement mode active: ", placement_mode)
+
 
 static func place_at_preview_position():
 	"""Place the asset at the current preview position"""
@@ -173,7 +170,7 @@ static func place_at_preview_position():
 		placed_node = place_asset_in_scene(placement_asset_path, position, current_settings)
 	
 	if placed_node:
-		print("Asset placed at: ", position, " with rotation: ", RotationManager.get_display_text(), " - ready for next placement")
+
 		
 		# Update preview rotation for next placement
 		PreviewManager.update_rotation()
@@ -208,7 +205,7 @@ static func place_asset_in_scene(asset_path: String, position: Vector3 = Vector3
 			scene_instance.scale *= settings.get("scale_multiplier", 1.0)
 		
 		placed_node = scene_instance
-		print("PlacementCore: Placed scene: ", asset_path.get_file())
+
 		
 	elif resource is Mesh:
 		# Create a MeshInstance3D for direct mesh resources
@@ -228,7 +225,7 @@ static func place_asset_in_scene(asset_path: String, position: Vector3 = Vector3
 			mesh_instance.scale *= settings.get("scale_multiplier", 1.0)
 		
 		placed_node = mesh_instance
-		print("PlacementCore: Placed mesh: ", asset_path.get_file())
+
 		
 	else:
 		print("PlacementCore: Unsupported asset type: ", asset_path, " (", resource.get_class(), ")")
@@ -263,7 +260,7 @@ static func place_meshlib_item_in_scene(meshlib: MeshLibrary, item_id: int, posi
 	if settings.get("scale_multiplier", 1.0) != 1.0:
 		mesh_instance.scale *= settings.get("scale_multiplier", 1.0)
 	
-	print("Place ", meshlib.get_item_name(item_id))
+
 	
 	return mesh_instance
 
@@ -275,7 +272,7 @@ static func handle_placement_input(event: InputEvent, viewport: Viewport, dock_i
 	# Debug logging for significant events
 	if event is InputEventKey and event.pressed:
 		var key_name = OS.get_keycode_string(event.keycode)
-		print("[PLACEMENT_CORE] Key event in handle_placement_input: ", key_name, " (Alt: ", event.alt_pressed, ")")
+
 	
 	# Mouse motion is now handled in main plugin's _process function
 	if event is InputEventMouseMotion:
@@ -321,14 +318,14 @@ static func start_placement_updates():
 	if current_scene:
 		current_scene.add_child(update_timer)
 		update_timer.start()
-		print("PlacementCore: Timer started successfully")
+
 	else:
 		print("PlacementCore: ERROR - Could not add timer to scene")
 
 static func stop_placement_updates():
 	"""Stop the update timer"""
 	if update_timer and is_instance_valid(update_timer):
-		print("PlacementCore: Stopping input polling timer")
+
 		update_timer.stop()
 		update_timer.queue_free()
 	update_timer = null

@@ -164,14 +164,14 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 	
 	# Only apply fallback material if no materials found at all
 	if not has_any_material:
-		print("ThumbnailGenerator: No materials found, applying neutral fallback material")
+
 		var fallback_material = StandardMaterial3D.new()
 		fallback_material.albedo_color = Color(0.8, 0.8, 0.8, 1.0)  # Neutral gray
 		fallback_material.metallic = 0.0
 		fallback_material.roughness = 0.7
 		mesh_instance.material_override = fallback_material
 	else:
-		print("ThumbnailGenerator: Using original materials from asset")
+		pass
 	
 	# Use simple, consistent camera positioning to focus on shape differences
 	_position_camera_simple(mesh)
@@ -415,7 +415,7 @@ static func generate_meshlib_thumbnail(meshlib: MeshLibrary, item_id: int = -1) 
 		material.metallic = 0.0
 		material.roughness = 0.8
 		mesh_instance.set_surface_override_material(0, material)
-		print("ThumbnailGenerator: Applied material to mesh")
+
 	
 	# Calculate optimal camera position
 	var aabb = mesh.get_aabb()
@@ -436,7 +436,7 @@ static func generate_meshlib_thumbnail(meshlib: MeshLibrary, item_id: int = -1) 
 		light.look_at(Vector3.ZERO, Vector3.UP)
 	
 	# Force viewport update
-	print("ThumbnailGenerator: Forcing viewport update for meshlib item")
+
 	viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	
 	# Wait for multiple frames to ensure rendering is complete

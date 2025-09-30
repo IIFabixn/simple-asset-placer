@@ -3,227 +3,253 @@ extends RefCounted
 
 class_name ScaleManager
 
-# Scale state
-static var current_scale: float = 1.0  # Uniform scale multiplier
-static var scale_step: float = 0.1  # Default scale increment
-static var min_scale: float = 0.1  # Minimum scale
-static var max_scale: float = 10.0  # Maximum scale
+"""
+3D SCALING MATHEMATICS SYSTEM
+=============================
 
-# UI overlay for scale feedback
-static var scale_overlay: Control = null
-static var scale_label: Label = null
+PURPOSE: Handles all scaling calculations and transformations with support for uniform and non-uniform scaling.
+
+RESPONSIBILITIES:
+- Scale state management (uniform and non-uniform scaling)
+- Scale step application (increase/decrease by configurable amounts)
+- Scale bounds enforcement (prevents zero/negative scaling)
+- Node scale application and copying  
+- Scale reset functionality
+- Conversion between uniform and Vector3 scaling
+
+ARCHITECTURE POSITION: Pure scaling math with no dependencies
+- Does NOT handle input detection (receives scale commands)
+- Does NOT handle UI or feedback
+- Does NOT know about placement/transform modes
+- Works with any Node3D object
+
+USED BY: TransformationManager for all scaling operations
+DEPENDS ON: Only Godot math system (Vector3, scale properties)
+"""
+
+# Current scale state
+static var current_scale: float = 1.0  # Uniform scale multiplier
+static var non_uniform_scale: Vector3 = Vector3.ONE  # For non-uniform scaling
+
+## Core Scale Functions
+
+static func set_scale(scale: float):
+	"""Set uniform scale"""
+	current_scale = max(0.01, scale)  # Prevent zero/negative scale
+	non_uniform_scale = Vector3(current_scale, current_scale, current_scale)
+
+static func set_non_uniform_scale(scale: Vector3):
+	"""Set non-uniform scale"""
+	non_uniform_scale = Vector3(
+		max(0.01, scale.x),
+		max(0.01, scale.y),
+		max(0.01, scale.z)
+	)
+	# Update uniform scale to average
+	current_scale = (non_uniform_scale.x + non_uniform_scale.y + non_uniform_scale.z) / 3.0
+
+static func get_scale() -> float:
+	"""Get current uniform scale"""
+	return current_scale
+
+static func get_scale_vector() -> Vector3:
+	"""Get current scale as Vector3"""
+	return non_uniform_scale
 
 static func reset_scale():
-	"""Reset scale to 1.0 (original size)"""
-	current_scale = 1.0
-	
-	# Notify that scale changed - handled by placement system
-	_notify_scale_changed()
+	"""Reset scale to 1.0"""
+	set_scale(1.0)
+	print("ScaleManager: Scale reset to 1.0")
 
-static func adjust_scale(delta: float):
-	"""Adjust scale by the given delta"""
-	current_scale += delta
-	
-	# Keep scale within reasonable bounds
-	current_scale = clamp(current_scale, min_scale, max_scale)
-	
-	# Notify that scale changed - handled by placement system
-	_notify_scale_changed()
+## Scale Modifications
+
+static func increase_scale(amount: float = 0.1):
+	"""Increase scale by amount"""
+	set_scale(current_scale + amount)
+	print("ScaleManager: Increased scale by ", amount, " to ", current_scale)
+
+static func decrease_scale(amount: float = 0.1):
+	"""Decrease scale by amount"""
+	set_scale(current_scale - amount)
+	print("ScaleManager: Decreased scale by ", amount, " to ", current_scale)
 
 static func multiply_scale(multiplier: float):
 	"""Multiply current scale by a factor"""
-	current_scale *= multiplier
-	
-	# Keep scale within reasonable bounds
-	current_scale = clamp(current_scale, min_scale, max_scale)
-	
-	# Notify that scale changed - handled by placement system
-	_notify_scale_changed()
+	set_scale(current_scale * multiplier)
+	print("ScaleManager: Multiplied scale by ", multiplier, " to ", current_scale)
 
-static func _notify_scale_changed():
-	"""Internal method to handle scale updates"""
-	# This will be called by the placement system to update preview
-	pass
+static func scale_up(factor: float = 1.1):
+	"""Scale up by a factor (default 10% increase)"""
+	multiply_scale(factor)
 
-static func get_scale() -> float:
-	"""Get the current scale value"""
-	return current_scale
+static func scale_down(factor: float = 0.9):
+	"""Scale down by a factor (default 10% decrease)"""
+	multiply_scale(factor)
+
+## Non-Uniform Scale Modifications
+
+static func scale_axis(axis: String, amount: float):
+	"""Scale a specific axis by amount"""
+	match axis.to_upper():
+		"X":
+			non_uniform_scale.x = max(0.01, non_uniform_scale.x + amount)
+		"Y":
+			non_uniform_scale.y = max(0.01, non_uniform_scale.y + amount)
+		"Z":
+			non_uniform_scale.z = max(0.01, non_uniform_scale.z + amount)
+		_:
+			print("ScaleManager: Invalid axis: ", axis)
+			return
+	
+	# Update uniform scale
+	current_scale = (non_uniform_scale.x + non_uniform_scale.y + non_uniform_scale.z) / 3.0
+
+static func multiply_axis_scale(axis: String, multiplier: float):
+	"""Multiply a specific axis scale by a factor"""
+	match axis.to_upper():
+		"X":
+			non_uniform_scale.x = max(0.01, non_uniform_scale.x * multiplier)
+		"Y":
+			non_uniform_scale.y = max(0.01, non_uniform_scale.y * multiplier)
+		"Z":
+			non_uniform_scale.z = max(0.01, non_uniform_scale.z * multiplier)
+		_:
+			print("ScaleManager: Invalid axis: ", axis)
+			return
+	
+	# Update uniform scale
+	current_scale = (non_uniform_scale.x + non_uniform_scale.y + non_uniform_scale.z) / 3.0
+
+## Node Application
 
 static func apply_scale_to_node(node: Node3D):
-	"""Apply the current scale to a 3D node"""
+	"""Apply current scale to a node"""
 	if node:
-		# Preserve the base scale and apply our multiplier
-		var base_scale = node.get_meta("original_scale", Vector3.ONE)
-		node.scale = base_scale * current_scale
+		node.scale = non_uniform_scale
 
-static func get_display_text() -> String:
+static func apply_uniform_scale_to_node(node: Node3D):
+	"""Apply uniform scale to a node"""
+	if node:
+		node.scale = Vector3(current_scale, current_scale, current_scale)
+
+static func copy_scale_from_node(node: Node3D):
+	"""Copy scale from a node to the manager state"""
+	if node:
+		non_uniform_scale = node.scale
+		current_scale = (non_uniform_scale.x + non_uniform_scale.y + non_uniform_scale.z) / 3.0
+
+## Scale Constraints and Validation
+
+static func clamp_scale(min_scale: float = 0.01, max_scale: float = 100.0):
+	"""Clamp scale within specified bounds"""
+	current_scale = clampf(current_scale, min_scale, max_scale)
+	non_uniform_scale.x = clampf(non_uniform_scale.x, min_scale, max_scale)
+	non_uniform_scale.y = clampf(non_uniform_scale.y, min_scale, max_scale)
+	non_uniform_scale.z = clampf(non_uniform_scale.z, min_scale, max_scale)
+
+static func is_uniform_scale() -> bool:
+	"""Check if current scale is uniform"""
+	var epsilon = 0.001
+	return abs(non_uniform_scale.x - non_uniform_scale.y) < epsilon and \
+		   abs(non_uniform_scale.y - non_uniform_scale.z) < epsilon
+
+static func is_scale_at_default() -> bool:
+	"""Check if scale is at default (1.0)"""
+	return abs(current_scale - 1.0) < 0.001
+
+## Scale Presets
+
+static func set_scale_preset(preset_name: String):
+	"""Set scale to a common preset"""
+	match preset_name.to_lower():
+		"tiny":
+			set_scale(0.1)
+		"small":
+			set_scale(0.5)
+		"normal", "default":
+			set_scale(1.0)
+		"large":
+			set_scale(2.0)
+		"huge":
+			set_scale(5.0)
+		"double":
+			set_scale(2.0)
+		"half":
+			set_scale(0.5)
+		"quarter":
+			set_scale(0.25)
+		_:
+			print("ScaleManager: Unknown preset: ", preset_name)
+
+## Scale Interpolation
+
+static func lerp_to_scale(target_scale: float, weight: float):
+	"""Smoothly interpolate to a target scale"""
+	set_scale(lerp(current_scale, target_scale, weight))
+
+static func lerp_to_scale_vector(target_scale: Vector3, weight: float):
+	"""Smoothly interpolate to a target scale vector"""
+	set_non_uniform_scale(non_uniform_scale.lerp(target_scale, weight))
+
+## Configuration and Settings
+
+static func configure(settings: Dictionary):
+	"""Configure scale manager with settings"""
+	if settings.has("initial_scale"):
+		var initial = settings.initial_scale
+		if initial is float or initial is int:
+			set_scale(float(initial))
+		elif initial is Vector3:
+			set_non_uniform_scale(initial)
+	
+	if settings.has("min_scale"):
+		var min_val = settings.get("max_scale", 100.0)
+		var max_val = settings.get("min_scale", 0.01)
+		clamp_scale(min_val, max_val)
+
+static func get_configuration() -> Dictionary:
+	"""Get current configuration"""
+	return {
+		"current_scale": current_scale,
+		"scale_vector": non_uniform_scale,
+		"is_uniform": is_uniform_scale(),
+		"is_default": is_scale_at_default()
+	}
+
+## Display and Formatting
+
+static func get_scale_percentage() -> float:
+	"""Get scale as percentage (1.0 = 100%)"""
+	return current_scale * 100.0
+
+static func get_scale_display_text() -> String:
 	"""Get formatted scale display text"""
-	return "Scale: %.1fx" % current_scale
+	if is_uniform_scale():
+		return "Scale: %.1f%%" % get_scale_percentage()
+	else:
+		return "Scale: X:%.1f%% Y:%.1f%% Z:%.1f%%" % [
+			non_uniform_scale.x * 100.0,
+			non_uniform_scale.y * 100.0,
+			non_uniform_scale.z * 100.0
+		]
 
-static func handle_key_input(event: InputEventKey, settings: Dictionary) -> bool:
-	"""Handle scale keyboard input"""
-	var scale_up_key = settings.get("scale_up_key", "PAGE_UP")
-	var scale_down_key = settings.get("scale_down_key", "PAGE_DOWN")
-	var scale_reset_key = settings.get("scale_reset_key", "HOME")
-	
-	var scale_increment = settings.get("scale_increment", 0.1)
-	var large_scale_increment = settings.get("large_scale_increment", 0.5)
-	
-	# Convert string keys to keycodes
-	var scale_up_keycode = string_to_keycode(scale_up_key)
-	var scale_down_keycode = string_to_keycode(scale_down_key)
-	var scale_reset_keycode = string_to_keycode(scale_reset_key)
-	
-	# Get modifier key settings
-	var large_increment_key = settings.get("large_increment_modifier_key", "ALT")
-	var reverse_key = settings.get("reverse_modifier_key", "SHIFT")
-	
-	# Check if modifiers are pressed (need to check Input directly since event doesn't have all modifiers)
-	var large_increment_pressed = _is_modifier_pressed(large_increment_key)
-	var reverse_pressed = _is_modifier_pressed(reverse_key)
-	
-	# Check for scale up
-	if event.keycode == scale_up_keycode:
-		var increment = large_scale_increment if large_increment_pressed else scale_increment
-		# Apply reverse modifier (swap up/down behavior)
-		var final_increment = increment if not reverse_pressed else -increment
-		adjust_scale(final_increment)
-		show_scale_overlay()
-		return true
-	
-	# Check for scale down
-	if event.keycode == scale_down_keycode:
-		var increment = large_scale_increment if large_increment_pressed else scale_increment
-		# Apply reverse modifier (swap up/down behavior)
-		var final_increment = -increment if not reverse_pressed else increment
-		adjust_scale(final_increment)
-		show_scale_overlay()
-		return true
-	
-	# Check for scale reset
-	if event.keycode == scale_reset_keycode:
-		reset_scale()
-		show_scale_overlay()
-		return true
-	
-	return false
+## Debug and Information
 
-static func string_to_keycode(key_string: String) -> Key:
-	"""Convert string representation to Key enum"""
-	match key_string.to_upper():
-		"PAGE_UP": return KEY_PAGEUP
-		"PAGE_DOWN": return KEY_PAGEDOWN
-		"HOME": return KEY_HOME
-		"END": return KEY_END
-		"INSERT": return KEY_INSERT
-		"DELETE": return KEY_DELETE
-		"PLUS": return KEY_PLUS
-		"MINUS": return KEY_MINUS
-		"EQUAL": return KEY_EQUAL
-		"A": return KEY_A
-		"B": return KEY_B
-		"C": return KEY_C
-		"D": return KEY_D
-		"E": return KEY_E
-		"F": return KEY_F
-		"G": return KEY_G
-		"H": return KEY_H
-		"I": return KEY_I
-		"J": return KEY_J
-		"K": return KEY_K
-		"L": return KEY_L
-		"M": return KEY_M
-		"N": return KEY_N
-		"O": return KEY_O
-		"P": return KEY_P
-		"Q": return KEY_Q
-		"R": return KEY_R
-		"S": return KEY_S
-		"T": return KEY_T
-		"U": return KEY_U
-		"V": return KEY_V
-		"W": return KEY_W
-		"X": return KEY_X
-		"Y": return KEY_Y
-		"Z": return KEY_Z
-		"0": return KEY_0
-		"1": return KEY_1
-		"2": return KEY_2
-		"3": return KEY_3
-		"4": return KEY_4
-		"5": return KEY_5
-		"6": return KEY_6
-		"7": return KEY_7
-		"8": return KEY_8
-		"9": return KEY_9
-		_: return KEY_NONE
+static func debug_print_scale():
+	"""Print current scale state for debugging"""
+	print("ScaleManager State:")
+	print("  Uniform Scale: %.3f (%.1f%%)" % [current_scale, get_scale_percentage()])
+	print("  Scale Vector: X:%.3f Y:%.3f Z:%.3f" % [non_uniform_scale.x, non_uniform_scale.y, non_uniform_scale.z])
+	print("  Is Uniform: ", is_uniform_scale())
+	print("  Is Default: ", is_scale_at_default())
 
-static func show_scale_overlay():
-	"""Show scale overlay with current scale value"""
-	create_scale_overlay()
-	
-	if scale_overlay and scale_label:
-		scale_label.text = get_display_text()
-		scale_overlay.visible = true
-		
-		# Hide overlay after 2 seconds
-		var viewport = EditorInterface.get_editor_viewport_3d(0)
-		if viewport:
-			viewport.get_tree().create_timer(2.0).timeout.connect(hide_scale_overlay)
-
-static func hide_scale_overlay():
-	"""Hide scale overlay"""
-	if scale_overlay:
-		scale_overlay.visible = false
-
-static func create_scale_overlay():
-	"""Create scale feedback overlay"""
-	if scale_overlay:
-		return
-	
-	var viewport = EditorInterface.get_editor_viewport_3d(0)
-	if not viewport:
-		return
-	
-	# Create overlay container
-	scale_overlay = Control.new()
-	scale_overlay.name = "ScaleOverlay"
-	scale_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	scale_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	
-	# Create background panel
-	var panel = Panel.new()
-	panel.custom_minimum_size = Vector2(200, 60)
-	panel.position = Vector2(20, 100)  # Position below rotation overlay
-	
-	# Create label
-	scale_label = Label.new()
-	scale_label.text = get_display_text()
-	scale_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	scale_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	scale_label.add_theme_font_size_override("font_size", 14)
-	scale_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	
-	panel.add_child(scale_label)
-	scale_overlay.add_child(panel)
-	
-	# Add to viewport
-	viewport.add_child(scale_overlay)
-	scale_overlay.visible = false
-
-static func cleanup_overlay():
-	"""Clean up scale overlay"""
-	if scale_overlay and is_instance_valid(scale_overlay):
-		scale_overlay.queue_free()
-	
-	scale_overlay = null
-	scale_label = null
-
-static func _is_modifier_pressed(modifier_key: String) -> bool:
-	"""Check if a modifier key is currently pressed"""
-	match modifier_key.to_upper():
-		"SHIFT": return Input.is_key_pressed(KEY_SHIFT)
-		"CTRL": return Input.is_key_pressed(KEY_CTRL)
-		"ALT": return Input.is_key_pressed(KEY_ALT)
-		"META": return Input.is_key_pressed(KEY_META)
-		_: return false
+static func get_scale_info() -> Dictionary:
+	"""Get comprehensive scale information"""
+	return {
+		"uniform_scale": current_scale,
+		"scale_vector": non_uniform_scale,
+		"scale_percentage": get_scale_percentage(),
+		"is_uniform": is_uniform_scale(),
+		"is_default": is_scale_at_default(),
+		"display_text": get_scale_display_text()
+	}

@@ -208,23 +208,6 @@ Contributions are welcome! Please feel free to submit issues, feature requests, 
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Recent Improvements
-
-### ✨ **NEW: Enhanced Rotation System** ✅ **FULLY WORKING**
-- **Perfect Key Controls**: X/Y/Z keys for instant 15° rotation on each axis  
-- **Smart Modifier Support**: Shift for reverse (-15°), Left Alt for large (90°), Alt+Shift for large reverse (-90°)
-- **Conflict-Free Design**: Uses Left Alt instead of Ctrl to avoid undo keybind conflicts
-- **Full Z-Axis Support**: All rotation combinations work including Alt+Z for large Z rotations
-- **Reliable Detection**: Uses robust modifier key detection for consistent behavior
-- **Visual Feedback**: Live rotation values displayed in overlay
-- **Intuitive Mapping**: X/Y/Z keys directly control their respective axes
-
-### ✅ **Improved Controls & Compatibility**
-- **Intuitive Key Mapping**: X/Y/Z keys map directly to their respective rotation axes
-- **Non-Conflicting Design**: All controls work alongside Godot's standard editor navigation  
-- **Customizable Bindings**: All rotation and scale keys can be rebound through the Settings tab
-- **Preserved Camera Navigation**: All camera controls (pan, zoom, orbit) work normally without conflicts
-
 ## Credits
 
 **Author**: LuckyTeapot  

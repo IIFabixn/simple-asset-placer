@@ -141,6 +141,9 @@ func setup_ui():
 	placement_settings.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	settings_margin.add_child(placement_settings)
 	
+	# Ensure settings are loaded after UI setup
+	call_deferred("_ensure_settings_loaded")
+	
 	# Connect signals
 	refresh_button.pressed.connect(_on_refresh_pressed)
 	search_line_edit.text_changed.connect(_on_search_changed)
@@ -497,6 +500,11 @@ func _scene_file_contains_mesh(file_path: String) -> bool:
 	var has_mesh = _scene_has_mesh_recursive(scene_instance)
 	scene_instance.queue_free()
 	return has_mesh
+
+func _ensure_settings_loaded():
+	"""Ensure settings are properly loaded and applied to UI after initialization"""
+	if placement_settings:
+		placement_settings.load_settings()
 
 func get_placement_settings() -> Dictionary:
 	"""Get current placement settings from the settings component"""

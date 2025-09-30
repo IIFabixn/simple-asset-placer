@@ -1,251 +1,242 @@
 @tool
 extends EditorPlugin
 
-const AssetPlacerDock = preload("res://addons/simpleassetplacer/asset_placer_dock.gd")
-const PlacementCore = preload("res://addons/simpleassetplacer/placement_core.gd")
-const PreviewManager = preload("res://addons/simpleassetplacer/preview_manager.gd")
+# Main Plugin
+# Only handles editor integration and delegates everything to TransformationManager
+
+# Import specialized managers
+const InputHandler = preload("res://addons/simpleassetplacer/input_handler.gd")
+const PositionManager = preload("res://addons/simpleassetplacer/position_manager.gd")
+const OverlayManager = preload("res://addons/simpleassetplacer/overlay_manager.gd")
 const RotationManager = preload("res://addons/simpleassetplacer/rotation_manager.gd")
 const ScaleManager = preload("res://addons/simpleassetplacer/scale_manager.gd")
+const PreviewManager = preload("res://addons/simpleassetplacer/preview_manager.gd")
+const TransformationManager = preload("res://addons/simpleassetplacer/transformation_manager.gd")
+
+# Import dock and utilities (keep existing)
+const AssetPlacerDock = preload("res://addons/simpleassetplacer/asset_placer_dock.gd")
 const ThumbnailGenerator = preload("res://addons/simpleassetplacer/thumbnail_generator.gd")
 const ThumbnailQueueManager = preload("res://addons/simpleassetplacer/thumbnail_queue_manager.gd")
-var dock: AssetPlacerDock
-var input_overlay: Control
-var input_poll_timer: Timer
-var _key_was_pressed: Dictionary = {}  # Track key states for edge detection
 
+# Plugin state
+var dock: AssetPlacerDock
+var _settings: Dictionary = {}
+
+## Plugin Lifecycle
 
 func _enable_plugin() -> void:
-	# Add autoloads here.
-	pass
-
+	print("AssetPlacer: Plugin enabled")
 
 func _disable_plugin() -> void:
-	# Clean up thumbnail queue manager (which will also clean up ThumbnailGenerator)
-	ThumbnailQueueManager.cleanup()
-	# Clean up any preview objects
-	PreviewManager.cleanup_preview()
-	# Clean up overlays
-	RotationManager.hide_overlay()
-	ScaleManager.hide_scale_overlay()
-	# Remove autoloads here.
-	pass
-
-
-func handles(object) -> bool:
-	# We want to handle input when in placement mode
-	return PlacementCore.placement_mode
+	print("AssetPlacer: Plugin disabled")
 
 func _enter_tree() -> void:
-	# Initialization of the plugin goes here.
+	print("AssetPlacer: Initializing...")
 	
-	# Initialize thumbnail generator with clean state
-	ThumbnailGenerator.initialize()
+	# Initialize systems in order
+	_initialize_systems()
+	_setup_dock()
+	_load_settings()
 	
-	# Enable always-on input forwarding for reliable input handling
+	# Enable input forwarding for reliable input handling
 	set_input_event_forwarding_always_enabled()
 	
-	dock = AssetPlacerDock.new()
-	dock.name = "Asset Placer"
-	dock.asset_selected.connect(_on_asset_selected)
-	dock.meshlib_item_selected.connect(_on_meshlib_item_selected)
-	add_control_to_dock(DOCK_SLOT_RIGHT_UL, dock)
-	
-	# Set up input polling timer as fallback
-	input_poll_timer = Timer.new()
-	input_poll_timer.wait_time = 0.016  # ~60 FPS
-	input_poll_timer.autostart = false
-	get_tree().root.add_child(input_poll_timer)
-	input_poll_timer.timeout.connect(_poll_input)
-
+	print("AssetPlacer: Initialization complete!")
 
 func _exit_tree() -> void:
-	# Clean-up of the plugin goes here.
-	ThumbnailGenerator.cleanup()
-	if PlacementCore.placement_mode:
-		PlacementCore.exit_placement_mode()
-	# Additional cleanup of any leftover objects
+	print("AssetPlacer: Cleaning up...")
+	
+	# Clean up in reverse order
+	_cleanup_systems()
+	_cleanup_dock()
+	
+	print("AssetPlacer: Cleanup complete!")
+
+## System Initialization
+
+func _initialize_systems():
+	"""Initialize all manager systems"""
+	# Initialize core systems
+	InputHandler.update_input_state({})  # Initialize with empty settings initially
+	PositionManager.configure({})
+	OverlayManager.initialize_overlays()
+	PreviewManager.initialize()
+	
+	# Initialize thumbnail system
+	ThumbnailGenerator.initialize()
+	
+	print("AssetPlacer: All systems initialized")
+
+func _cleanup_systems():
+	"""Clean up all manager systems"""
+	# Exit any active modes
+	TransformationManager.exit_any_mode()
+	
+	# Clean up systems
+	OverlayManager.cleanup_all_overlays()
 	PreviewManager.cleanup_preview()
-	RotationManager.hide_overlay()
-	ScaleManager.hide_scale_overlay()
-	if input_overlay:
-		input_overlay.queue_free()
+	TransformationManager.cleanup()
+	ThumbnailGenerator.cleanup()
+	ThumbnailQueueManager.cleanup()
+
+## Dock Management
+
+func _setup_dock():
+	"""Set up the asset placer dock"""
+	dock = AssetPlacerDock.new()
+	dock.name = "Asset Placer"
+	
+	# Connect dock signals
+	dock.asset_selected.connect(_on_asset_selected)
+	dock.meshlib_item_selected.connect(_on_meshlib_item_selected)
+	
+	# Add to Godot dock
+	add_control_to_dock(DOCK_SLOT_RIGHT_UL, dock)
+	
+	print("AssetPlacer: Dock setup complete")
+
+func _cleanup_dock():
+	"""Clean up the dock"""
 	if dock:
 		remove_control_from_docks(dock)
-	if input_poll_timer:
-		input_poll_timer.queue_free()
+		dock.queue_free()
+		dock = null
 
-func _on_asset_selected(asset_path: String, mesh_resource: Resource, settings: Dictionary):
-	# Start interactive placement mode instead of immediate placement
-	PlacementCore.start_asset_placement(asset_path, settings, dock)
-	# Input polling is now handled in _process function
-	print("Continuous placement started. Left-click to place multiple, Escape to exit.")
+## Settings Management
+
+func _load_settings():
+	"""Load plugin settings"""
+	# Load default settings (could be enhanced to load from file)
+	_settings = {
+		"cancel_key": "ESCAPE",
+		"height_up_key": "Q", 
+		"height_down_key": "E",
+		"rotate_x_key": "X",
+		"rotate_y_key": "Y", 
+		"rotate_z_key": "Z",
+		"reset_rotation_key": "T",
+		"scale_up_key": "PAGE_UP",
+		"scale_down_key": "PAGE_DOWN",
+		"scale_reset_key": "HOME",
+		"collision_enabled": true,
+		"snap_to_ground": true,
+		"height_step_size": 0.1,
+		"preview_opacity": 0.6
+	}
+	
+	print("AssetPlacer: Settings loaded")
+
+## Core Processing Loop
 
 func _process(delta: float) -> void:
-	# Handle all input during placement mode with precise timing
-	if PlacementCore.placement_mode:
-		# Handle rotation keys
-		RotationManager.process_key_input(delta, dock)
-		
-		# Handle mouse motion for preview positioning (unless in rotation mode)
-		var viewport_3d = EditorInterface.get_editor_viewport_3d(0)
-		if viewport_3d:
-			var current_mouse_pos = viewport_3d.get_mouse_position()
-			
-			# Check if rotation manager wants to handle mouse motion first
-			var rotation_handled = RotationManager.handle_mouse_polling(current_mouse_pos, dock)
-			
-			# Only update preview position if not in rotation mode
-			if not rotation_handled:
-				PreviewManager.update_position(viewport_3d, current_mouse_pos, dock)
-		
-		# Handle mouse clicks
-		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-			if not PlacementCore.left_was_pressed:
-				PlacementCore.place_at_preview_position()
-				PlacementCore.left_was_pressed = true
-		else:
-			PlacementCore.left_was_pressed = false
-		
-		# Handle configurable cancel key
-		_handle_cancel_input()
-		
-		# Handle height adjustment keys
-		_handle_height_input()
-		
-		# Handle scale keys directly
-		_handle_scale_input()
+	"""Main processing loop - delegates everything to TransformationManager"""
+	if not _is_plugin_ready():
+		return
+	
+	# Get current camera for positioning
+	var camera = _get_current_camera()
+	if not camera:
+		return
+	
+	# Delegate frame processing to coordinator
+	# Get current settings from dock if available, otherwise use defaults
+	var current_settings = _settings.duplicate()
+	if dock and dock.has_method("get_placement_settings"):
+		var dock_settings = dock.get_placement_settings()
+		# Use merge with overwrite to ensure dock settings take priority
+		current_settings.merge(dock_settings, true)  # true = overwrite existing keys
+	
+	TransformationManager.process_frame_input(camera, current_settings)
 
-func forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
-	var viewport = viewport_camera.get_viewport()
-	
-	# Check if there's an edited scene root
-	var scene_root = EditorInterface.get_edited_scene_root()
-	if not scene_root:
-		return EditorPlugin.AFTER_GUI_INPUT_PASS
-	
-	# Only handle specific events that aren't handled in _process
-	# Mouse clicks for placement are now handled in _process
-	# This function now only handles events that need immediate processing
-	if PlacementCore.placement_mode and event is InputEventMouseButton and event.pressed:
-		if event.button_index == MOUSE_BUTTON_LEFT:
-			# Left click handled in _process for better timing
-			return EditorPlugin.AFTER_GUI_INPUT_STOP
-	
+func _is_plugin_ready() -> bool:
+	"""Check if plugin is ready for processing"""
+	return dock != null
+
+func _get_current_camera() -> Camera3D:
+	"""Get the current 3D viewport camera"""
+	var viewport_3d = EditorInterface.get_editor_viewport_3d(0)
+	if viewport_3d:
+		return viewport_3d.get_camera_3d()
+	return null
+
+## Input Handling (Minimal - delegates to TransformationManager)
+
+func handles(object) -> bool:
+	"""Check if we should handle input for this object"""
+	return TransformationManager.is_any_mode_active()
+
+func _forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
+	"""Forward 3D GUI input - delegate to transformation manager if needed"""
+	# The architecture handles input through the process loop
+	# This is just for any special viewport-specific input
 	return EditorPlugin.AFTER_GUI_INPUT_PASS
 
+## Asset Selection Handlers (From Dock)
+
+func _on_asset_selected(asset_path: String, mesh_resource: Resource, settings: Dictionary):
+	"""Handle asset selection from dock"""
+	print("AssetPlacer: Asset selected: ", asset_path)
+	
+	# Merge dock settings with plugin settings
+	var combined_settings = _settings.duplicate()
+	combined_settings.merge(settings)
+	
+	# Start placement mode through the coordinator
+	if mesh_resource and mesh_resource is Mesh:
+		TransformationManager.start_placement_mode(mesh_resource, null, -1, "", combined_settings, dock)
+	else:
+		TransformationManager.start_placement_mode(null, null, -1, asset_path, combined_settings, dock)
+	
+	# Show user feedback
+	OverlayManager.show_status_message("Placement mode started - Left-click to place, ESC to exit", Color.GREEN, 3.0)
+
 func _on_meshlib_item_selected(meshlib: MeshLibrary, item_id: int, settings: Dictionary):
-	# Start interactive placement mode instead of immediate placement
-	PlacementCore.start_meshlib_placement(meshlib, item_id, settings, dock)
-
-func _can_drop_data(position: Vector2, data) -> bool:
-	if data is Dictionary:
-		if data.has("asset_path") or data.has("type"):
-			return true
-	return false
-
-func _drop_data(position: Vector2, data):
-	if data is Dictionary:
-		if data.has("asset_path"):
-			# Start placement mode for dragged asset
-			PlacementCore.start_asset_placement(data.asset_path, {}, dock)
-		elif data.get("type") == "meshlib_item":
-			# Start placement mode for dragged meshlib item
-			PlacementCore.start_meshlib_placement(data.meshlib, data.item_id, {}, dock)
-
-func _poll_input():
-	# This function is no longer needed as all input is handled in _process
-	if not PlacementCore.placement_mode:
-
-		input_poll_timer.stop()
-
-func _handle_scale_input():
-	"""Handle scale input keys in _process function"""
-	# Get current settings from dock
-	var settings = {}
-	if dock and dock.has_method("get_placement_settings"):
-		settings = dock.get_placement_settings()
+	"""Handle MeshLibrary item selection from dock"""
+	print("AssetPlacer: MeshLib item selected: ", item_id)
 	
-	# Get configured scale keys from settings
-	var scale_up_key = settings.get("scale_up_key", "PAGE_UP")
-	var scale_down_key = settings.get("scale_down_key", "PAGE_DOWN")
-	var scale_reset_key = settings.get("scale_reset_key", "HOME")
+	# Merge dock settings with plugin settings
+	var combined_settings = _settings.duplicate()
+	combined_settings.merge(settings)
 	
-	# Convert to keycodes
-	var scale_up_keycode = ScaleManager.string_to_keycode(scale_up_key)
-	var scale_down_keycode = ScaleManager.string_to_keycode(scale_down_key)
-	var scale_reset_keycode = ScaleManager.string_to_keycode(scale_reset_key)
+	# Start placement mode through the coordinator
+	TransformationManager.start_placement_mode(null, meshlib, item_id, "", combined_settings, dock)
 	
-	# Check each configured key
-	var scale_keys = [scale_up_keycode, scale_down_keycode, scale_reset_keycode]
-	for key in scale_keys:
-		if key != KEY_NONE and Input.is_key_pressed(key):
-			if not _key_was_pressed.get(key, false):  # Only on first press
-				var key_event = InputEventKey.new()
-				key_event.keycode = key
-				key_event.pressed = true
-				key_event.alt_pressed = Input.is_key_pressed(KEY_ALT)
-				
-				var scale_handled = ScaleManager.handle_key_input(key_event, settings)
-				if scale_handled:
-					PreviewManager.update_scale()
-			_key_was_pressed[key] = true
-		else:
-			_key_was_pressed[key] = false
+	# Show user feedback
+	OverlayManager.show_status_message("Placement mode started - Left-click to place, ESC to exit", Color.GREEN, 3.0)
 
-func _handle_cancel_input():
-	"""Handle configurable cancel key input"""
-	# Get current settings from dock
-	var settings = {}
-	if dock and dock.has_method("get_placement_settings"):
-		settings = dock.get_placement_settings()
-	
-	# Get configured cancel key
-	var cancel_key_string = settings.get("cancel_key", "ESCAPE")
-	var cancel_keycode = _string_to_keycode_simple(cancel_key_string)
-	
-	# Check for cancel input (both ui_cancel action and configured key)
-	if Input.is_action_just_pressed("ui_cancel") or Input.is_key_pressed(cancel_keycode):
-		PlacementCore.exit_placement_mode()
+## Settings and Configuration
 
-func _handle_height_input():
-	"""Handle configurable height adjustment input with edge detection"""
-	# Get current settings from dock
-	var settings = {}
-	if dock and dock.has_method("get_placement_settings"):
-		settings = dock.get_placement_settings()
-	
-	# Get configured height adjustment keys
-	var height_up_key = settings.get("height_up_key", "Q")
-	var height_down_key = settings.get("height_down_key", "E")
-	var height_step = settings.get("height_adjustment_step", 0.1)
-	
-	# Convert to keycodes
-	var height_up_keycode = PreviewManager.string_to_keycode(height_up_key)
-	var height_down_keycode = PreviewManager.string_to_keycode(height_down_key)
-	
-	# Edge detection for height up key
-	var height_up_pressed = Input.is_key_pressed(height_up_keycode)
-	var height_up_key_name = "height_up"
-	if height_up_pressed and not _key_was_pressed.get(height_up_key_name, false):
-		PreviewManager.height_offset += height_step
+func update_plugin_settings(new_settings: Dictionary):
+	"""Update plugin settings"""
+	_settings.merge(new_settings)
+	print("AssetPlacer: Settings updated")
 
-	_key_was_pressed[height_up_key_name] = height_up_pressed
-	
-	# Edge detection for height down key
-	var height_down_pressed = Input.is_key_pressed(height_down_keycode)
-	var height_down_key_name = "height_down"
-	if height_down_pressed and not _key_was_pressed.get(height_down_key_name, false):
-		PreviewManager.height_offset -= height_step
+func get_plugin_settings() -> Dictionary:
+	"""Get current plugin settings"""
+	return _settings.duplicate()
 
-	_key_was_pressed[height_down_key_name] = height_down_pressed
+## Debug and Information
 
-func _string_to_keycode_simple(key_string: String) -> Key:
-	"""Simple keycode conversion for main plugin"""
-	match key_string.to_upper():
-		"ESCAPE": return KEY_ESCAPE
-		"TAB": return KEY_TAB
-		"ENTER": return KEY_ENTER
-		"SPACE": return KEY_SPACE
-		"BACKSPACE": return KEY_BACKSPACE
-		"DELETE": return KEY_DELETE
-		_: return KEY_ESCAPE  # Default fallback
+func get_system_status() -> Dictionary:
+	"""Get status of all systems for debugging"""
+	return {
+		"plugin_ready": _is_plugin_ready(),
+		"dock_exists": dock != null,
+		"current_mode": TransformationManager.get_current_mode(),
+		"has_camera": _get_current_camera() != null,
+		"settings_loaded": not _settings.is_empty()
+	}
+
+func debug_print_status():
+	"""Print system status for debugging"""
+	var status = get_system_status()
+	print("AssetPlacer System Status:")
+	for key in status:
+		print("  ", key, ": ", status[key])
+
+## Legacy Compatibility (Minimal)
+
+# Keep minimal legacy compatibility for any external code that might reference these
+func string_to_keycode(key_string: String) -> Key:
+	"""Legacy compatibility - delegate to InputHandler"""
+	return InputHandler.string_to_keycode(key_string)

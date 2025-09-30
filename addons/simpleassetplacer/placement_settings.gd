@@ -17,6 +17,11 @@ var scale_spin: SpinBox
 var collision_check: CheckBox
 var grouping_check: CheckBox
 
+# Reset behavior controls
+var reset_height_on_exit_check: CheckBox
+var reset_scale_on_exit_check: CheckBox
+var reset_rotation_on_exit_check: CheckBox
+
 # Rotation Controls
 var rotate_y_key_button: Button
 var rotate_x_key_button: Button
@@ -45,6 +50,7 @@ var large_increment_modifier_key_button: Button
 
 # Control Key Controls
 var cancel_key_button: Button
+var transform_mode_key_button: Button
 
 # Settings
 var snap_to_ground: bool = false
@@ -54,6 +60,11 @@ var random_rotation: bool = false
 var scale_multiplier: float = 1.0
 var add_collision: bool = false
 var group_instances: bool = false
+
+# Reset behavior settings
+var reset_height_on_exit: bool = false  # Whether to reset height offset when exiting modes
+var reset_scale_on_exit: bool = false   # Whether to reset scale when exiting modes
+var reset_rotation_on_exit: bool = false  # Whether to reset rotation when exiting modes
 
 # Rotation Settings
 var rotate_y_key: String = "Y"  # Y-axis rotation (yaw) - Y axis
@@ -82,6 +93,7 @@ var large_increment_modifier_key: String = "ALT"  # Large increments
 
 # Control Settings
 var cancel_key: String = "ESCAPE"    # Cancel placement mode
+var transform_mode_key: String = "TAB"  # Activate transform mode on selected object
 
 func _ready():
 	setup_ui()
@@ -203,6 +215,39 @@ func setup_ui():
 	grouping_check.tooltip_text = "Group multiple instances of same asset"
 	grouping_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_child(grouping_check)
+	
+	# Add separator for reset behavior settings
+	var reset_separator = HSeparator.new()
+	reset_separator.add_theme_constant_override("separation", 8)
+	vbox.add_child(reset_separator)
+	
+	# Reset Behavior Settings section
+	var reset_behavior_label = Label.new()
+	reset_behavior_label.text = "Reset on Mode Exit"
+	reset_behavior_label.add_theme_font_size_override("font_size", 14)
+	reset_behavior_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.9))
+	vbox.add_child(reset_behavior_label)
+	
+	# Reset height on exit
+	reset_height_on_exit_check = CheckBox.new()
+	reset_height_on_exit_check.text = "Reset Height Offset"
+	reset_height_on_exit_check.tooltip_text = "Reset height offset to 0 when exiting placement/transform mode"
+	reset_height_on_exit_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(reset_height_on_exit_check)
+	
+	# Reset scale on exit
+	reset_scale_on_exit_check = CheckBox.new()
+	reset_scale_on_exit_check.text = "Reset Scale"
+	reset_scale_on_exit_check.tooltip_text = "Reset scale to 1.0 when exiting placement/transform mode"
+	reset_scale_on_exit_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(reset_scale_on_exit_check)
+	
+	# Reset rotation on exit
+	reset_rotation_on_exit_check = CheckBox.new()
+	reset_rotation_on_exit_check.text = "Reset Rotation"
+	reset_rotation_on_exit_check.tooltip_text = "Reset rotation to 0° when exiting placement/transform mode"
+	reset_rotation_on_exit_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(reset_rotation_on_exit_check)
 	
 	# Add separator for rotation settings
 	var rotation_separator = HSeparator.new()
@@ -567,6 +612,19 @@ func setup_ui():
 	cancel_key_button.tooltip_text = "Click to set key for canceling placement mode. Press ESC to cancel."
 	control_grid.add_child(cancel_key_button)
 	
+	# Transform Mode Key
+	var transform_mode_label = Label.new()
+	transform_mode_label.text = "Transform Mode:"
+	transform_mode_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	control_grid.add_child(transform_mode_label)
+	
+	transform_mode_key_button = Button.new()
+	transform_mode_key_button.text = transform_mode_key
+	transform_mode_key_button.custom_minimum_size.x = 80
+	transform_mode_key_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	transform_mode_key_button.tooltip_text = "Click to set key for activating transform mode on selected object. Press ESC to cancel."
+	control_grid.add_child(transform_mode_key_button)
+	
 	# Add separator for thumbnail settings
 	var thumbnail_separator = HSeparator.new()
 	thumbnail_separator.add_theme_constant_override("separation", 8)
@@ -601,6 +659,11 @@ func setup_ui():
 	collision_check.toggled.connect(_on_setting_changed)
 	grouping_check.toggled.connect(_on_setting_changed)
 	
+	# Connect reset behavior control signals
+	reset_height_on_exit_check.toggled.connect(_on_setting_changed)
+	reset_scale_on_exit_check.toggled.connect(_on_setting_changed)
+	reset_rotation_on_exit_check.toggled.connect(_on_setting_changed)
+	
 	# Connect rotation control signals
 	rotate_y_key_button.pressed.connect(_on_key_binding_button_pressed.bind(rotate_y_key_button, "rotate_y_key"))
 	rotate_x_key_button.pressed.connect(_on_key_binding_button_pressed.bind(rotate_x_key_button, "rotate_x_key"))
@@ -628,6 +691,7 @@ func setup_ui():
 	
 	# Connect control key signals
 	cancel_key_button.pressed.connect(_on_key_binding_button_pressed.bind(cancel_key_button, "cancel_key"))
+	transform_mode_key_button.pressed.connect(_on_key_binding_button_pressed.bind(transform_mode_key_button, "transform_mode_key"))
 	
 	clear_cache_button.pressed.connect(_on_clear_cache_pressed)
 
@@ -637,6 +701,12 @@ func _on_setting_changed(value = null):
 	random_rotation = random_rotation_check.button_pressed
 	add_collision = collision_check.button_pressed
 	group_instances = grouping_check.button_pressed
+	
+	# Reset behavior settings
+	reset_height_on_exit = reset_height_on_exit_check.button_pressed
+	reset_scale_on_exit = reset_scale_on_exit_check.button_pressed
+	reset_rotation_on_exit = reset_rotation_on_exit_check.button_pressed
+	
 	settings_changed.emit()
 
 func _on_scale_changed(value: float):
@@ -701,6 +771,8 @@ func _input(event: InputEvent):
 				large_increment_modifier_key = key_string
 			"cancel_key":
 				cancel_key = key_string
+			"transform_mode_key":
+				transform_mode_key = key_string
 		
 		# Update button display
 		listening_button.text = key_string
@@ -744,6 +816,8 @@ func _cancel_key_binding():
 			listening_button.text = large_increment_modifier_key
 		"cancel_key":
 			listening_button.text = cancel_key
+		"transform_mode_key":
+			listening_button.text = transform_mode_key
 	
 	listening_button.modulate = Color.WHITE
 	listening_button = null
@@ -799,7 +873,13 @@ func get_placement_settings() -> Dictionary:
 		"height_adjustment_step": height_adjustment_step,
 		"reverse_modifier_key": reverse_modifier_key,
 		"large_increment_modifier_key": large_increment_modifier_key,
-		"cancel_key": cancel_key
+		"cancel_key": cancel_key,
+		"transform_mode_key": transform_mode_key,
+		
+		# Reset behavior settings
+		"reset_height_on_exit": reset_height_on_exit,
+		"reset_scale_on_exit": reset_scale_on_exit,
+		"reset_rotation_on_exit": reset_rotation_on_exit
 	}
 
 func save_settings():
@@ -812,6 +892,11 @@ func save_settings():
 	editor_settings.set_setting("simple_asset_placer/scale_multiplier", scale_multiplier)
 	editor_settings.set_setting("simple_asset_placer/add_collision", add_collision)
 	editor_settings.set_setting("simple_asset_placer/group_instances", group_instances)
+	
+	# Save reset behavior settings
+	editor_settings.set_setting("simple_asset_placer/reset_height_on_exit", reset_height_on_exit)
+	editor_settings.set_setting("simple_asset_placer/reset_scale_on_exit", reset_scale_on_exit)
+	editor_settings.set_setting("simple_asset_placer/reset_rotation_on_exit", reset_rotation_on_exit)
 	
 	# Save rotation settings
 	editor_settings.set_setting("simple_asset_placer/rotate_y_key", rotate_y_key)
@@ -840,6 +925,7 @@ func save_settings():
 	
 	# Save control settings
 	editor_settings.set_setting("simple_asset_placer/cancel_key", cancel_key)
+	editor_settings.set_setting("simple_asset_placer/transform_mode_key", transform_mode_key)
 
 func load_settings():
 	# Load settings from editor settings
@@ -860,6 +946,14 @@ func load_settings():
 		add_collision = editor_settings.get_setting("simple_asset_placer/add_collision")
 	if editor_settings.has_setting("simple_asset_placer/group_instances"):
 		group_instances = editor_settings.get_setting("simple_asset_placer/group_instances")
+	
+	# Load reset behavior settings
+	if editor_settings.has_setting("simple_asset_placer/reset_height_on_exit"):
+		reset_height_on_exit = editor_settings.get_setting("simple_asset_placer/reset_height_on_exit")
+	if editor_settings.has_setting("simple_asset_placer/reset_scale_on_exit"):
+		reset_scale_on_exit = editor_settings.get_setting("simple_asset_placer/reset_scale_on_exit")
+	if editor_settings.has_setting("simple_asset_placer/reset_rotation_on_exit"):
+		reset_rotation_on_exit = editor_settings.get_setting("simple_asset_placer/reset_rotation_on_exit")
 	
 	# Load rotation settings
 	if editor_settings.has_setting("simple_asset_placer/rotate_y_key"):
@@ -906,11 +1000,16 @@ func load_settings():
 	# Load control settings
 	if editor_settings.has_setting("simple_asset_placer/cancel_key"):
 		cancel_key = editor_settings.get_setting("simple_asset_placer/cancel_key")
+	if editor_settings.has_setting("simple_asset_placer/transform_mode_key"):
+		transform_mode_key = editor_settings.get_setting("simple_asset_placer/transform_mode_key")
 	
 	# Update UI to reflect loaded settings
 	update_ui_from_settings()
 
 func update_ui_from_settings():
+	# Temporarily disconnect signals to prevent triggering _on_setting_changed
+	_disconnect_ui_signals()
+	
 	# Update UI controls to match the loaded settings
 	if snap_to_ground_check:
 		snap_to_ground_check.button_pressed = snap_to_ground
@@ -926,6 +1025,17 @@ func update_ui_from_settings():
 		collision_check.button_pressed = add_collision
 	if grouping_check:
 		grouping_check.button_pressed = group_instances
+	
+	# Update reset behavior controls
+	if reset_height_on_exit_check:
+		reset_height_on_exit_check.button_pressed = reset_height_on_exit
+	if reset_scale_on_exit_check:
+		reset_scale_on_exit_check.button_pressed = reset_scale_on_exit
+	if reset_rotation_on_exit_check:
+		reset_rotation_on_exit_check.button_pressed = reset_rotation_on_exit
+	
+	# Reconnect signals after UI update
+	_connect_ui_signals()
 	
 	# Update rotation controls
 	if rotate_y_key_button:
@@ -962,6 +1072,44 @@ func update_ui_from_settings():
 		height_down_key_button.text = height_down_key
 	if height_step_spin:
 		height_step_spin.value = height_adjustment_step
+
+func _disconnect_ui_signals():
+	"""Temporarily disconnect UI signals to prevent unwanted save triggers"""
+	if snap_to_ground_check and snap_to_ground_check.toggled.is_connected(_on_setting_changed):
+		snap_to_ground_check.toggled.disconnect(_on_setting_changed)
+	if snap_enabled_check and snap_enabled_check.toggled.is_connected(_on_setting_changed):
+		snap_enabled_check.toggled.disconnect(_on_setting_changed)
+	if random_rotation_check and random_rotation_check.toggled.is_connected(_on_setting_changed):
+		random_rotation_check.toggled.disconnect(_on_setting_changed)
+	if collision_check and collision_check.toggled.is_connected(_on_setting_changed):
+		collision_check.toggled.disconnect(_on_setting_changed)
+	if grouping_check and grouping_check.toggled.is_connected(_on_setting_changed):
+		grouping_check.toggled.disconnect(_on_setting_changed)
+	if reset_height_on_exit_check and reset_height_on_exit_check.toggled.is_connected(_on_setting_changed):
+		reset_height_on_exit_check.toggled.disconnect(_on_setting_changed)
+	if reset_scale_on_exit_check and reset_scale_on_exit_check.toggled.is_connected(_on_setting_changed):
+		reset_scale_on_exit_check.toggled.disconnect(_on_setting_changed)
+	if reset_rotation_on_exit_check and reset_rotation_on_exit_check.toggled.is_connected(_on_setting_changed):
+		reset_rotation_on_exit_check.toggled.disconnect(_on_setting_changed)
+
+func _connect_ui_signals():
+	"""Reconnect UI signals after updating UI from loaded settings"""
+	if snap_to_ground_check and not snap_to_ground_check.toggled.is_connected(_on_setting_changed):
+		snap_to_ground_check.toggled.connect(_on_setting_changed)
+	if snap_enabled_check and not snap_enabled_check.toggled.is_connected(_on_setting_changed):
+		snap_enabled_check.toggled.connect(_on_setting_changed)
+	if random_rotation_check and not random_rotation_check.toggled.is_connected(_on_setting_changed):
+		random_rotation_check.toggled.connect(_on_setting_changed)
+	if collision_check and not collision_check.toggled.is_connected(_on_setting_changed):
+		collision_check.toggled.connect(_on_setting_changed)
+	if grouping_check and not grouping_check.toggled.is_connected(_on_setting_changed):
+		grouping_check.toggled.connect(_on_setting_changed)
+	if reset_height_on_exit_check and not reset_height_on_exit_check.toggled.is_connected(_on_setting_changed):
+		reset_height_on_exit_check.toggled.connect(_on_setting_changed)
+	if reset_scale_on_exit_check and not reset_scale_on_exit_check.toggled.is_connected(_on_setting_changed):
+		reset_scale_on_exit_check.toggled.connect(_on_setting_changed)
+	if reset_rotation_on_exit_check and not reset_rotation_on_exit_check.toggled.is_connected(_on_setting_changed):
+		reset_rotation_on_exit_check.toggled.connect(_on_setting_changed)
 	
 	# Update modifier key controls
 	if reverse_modifier_key_button:
@@ -972,3 +1120,5 @@ func update_ui_from_settings():
 	# Update control key controls
 	if cancel_key_button:
 		cancel_key_button.text = cancel_key
+	if transform_mode_key_button:
+		transform_mode_key_button.text = transform_mode_key

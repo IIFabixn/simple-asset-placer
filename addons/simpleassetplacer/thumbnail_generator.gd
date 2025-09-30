@@ -36,7 +36,8 @@ static func initialize():
 	mesh_instance = null
 	light = null
 	
-	# Create viewport for thumbnail generation
+	# Create a completely isolated SubViewport for thumbnail generation
+	# This viewport will have its own world and rendering context
 	viewport = SubViewport.new()
 	if not viewport:
 		print("ThumbnailGenerator: ERROR - Failed to create SubViewport!")
@@ -51,8 +52,11 @@ static func initialize():
 	viewport.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED
 	viewport.use_debanding = false
 	
-	# Add viewport to a hidden container instead of main screen
-	# Create a hidden control container to hold the viewport
+	# CRITICAL: Create a new World3D to completely isolate from main scene
+	viewport.world_3d = World3D.new()
+	
+	# Add viewport to a completely independent container
+	# Create a hidden control container that's isolated from the main editor
 	var hidden_container = Control.new()
 	if not hidden_container:
 		print("ThumbnailGenerator: ERROR - Failed to create hidden container!")
@@ -61,7 +65,9 @@ static func initialize():
 		return
 	
 	hidden_container.visible = false
+	hidden_container.name = "ThumbnailGeneratorContainer"
 	
+	# Add to editor but in a way that's completely isolated
 	var main_screen = EditorInterface.get_editor_main_screen()
 	if not main_screen:
 		print("ThumbnailGenerator: ERROR - Could not get editor main screen!")
@@ -206,6 +212,12 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 		if old_mesh:
 			for i in range(old_mesh.get_surface_count()):
 				mesh_instance.set_surface_override_material(i, null)
+		
+		# Ensure isolated world is completely clean
+		if viewport and viewport.world_3d:
+			# The isolated World3D should only contain our camera, lights, and mesh_instance
+			# No additional cleanup needed as it's completely separate from main scene
+			pass
 		
 		# Force the viewport to render a blank frame to clear previous state
 		viewport.render_target_update_mode = SubViewport.UPDATE_ONCE

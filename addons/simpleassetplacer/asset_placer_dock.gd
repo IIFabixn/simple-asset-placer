@@ -5,7 +5,9 @@ class_name AssetPlacerDock
 
 const ThumbnailGenerator = preload("res://addons/simpleassetplacer/thumbnail_generator.gd")
 const MeshLibraryBrowser = preload("res://addons/simpleassetplacer/meshlib_browser.gd")
+const ModelLibraryBrowser = preload("res://addons/simpleassetplacer/modellib_browser.gd")
 const PlacementSettings = preload("res://addons/simpleassetplacer/placement_settings.gd")
+const AssetThumbnailItem = preload("res://addons/simpleassetplacer/asset_thumbnail_item.gd")
 
 signal asset_selected(asset_path: String, mesh_resource: Resource, settings: Dictionary)
 signal meshlib_item_selected(meshlib: MeshLibrary, item_id: int, settings: Dictionary)
@@ -13,13 +15,14 @@ signal meshlib_item_selected(meshlib: MeshLibrary, item_id: int, settings: Dicti
 # UI Components
 var search_line_edit: LineEdit
 var refresh_button: Button
-var filter_options: OptionButton
+
 var tab_container: TabContainer
 var models_tab: Control
 var meshlib_tab: Control
 var scroll_container: ScrollContainer
 var grid_container: GridContainer
 var meshlib_browser: MeshLibraryBrowser
+var modellib_browser: ModelLibraryBrowser
 var placement_settings: PlacementSettings
 var settings_tab: Control
 var thumbnail_size: int = 64
@@ -27,7 +30,7 @@ var thumbnail_size: int = 64
 # Asset Management
 var discovered_assets: Array = []
 var mesh_thumbnails: Dictionary = {}
-var supported_extensions = ["obj", "fbx", "dae", "gltf", "glb", "tres", "res", "meshlib"]
+var supported_extensions = ["obj", "fbx", "dae", "gltf", "glb", "blend", "tscn", "scn", "tres", "res", "meshlib"]
 
 # Thumbnail generation queue to prevent conflicts
 var thumbnail_queue: Array = []
@@ -78,7 +81,7 @@ func setup_ui():
 	tab_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_child(tab_container)
 	
-	# Models tab
+	# Models tab - now using ModelLibraryBrowser
 	models_tab = Control.new()
 	models_tab.name = "3D Models"
 	tab_container.add_child(models_tab)
@@ -92,32 +95,10 @@ func setup_ui():
 	models_margin.add_theme_constant_override("margin_bottom", 8)
 	models_tab.add_child(models_margin)
 	
-	var models_vbox = VBoxContainer.new()
-	models_vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	models_vbox.add_theme_constant_override("separation", 8)
-	models_margin.add_child(models_vbox)
-	
-	# Filter options for models
-	filter_options = OptionButton.new()
-	filter_options.add_item("All Models")
-	filter_options.add_item("OBJ Files")
-	filter_options.add_item("FBX Files")
-	filter_options.add_item("GLTF Files")
-	models_vbox.add_child(filter_options)
-	
-	# Scroll container for assets
-	scroll_container = ScrollContainer.new()
-	scroll_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	models_vbox.add_child(scroll_container)
-	
-	# Grid for thumbnails
-	grid_container = GridContainer.new()
-	grid_container.columns = 2  # Start with 2 columns, will adjust dynamically
-	grid_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	grid_container.add_theme_constant_override("h_separation", 8)
-	grid_container.add_theme_constant_override("v_separation", 8)
-	scroll_container.add_child(grid_container)
+	# Create ModelLibraryBrowser
+	modellib_browser = ModelLibraryBrowser.new()
+	modellib_browser.asset_item_selected.connect(_on_asset_selected)
+	models_margin.add_child(modellib_browser)
 	
 	# MeshLibrary tab
 	meshlib_tab = Control.new()
@@ -163,7 +144,6 @@ func setup_ui():
 	# Connect signals
 	refresh_button.pressed.connect(_on_refresh_pressed)
 	search_line_edit.text_changed.connect(_on_search_changed)
-	filter_options.item_selected.connect(_on_filter_changed)
 	meshlib_browser.meshlib_item_selected.connect(_on_meshlib_item_selected)
 	placement_settings.cache_cleared.connect(_on_cache_cleared)
 	
@@ -174,31 +154,61 @@ func setup_ui():
 	call_deferred("update_responsive_sizes")
 
 func _on_dock_resized():
-	# Calculate responsive thumbnail size
+	# Calculate responsive thumbnail size based on available space
 	update_responsive_sizes()
 	
-	# Adjust grid columns based on available width
+	# Adjust grid columns based on available width - fully adaptive
 	if grid_container:
-		var available_width = get_rect().size.x - 32  # Account for margins and scrollbar
-		var thumbnail_width = thumbnail_size + 18  # Thumbnail + spacing + padding
-		var new_columns = max(1, int(available_width / thumbnail_width))
-		grid_container.columns = min(new_columns, 4)  # Max 4 columns
+		var available_width = get_rect().size.x - 60  # Account for scroll margins
+		var item_width = thumbnail_size + 16  # AssetThumbnailItem width (thumbnail + margins)
+		var spacing = 12  # Grid separation - match grid_container settings
+		
+		# Calculate how many columns can fit with proper spacing
+		var columns_that_fit = 1
+		var total_width_needed = item_width
+		
+		# Keep adding columns while they fit (with 20px buffer for safety)
+		while total_width_needed + spacing + item_width <= available_width - 20:
+			columns_that_fit += 1
+			total_width_needed += spacing + item_width
+		
+		grid_container.columns = max(1, columns_that_fit)
 	
-	# Also update meshlib browser grid
+	# Also update both browser grids
 	if meshlib_browser:
 		meshlib_browser.update_grid_columns(get_rect().size.x)
+	if modellib_browser:
+		modellib_browser.update_grid_columns(get_rect().size.x)
 
 func update_responsive_sizes():
 	var dock_width = get_rect().size.x
 	var old_thumbnail_size = thumbnail_size
 	
-	# Responsive thumbnail sizing
-	if dock_width < 250:
-		thumbnail_size = 48  # Small thumbnails for narrow dock
-	elif dock_width < 350:
-		thumbnail_size = 64  # Medium thumbnails
-	else:
-		thumbnail_size = 80  # Larger thumbnails for wider dock
+	# Calculate optimal thumbnail size within 64-128px range based on available space
+	var available_width = dock_width - 60  # Account for scroll margins
+	var grid_spacing = 12   # Space between grid items - match grid_container settings
+	
+	# Start with minimum size and see how many columns we can fit
+	var best_thumbnail_size = 64
+	var best_columns = 1
+	
+	# Test different thumbnail sizes to find the best fit
+	for test_size in range(64, 129, 8):  # Test in 8px increments from 64 to 128
+		var test_item_width = test_size + 16  # AssetThumbnailItem width calculation
+		var columns = 1
+		var total_width = test_item_width
+		
+		# Calculate how many columns fit with this thumbnail size (with 20px buffer)
+		while total_width + grid_spacing + test_item_width <= available_width - 20:
+			columns += 1
+			total_width += grid_spacing + test_item_width
+		
+		# Prefer more columns, but not at the expense of too-small thumbnails
+		if columns > best_columns or (columns == best_columns and test_size > best_thumbnail_size):
+			best_thumbnail_size = test_size
+			best_columns = columns
+	
+	thumbnail_size = clamp(best_thumbnail_size, 64, 128)
 	
 	# Only refresh if size actually changed
 	if old_thumbnail_size != thumbnail_size:
@@ -206,14 +216,30 @@ func update_responsive_sizes():
 		if meshlib_browser:
 			meshlib_browser.update_thumbnail_size(thumbnail_size)
 		
-		# Refresh 3D models grid with new thumbnail size
-		update_asset_grid()
+		# Update modellib browser thumbnail size
+		if modellib_browser:
+			modellib_browser.update_thumbnail_size(thumbnail_size)
+		
+		# Update existing thumbnail items or refresh grid
+		if grid_container:
+			var needs_refresh = false
+			for child in grid_container.get_children():
+				if child is AssetThumbnailItem:
+					child.update_thumbnail_size(thumbnail_size)
+				else:
+					needs_refresh = true
+			
+			# If there are non-AssetThumbnailItem children, refresh the grid
+			if needs_refresh:
+				update_asset_grid()
 
 func discover_assets():
 	discovered_assets.clear()
 	_scan_directory("res://")
-	update_asset_grid()
 	update_meshlib_browser()
+	# Discover assets for the model library browser
+	if modellib_browser:
+		modellib_browser.discover_assets()
 
 func _scan_directory(path: String):
 	var dir = DirAccess.open(path)
@@ -247,64 +273,42 @@ func _scan_directory(path: String):
 						elif resource != null:
 							# Check if other .tres/.res files contain meshes
 							has_mesh = _resource_contains_mesh(resource)
+					elif extension in ["tscn", "scn"]:
+						# For Godot scene files, check if they contain meshes
+						has_mesh = _scene_file_contains_mesh(full_path)
 					else:
-						# For 3D model files (.fbx, .obj, .gltf, etc.), check if they contain meshes
+						# For 3D model files (.fbx, .obj, .gltf, .blend, etc.), check if they contain meshes
 						has_mesh = _model_file_contains_mesh(full_path)
 					
 					# Only add assets that have meshes or are MeshLibraries
 					if has_mesh:
+						var asset_type = "MeshLibrary"
+						if not is_meshlib:
+							if extension in ["tscn", "scn"]:
+								asset_type = "Scene"
+							else:
+								asset_type = "3D Model"
+						
 						var asset_info = {
 							"path": full_path,
 							"name": file_name.get_basename(),
 							"extension": extension,
 							"is_meshlib": is_meshlib,
-							"type": "MeshLibrary" if is_meshlib else "3D Model"
+							"type": asset_type
 						}
 						discovered_assets.append(asset_info)
 			
 			file_name = dir.get_next()
 
 func update_asset_grid():
-	# Clear existing thumbnails
-	for child in grid_container.get_children():
-		child.queue_free()
-	
-	# Filter assets based on search and filter
-	var filtered_assets = get_filtered_assets()
-	
-	# Create thumbnail buttons for each asset
-	for asset in filtered_assets:
-		create_asset_thumbnail(asset)
+	# This function is no longer needed since the models tab now uses ModelLibraryBrowser
+	# The grid_container is no longer used for the models tab
+	pass
 
 func get_filtered_assets() -> Array:
-	var search_text = search_line_edit.text.to_lower()
-	var selected_filter = filter_options.get_selected_id()
-	
-	var filtered = []
-	for asset in discovered_assets:
-		# Skip MeshLibraries in the models tab
-		if asset.is_meshlib:
-			continue
-		
-		# Search filter
-		if search_text != "" and not asset.name.to_lower().contains(search_text):
-			continue
-		
-		# Extension filter
-		match selected_filter:
-			1: # OBJ Files only
-				if asset.extension != "obj":
-					continue
-			2: # FBX Files only
-				if asset.extension != "fbx":
-					continue
-			3: # GLTF Files only
-				if not asset.extension in ["gltf", "glb"]:
-					continue
-		
-		filtered.append(asset)
-	
-	return filtered
+	# This function is no longer needed since filtering is handled by ModelLibraryBrowser
+	# Return empty array to maintain compatibility
+	return []
 
 func update_meshlib_browser():
 	# Get all MeshLibrary paths
@@ -320,38 +324,14 @@ func _on_meshlib_item_selected(meshlib: MeshLibrary, item_id: int):
 	meshlib_item_selected.emit(meshlib, item_id, settings)
 
 func create_asset_thumbnail(asset_info: Dictionary):
-	var button = Button.new()
-	button.custom_minimum_size = Vector2(thumbnail_size + 10, thumbnail_size + 30)
-	button.flat = true
+	# Create the thumbnail item using our dedicated control
+	var thumbnail_item = AssetThumbnailItem.create_for_asset(asset_info, thumbnail_size)
 	
-	# Create vertical layout for thumbnail and label
-	var vbox = VBoxContainer.new()
-	button.add_child(vbox)
+	# Connect signals
+	thumbnail_item.asset_item_selected.connect(_on_asset_selected)
 	
-	# Thumbnail area
-	var thumbnail_rect = TextureRect.new()
-	thumbnail_rect.custom_minimum_size = Vector2(thumbnail_size, thumbnail_size)
-	thumbnail_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	vbox.add_child(thumbnail_rect)
-	
-	# Asset name label
-	var label = Label.new()
-	label.text = asset_info.name
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.custom_minimum_size.y = 20
-	vbox.add_child(label)
-	
-	# Generate or load thumbnail
-	generate_thumbnail_for_asset(asset_info, thumbnail_rect)
-	
-	# Connect button signal
-	button.pressed.connect(_on_asset_selected.bind(asset_info))
-	
-	# Enable drag and drop
-	button.gui_input.connect(_on_thumbnail_gui_input.bind(asset_info))
-	
-	grid_container.add_child(button)
+	# Add to grid
+	grid_container.add_child(thumbnail_item)
 
 func generate_thumbnail_for_asset(asset_info: Dictionary, thumbnail_rect: TextureRect):
 	# Generate actual 3D thumbnail
@@ -393,20 +373,22 @@ func _on_refresh_pressed():
 	discover_assets()
 
 func _on_search_changed(new_text: String):
-	update_asset_grid()
-	# Also update MeshLibrary browser search
+	# Update MeshLibrary browser search
 	if meshlib_browser:
 		meshlib_browser.set_search_text(new_text)
+	# Also update ModelLibrary browser search
+	if modellib_browser:
+		modellib_browser.set_search_text(new_text)
 
-func _on_filter_changed(index: int):
-	update_asset_grid()
+
 
 func _on_cache_cleared():
 	# Clear any pending thumbnail queue
 	thumbnail_queue.clear()
 	is_generating_thumbnails = false
-	# Refresh the asset grid to regenerate thumbnails
-	update_asset_grid()
+	# Refresh both browsers to regenerate thumbnails
+	if modellib_browser:
+		modellib_browser.update_asset_grid()
 
 func _queue_thumbnail_generation(asset_info: Dictionary, thumbnail_rect: TextureRect):
 	# Add to queue
@@ -463,7 +445,7 @@ func _resource_contains_mesh(resource: Resource) -> bool:
 	return false
 
 func _model_file_contains_mesh(file_path: String) -> bool:
-	# Check if a 3D model file (.fbx, .obj, .gltf, etc.) contains meshes
+	# Check if a 3D model file (.fbx, .obj, .gltf, .blend, etc.) contains meshes
 	if not ResourceLoader.exists(file_path):
 		return false
 	
@@ -500,6 +482,21 @@ func _scene_has_mesh_recursive(node: Node) -> bool:
 			return true
 	
 	return false
+
+func _scene_file_contains_mesh(file_path: String) -> bool:
+	# Check if a Godot scene file (.tscn, .scn) contains meshes
+	if not ResourceLoader.exists(file_path):
+		return false
+	
+	var scene_resource = load(file_path)
+	if not scene_resource or not scene_resource is PackedScene:
+		return false
+	
+	# Instantiate the scene and check for meshes
+	var scene_instance = scene_resource.instantiate()
+	var has_mesh = _scene_has_mesh_recursive(scene_instance)
+	scene_instance.queue_free()
+	return has_mesh
 
 func get_placement_settings() -> Dictionary:
 	"""Get current placement settings from the settings component"""

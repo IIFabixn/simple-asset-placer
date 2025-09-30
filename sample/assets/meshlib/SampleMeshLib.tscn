@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3 uid="uid://b3kt6mw77f1h8"]
+
+[ext_resource type="PackedScene" uid="uid://cqrrncue8fovq" path="res://sample/assets/gltf/cone.gltf" id="1_crq3f"]
+[ext_resource type="PackedScene" uid="uid://di3ohh2mmpuxu" path="res://sample/assets/gltf/cube.gltf" id="2_ewme6"]
+
+[node name="SampleMeshLib" type="Node3D"]
+
+[node name="cone" parent="." instance=ExtResource("1_crq3f")]
+
+[node name="cube" parent="." instance=ExtResource("2_ewme6")]

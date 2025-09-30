@@ -7,6 +7,7 @@ const PreviewManager = preload("res://addons/simpleassetplacer/preview_manager.g
 const RotationManager = preload("res://addons/simpleassetplacer/rotation_manager.gd")
 const ScaleManager = preload("res://addons/simpleassetplacer/scale_manager.gd")
 const ThumbnailGenerator = preload("res://addons/simpleassetplacer/thumbnail_generator.gd")
+const ThumbnailQueueManager = preload("res://addons/simpleassetplacer/thumbnail_queue_manager.gd")
 var dock: AssetPlacerDock
 var input_overlay: Control
 var input_poll_timer: Timer
@@ -19,6 +20,13 @@ func _enable_plugin() -> void:
 
 
 func _disable_plugin() -> void:
+	# Clean up thumbnail queue manager (which will also clean up ThumbnailGenerator)
+	ThumbnailQueueManager.cleanup()
+	# Clean up any preview objects
+	PreviewManager.cleanup_preview()
+	# Clean up overlays
+	RotationManager.hide_overlay()
+	ScaleManager.hide_scale_overlay()
 	# Remove autoloads here.
 	pass
 
@@ -29,6 +37,9 @@ func handles(object) -> bool:
 
 func _enter_tree() -> void:
 	# Initialization of the plugin goes here.
+	
+	# Initialize thumbnail generator with clean state
+	ThumbnailGenerator.initialize()
 	
 	# Enable always-on input forwarding for reliable input handling
 	set_input_event_forwarding_always_enabled()
@@ -52,6 +63,10 @@ func _exit_tree() -> void:
 	ThumbnailGenerator.cleanup()
 	if PlacementCore.placement_mode:
 		PlacementCore.exit_placement_mode()
+	# Additional cleanup of any leftover objects
+	PreviewManager.cleanup_preview()
+	RotationManager.hide_overlay()
+	ScaleManager.hide_scale_overlay()
 	if input_overlay:
 		input_overlay.queue_free()
 	if dock:

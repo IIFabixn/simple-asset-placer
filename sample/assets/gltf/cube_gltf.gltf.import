@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://f1hbnr4prtan"
-path="res://.godot/imported/cone.glb-bafc84d15ff22b3ed4299e27828ab530.scn"
+uid="uid://di3ohh2mmpuxu"
+path="res://.godot/imported/cube_gltf.gltf-3da052e9f1f3cfc7f306a998a4ab6580.scn"
 
 [deps]
 
-source_file="res://sample/assets/glb/cone.glb"
-dest_files=["res://.godot/imported/cone.glb-bafc84d15ff22b3ed4299e27828ab530.scn"]
+source_file="res://sample/assets/gltf/cube_gltf.gltf"
+dest_files=["res://.godot/imported/cube_gltf.gltf-3da052e9f1f3cfc7f306a998a4ab6580.scn"]
 
 [params]
 

@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://d3hblvfcy5bxr"
-path="res://.godot/imported/cone.dae-b5840cbf14a3e45cd503f512a8f1485b.scn"
+uid="uid://xnugt2swiapl"
+path="res://.godot/imported/cube_fbx.fbx-368750c8a52b29f6cdf385fb2fe6aa69.scn"
 
 [deps]
 
-source_file="res://sample/assets/dae/cone.dae"
-dest_files=["res://.godot/imported/cone.dae-b5840cbf14a3e45cd503f512a8f1485b.scn"]
+source_file="res://sample/assets/fbx/cube_fbx.fbx"
+dest_files=["res://.godot/imported/cube_fbx.fbx-368750c8a52b29f6cdf385fb2fe6aa69.scn"]
 
 [params]
 
@@ -30,7 +30,7 @@ meshes/force_disable_compression=false
 skins/use_named_skins=true
 animation/import=true
 animation/fps=30
-animation/trimming=false
+animation/trimming=true
 animation/remove_immutable_tracks=true
 animation/import_rest_as_RESET=false
 import_script/path=""
@@ -38,3 +38,7 @@ materials/extract=0
 materials/extract_format=0
 materials/extract_path=""
 _subresources={}
+fbx/importer=0
+fbx/allow_geometry_helper_nodes=false
+fbx/embedded_image_handling=1
+fbx/naming_version=2

@@ -4,9 +4,11 @@ extends Control
 class_name ModelLibraryBrowser
 
 const AssetThumbnailItem = preload("res://addons/simpleassetplacer/asset_thumbnail_item.gd")
+const CategoryManager = preload("res://addons/simpleassetplacer/category_manager.gd")
 
 signal asset_item_selected(asset_info: Dictionary)
 
+var category_filter: OptionButton
 var filter_options: OptionButton
 var items_grid: GridContainer
 var scroll_container: ScrollContainer
@@ -14,7 +16,9 @@ var discovered_assets: Array = []
 var thumbnail_size: int = 64
 var selected_item: AssetThumbnailItem = null
 var current_search_text: String = ""
+var current_category_filter: String = ""
 var supported_extensions = ["obj", "fbx", "gltf", "glb", "dae", "blend", "tscn", "scn", "tres", "res"]
+var category_manager: CategoryManager = null
 
 func _ready():
 	setup_ui()
@@ -26,6 +30,11 @@ func setup_ui():
 	var vbox = VBoxContainer.new()
 	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(vbox)
+	
+	# Category filter dropdown
+	category_filter = OptionButton.new()
+	category_filter.add_item("All Categories")
+	vbox.add_child(category_filter)
 	
 	# Filter options for 3D models
 	filter_options = OptionButton.new()
@@ -58,7 +67,11 @@ func setup_ui():
 	scroll_container.add_child(items_grid)
 	
 	# Connect signals
+	category_filter.item_selected.connect(_on_category_filter_changed)
 	filter_options.item_selected.connect(_on_filter_changed)
+
+func set_category_manager(manager: CategoryManager):
+	category_manager = manager
 
 func update_grid_columns(available_width: float):
 	if items_grid:
@@ -75,6 +88,7 @@ func update_thumbnail_size(new_size: int):
 func discover_assets():
 	discovered_assets.clear()
 	_scan_directory("res://")
+	populate_category_filter()
 	update_asset_grid()
 
 func _scan_directory(path: String):
@@ -124,12 +138,21 @@ func _scan_directory(path: String):
 						if extension in ["tscn", "scn"]:
 							asset_type = "Scene"
 						
+						# Extract category information
+						var folder_categories = []
+						var custom_tags = []
+						if category_manager:
+							folder_categories = category_manager.extract_folder_categories(full_path)
+							custom_tags = category_manager.get_custom_tags(full_path)
+						
 						var asset_info = {
 							"path": full_path,
 							"name": file_name.get_basename(),
 							"extension": extension,
 							"is_meshlib": false,
-							"type": asset_type
+							"type": asset_type,
+							"folder_categories": folder_categories,
+							"custom_tags": custom_tags
 						}
 						discovered_assets.append(asset_info)
 			
@@ -175,7 +198,9 @@ func update_asset_grid():
 	# Create thumbnail items for each asset
 	for asset in filtered_assets:
 		var thumbnail_item = AssetThumbnailItem.create_for_asset(asset, thumbnail_size)
+		thumbnail_item.set_category_manager(category_manager)
 		thumbnail_item.asset_item_selected.connect(_on_asset_item_selected)
+		thumbnail_item.context_menu_requested.connect(_on_context_menu_requested)
 		items_grid.add_child(thumbnail_item)
 
 func get_filtered_assets() -> Array:
@@ -187,6 +212,32 @@ func get_filtered_assets() -> Array:
 		# Search filter
 		if search_text != "" and not asset.name.to_lower().contains(search_text):
 			continue
+		
+		# Category filter
+		if current_category_filter != "":
+			var passes_category_filter = false
+			
+			# Handle special categories
+			if current_category_filter == "⭐ Favorites":
+				if category_manager and category_manager.is_favorite(asset.path):
+					passes_category_filter = true
+			elif current_category_filter == "🕐 Recent":
+				if category_manager and category_manager.is_recent(asset.path):
+					passes_category_filter = true
+			else:
+				# Remove leading spaces from hierarchical display
+				var clean_category = current_category_filter.strip_edges()
+				
+				# Check folder categories
+				if asset.has("folder_categories") and clean_category in asset.folder_categories:
+					passes_category_filter = true
+				
+				# Check custom tags
+				if asset.has("custom_tags") and clean_category in asset.custom_tags:
+					passes_category_filter = true
+			
+			if not passes_category_filter:
+				continue
 		
 		# Extension filter
 		match selected_filter:
@@ -222,6 +273,66 @@ func get_filtered_assets() -> Array:
 func _on_filter_changed(index: int):
 	update_asset_grid()
 
+func _on_category_filter_changed(index: int):
+	if index == 0:
+		current_category_filter = ""
+	else:
+		# Check if this item has metadata (for folder categories with full paths)
+		var metadata = category_filter.get_item_metadata(index)
+		if metadata != null:
+			# Use the leaf folder name for matching
+			current_category_filter = metadata
+		else:
+			# Use the display text (for special categories and custom tags)
+			current_category_filter = category_filter.get_item_text(index)
+	update_asset_grid()
+
+func populate_category_filter():
+	if not category_manager:
+		return
+	
+	category_filter.clear()
+	category_filter.add_item("All Categories")
+	
+	# Add special categories first
+	var favorites = category_manager.get_favorites()
+	var recent = category_manager.get_recent_assets()
+	
+	if favorites.size() > 0:
+		category_filter.add_item("⭐ Favorites")
+	
+	if recent.size() > 0:
+		category_filter.add_item("🕐 Recent")
+	
+	if favorites.size() > 0 or recent.size() > 0:
+		category_filter.add_separator()
+	
+	# Get all folder categories with full paths
+	var folder_category_paths = category_manager.get_all_folder_category_paths(discovered_assets)
+	
+	if folder_category_paths.size() > 0:
+		category_filter.add_item("📁 Folder Categories")
+		category_filter.set_item_disabled(category_filter.get_item_count() - 1, true)
+		
+		for cat_info in folder_category_paths:
+			# Display full path, but store leaf name for matching
+			category_filter.add_item("  " + cat_info["display"])
+			# Store the leaf name in metadata for filtering
+			category_filter.set_item_metadata(category_filter.get_item_count() - 1, cat_info["match"])
+	
+	# Get custom tags
+	var custom_tags = category_manager.get_all_custom_tags()
+	
+	if custom_tags.size() > 0:
+		if folder_category_paths.size() > 0:
+			category_filter.add_separator()
+		
+		category_filter.add_item("🏷️ Custom Tags")
+		category_filter.set_item_disabled(category_filter.get_item_count() - 1, true)
+		
+		for tag in custom_tags:
+			category_filter.add_item("  " + tag)
+
 func _on_asset_item_selected(asset_info: Dictionary):
 	# Clear previous selection
 	if selected_item and is_instance_valid(selected_item):
@@ -243,3 +354,216 @@ func _on_asset_item_selected(asset_info: Dictionary):
 func set_search_text(text: String):
 	current_search_text = text
 	update_asset_grid()
+
+func _on_context_menu_requested(asset_item: AssetThumbnailItem, position: Vector2):
+	if not category_manager:
+		return
+	
+	var asset_path = asset_item.get_asset_path()
+	if asset_path.is_empty():
+		return
+	
+	# Create popup menu
+	var popup = PopupMenu.new()
+	add_child(popup)
+	
+	# Build menu structure - use dict to map menu_id to action
+	var menu_actions = {}
+	var menu_id = 0
+	
+	# Folder categories section (display only, not actionable)
+	var folder_cats = category_manager.extract_folder_categories(asset_path)
+	if folder_cats.size() > 0:
+		popup.add_item("📁 Folder Categories", menu_id)
+		popup.set_item_disabled(menu_id, true)
+		menu_id += 1
+		
+		for cat in folder_cats:
+			popup.add_item("  " + cat, menu_id)
+			popup.set_item_disabled(menu_id, true)
+			menu_id += 1
+		
+		popup.add_separator()
+		menu_id += 1
+	
+	# Recently used tags
+	var recent_tags = category_manager.get_recently_used_tags(5)
+	if recent_tags.size() > 0:
+		popup.add_item("🕐 Recent Tags", menu_id)
+		popup.set_item_disabled(menu_id, true)
+		menu_id += 1
+		
+		var current_tags = category_manager.get_custom_tags(asset_path)
+		for tag in recent_tags:
+			var is_assigned = tag in current_tags
+			var prefix = "✓ " if is_assigned else "  "
+			popup.add_item(prefix + tag, menu_id)
+			menu_actions[menu_id] = {"type": "tag", "name": tag, "assigned": is_assigned, "asset_path": asset_path}
+			menu_id += 1
+		
+		popup.add_separator()
+		menu_id += 1
+	
+	# All custom tags
+	var all_tags = category_manager.get_all_custom_tags()
+	if all_tags.size() > 0:
+		popup.add_item("🏷️ All Tags...", menu_id)
+		menu_actions[menu_id] = {"type": "all_tags_submenu", "asset_path": asset_path}
+		menu_id += 1
+	
+	# New tag option
+	popup.add_item("+ New Tag...", menu_id)
+	menu_actions[menu_id] = {"type": "new_tag", "asset_path": asset_path}
+	menu_id += 1
+	
+	popup.add_separator()
+	menu_id += 1
+	
+	# Favorites
+	var is_fav = category_manager.is_favorite(asset_path)
+	var fav_text = "⭐ Remove from Favorites" if is_fav else "⭐ Add to Favorites"
+	popup.add_item(fav_text, menu_id)
+	menu_actions[menu_id] = {"type": "favorite", "asset_path": asset_path}
+	menu_id += 1
+	
+	# Connect signal with proper dictionary
+	popup.id_pressed.connect(func(id): _on_context_menu_item_selected(id, menu_actions, popup))
+	
+	# Show popup at cursor position
+	popup.popup_on_parent(Rect2(position, Vector2.ZERO))
+
+func _on_context_menu_item_selected(id: int, menu_actions: Dictionary, popup: PopupMenu):
+	if not menu_actions.has(id):
+		popup.queue_free()
+		return
+	
+	var action = menu_actions[id]
+	
+	match action.get("type", ""):
+		"tag":
+			# Toggle tag
+			var tag_name = action["name"]
+			var asset_path = action.get("asset_path", "")
+			if action["assigned"]:
+				category_manager.remove_tag(asset_path, tag_name)
+			else:
+				category_manager.add_tag(asset_path, tag_name)
+			category_manager.save_config_file()
+			
+			# Refresh asset data
+			discover_assets()
+		
+		"new_tag":
+			# Show dialog to create new tag
+			_show_new_tag_dialog(action["asset_path"])
+		
+		"favorite":
+			var asset_path = action["asset_path"]
+			category_manager.toggle_favorite(asset_path)
+			populate_category_filter()
+			update_asset_grid()
+		
+		"all_tags_submenu":
+			# Show all tags dialog
+			_show_all_tags_dialog(action.get("asset_path", ""))
+	
+	popup.queue_free()
+
+func _show_new_tag_dialog(asset_path: String):
+	# Create input dialog
+	var dialog = AcceptDialog.new()
+	dialog.title = "Create New Tag"
+	dialog.dialog_autowrap = true
+	dialog.size = Vector2i(300, 150)
+	add_child(dialog)
+	
+	# Create input field
+	var vbox = VBoxContainer.new()
+	dialog.add_child(vbox)
+	
+	var label = Label.new()
+	label.text = "Enter tag name:"
+	vbox.add_child(label)
+	
+	var line_edit = LineEdit.new()
+	line_edit.placeholder_text = "e.g., medieval, outdoor"
+	vbox.add_child(line_edit)
+	
+	# Handle confirmation
+	dialog.confirmed.connect(func():
+		var tag_name = line_edit.text.strip_edges().to_lower()
+		if tag_name.is_empty():
+			return
+		
+		# Add tag to asset
+		category_manager.add_tag(asset_path, tag_name)
+		category_manager.save_config_file()
+		
+		# Refresh display
+		discover_assets()
+		
+		dialog.queue_free()
+	)
+	
+	# Handle cancel
+	dialog.canceled.connect(func():
+		dialog.queue_free()
+	)
+	
+	# Show dialog
+	dialog.popup_centered()
+	line_edit.grab_focus()
+
+func _show_all_tags_dialog(asset_path: String):
+	# Create a dialog showing all available tags
+	var dialog = AcceptDialog.new()
+	dialog.title = "All Tags"
+	dialog.dialog_autowrap = true
+	dialog.size = Vector2i(350, 400)
+	dialog.ok_button_text = "Close"
+	add_child(dialog)
+	
+	var vbox = VBoxContainer.new()
+	dialog.add_child(vbox)
+	
+	var label = Label.new()
+	label.text = "Click tags to toggle assignment:"
+	vbox.add_child(label)
+	
+	# Scroll container for tags
+	var scroll = ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(0, 300)
+	vbox.add_child(scroll)
+	
+	var tags_vbox = VBoxContainer.new()
+	scroll.add_child(tags_vbox)
+	
+	var all_tags = category_manager.get_all_custom_tags()
+	var current_tags = category_manager.get_custom_tags(asset_path)
+	
+	for tag in all_tags:
+		var checkbox = CheckBox.new()
+		checkbox.text = tag
+		checkbox.button_pressed = tag in current_tags
+		checkbox.toggled.connect(func(pressed):
+			if pressed:
+				category_manager.add_tag(asset_path, tag)
+			else:
+				category_manager.remove_tag(asset_path, tag)
+			category_manager.save_config_file()
+			# Don't refresh immediately, let user select multiple
+		)
+		tags_vbox.add_child(checkbox)
+	
+	if all_tags.size() == 0:
+		var no_tags = Label.new()
+		no_tags.text = "No tags available. Create one with '+ New Tag...' option."
+		tags_vbox.add_child(no_tags)
+	
+	# Handle dialog close
+	dialog.confirmed.connect(func():
+		discover_assets()  # Refresh after dialog closes
+		dialog.queue_free()
+	)
+	
+	dialog.popup_centered()

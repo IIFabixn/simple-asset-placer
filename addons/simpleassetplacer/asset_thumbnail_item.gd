@@ -5,6 +5,7 @@ class_name AssetThumbnailItem
 
 signal thumbnail_item_selected(meshlib: MeshLibrary, item_id: int)
 signal asset_item_selected(asset_info: Dictionary)
+signal context_menu_requested(asset_item: AssetThumbnailItem, position: Vector2)
 
 var meshlib: MeshLibrary
 var item_id: int
@@ -16,6 +17,7 @@ var label: Label
 var selection_border: NinePatchRect
 var is_meshlib_item: bool = false
 var ui_setup_complete: bool = false
+var category_manager = null
 
 # Constructor for MeshLibrary items
 func _init(p_meshlib: MeshLibrary = null, p_item_id: int = -1, p_thumbnail_size: int = 64):
@@ -88,6 +90,9 @@ func setup_ui():
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_child(label)
 	
+	# Add category badges
+	_add_category_badges(vbox)
+	
 	# Store metadata for external access
 	if is_meshlib_item:
 		set_meta("item_id", item_id)
@@ -104,6 +109,108 @@ func setup_ui():
 	
 	# Mark setup as complete
 	ui_setup_complete = true
+
+func _add_category_badges(vbox: VBoxContainer):
+	if not category_manager or is_meshlib_item:
+		return
+	
+	# Get categories for this asset
+	var folder_cats = asset_info.get("folder_categories", [])
+	var custom_tags = asset_info.get("custom_tags", [])
+	var is_fav = category_manager and category_manager.is_favorite(asset_info.get("path", ""))
+	
+	# Combine all tags to show (limit to first 2)
+	var tags_to_show = []
+	
+	if is_fav:
+		tags_to_show.append({"text": "⭐", "color": Color(1.0, 0.84, 0.0), "type": "favorite"})
+	
+	# Add first custom tag if available
+	if custom_tags.size() > 0 and tags_to_show.size() < 2:
+		tags_to_show.append({"text": custom_tags[0], "color": Color(0.4, 0.8, 0.4), "type": "custom"})
+	
+	# Add second custom tag or first folder category
+	if tags_to_show.size() < 2:
+		if custom_tags.size() > 1:
+			tags_to_show.append({"text": custom_tags[1], "color": Color(0.4, 0.8, 0.4), "type": "custom"})
+		elif folder_cats.size() > 0:
+			tags_to_show.append({"text": folder_cats[0], "color": Color(0.5, 0.7, 1.0), "type": "folder"})
+	
+	# Create badge container
+	if tags_to_show.size() > 0:
+		var badge_container = HBoxContainer.new()
+		badge_container.alignment = BoxContainer.ALIGNMENT_CENTER
+		badge_container.add_theme_constant_override("separation", 4)
+		vbox.add_child(badge_container)
+		
+		for tag_data in tags_to_show:
+			var badge = Label.new()
+			badge.text = tag_data["text"]
+			badge.add_theme_color_override("font_color", tag_data["color"])
+			badge.add_theme_font_size_override("font_size", 10)
+			
+			# Add background panel
+			var panel = PanelContainer.new()
+			var style = StyleBoxFlat.new()
+			style.bg_color = Color(0.2, 0.2, 0.2, 0.8)
+			style.corner_radius_top_left = 3
+			style.corner_radius_top_right = 3
+			style.corner_radius_bottom_left = 3
+			style.corner_radius_bottom_right = 3
+			style.content_margin_left = 4
+			style.content_margin_right = 4
+			style.content_margin_top = 2
+			style.content_margin_bottom = 2
+			panel.add_theme_stylebox_override("panel", style)
+			panel.add_child(badge)
+			badge_container.add_child(panel)
+	
+	# Build comprehensive tooltip
+	_update_tooltip()
+
+func _update_tooltip():
+	if not category_manager:
+		return
+	
+	var tooltip_parts = []
+	
+	if not is_meshlib_item:
+		var asset_path = asset_info.get("path", "")
+		var folder_cats = asset_info.get("folder_categories", [])
+		var custom_tags = asset_info.get("custom_tags", [])
+		var is_fav = category_manager.is_favorite(asset_path)
+		var is_recent = category_manager.is_recent(asset_path)
+		
+		# Asset name
+		tooltip_parts.append("[b]" + asset_info.get("name", "Unknown") + "[/b]")
+		
+		# Path
+		tooltip_parts.append("[i]" + asset_path + "[/i]")
+		
+		# Special status
+		var status_parts = []
+		if is_fav:
+			status_parts.append("⭐ Favorite")
+		if is_recent:
+			status_parts.append("🕐 Recent")
+		if status_parts.size() > 0:
+			tooltip_parts.append("\n" + ", ".join(status_parts))
+		
+		# Folder categories
+		if folder_cats.size() > 0:
+			tooltip_parts.append("\n📁 Folders: " + " > ".join(folder_cats))
+		
+		# Custom tags
+		if custom_tags.size() > 0:
+			tooltip_parts.append("🏷️ Tags: " + ", ".join(custom_tags))
+		
+		tooltip_text = "\n".join(tooltip_parts)
+	else:
+		# Meshlib item tooltip
+		var item_name = meshlib.get_item_name(item_id)
+		if item_name == "":
+			item_name = "Item " + str(item_id)
+		tooltip_text = item_name
 
 func _generate_thumbnail_async():
 	# Set a better placeholder first
@@ -255,11 +362,26 @@ func _create_simple_asset_icon(extension: String):
 	texture.set_image(image)
 	thumbnail_rect.texture = texture
 
+func _gui_input(event: InputEvent):
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+			# Emit signal for context menu
+			context_menu_requested.emit(self, event.global_position)
+			accept_event()
+
 func _on_item_selected():
 	if is_meshlib_item:
 		thumbnail_item_selected.emit(meshlib, item_id)
 	else:
 		asset_item_selected.emit(asset_info)
+
+func set_category_manager(manager):
+	category_manager = manager
+
+func get_asset_path() -> String:
+	if is_meshlib_item:
+		return ""  # MeshLib items don't have paths
+	return asset_info.get("path", "")
 
 func set_selected(selected: bool):
 	is_selected = selected

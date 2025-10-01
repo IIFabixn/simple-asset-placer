@@ -1,0 +1,22 @@
+{
+	"_comment": "Simple Asset Placer - Custom Tags Configuration",
+	"_description": "This file stores custom tags for assets. Keys can be asset names or full paths.",
+	"_usage": "Right-click assets in the plugin to add/remove tags, or edit this file directly.",
+	
+	"tags": {
+		"cone": ["primitives", "test", "geometry"],
+		"cube": ["primitives", "test", "geometry"],
+		"SampleMeshLib": ["examples", "meshlib", "demo"]
+	},
+	
+	"tag_usage": {
+		"primitives": 2,
+		"test": 2,
+		"geometry": 2,
+		"examples": 1,
+		"meshlib": 1,
+		"demo": 1
+	},
+	
+	"recently_used": ["primitives", "test", "geometry"]
+}

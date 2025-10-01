@@ -8,6 +8,7 @@ const MeshLibraryBrowser = preload("res://addons/simpleassetplacer/meshlib_brows
 const ModelLibraryBrowser = preload("res://addons/simpleassetplacer/modellib_browser.gd")
 const PlacementSettings = preload("res://addons/simpleassetplacer/placement_settings.gd")
 const AssetThumbnailItem = preload("res://addons/simpleassetplacer/asset_thumbnail_item.gd")
+const CategoryManager = preload("res://addons/simpleassetplacer/category_manager.gd")
 
 signal asset_selected(asset_path: String, mesh_resource: Resource, settings: Dictionary)
 signal meshlib_item_selected(meshlib: MeshLibrary, item_id: int, settings: Dictionary)
@@ -31,6 +32,7 @@ var thumbnail_size: int = 64
 var discovered_assets: Array = []
 var mesh_thumbnails: Dictionary = {}
 var supported_extensions = ["obj", "fbx", "dae", "gltf", "glb", "blend", "tscn", "scn", "tres", "res", "meshlib"]
+var category_manager: CategoryManager = null
 
 # Thumbnail generation queue to prevent conflicts
 var thumbnail_queue: Array = []
@@ -38,6 +40,11 @@ var is_generating_thumbnails: bool = false
 
 func _ready():
 	name = "Asset Placer"
+	
+	# Initialize category manager
+	category_manager = CategoryManager.new()
+	category_manager.load_config_file()
+	
 	setup_ui()
 	discover_assets()
 
@@ -97,6 +104,7 @@ func setup_ui():
 	
 	# Create ModelLibraryBrowser
 	modellib_browser = ModelLibraryBrowser.new()
+	modellib_browser.set_category_manager(category_manager)
 	modellib_browser.asset_item_selected.connect(_on_asset_selected)
 	models_margin.add_child(modellib_browser)
 	
@@ -115,6 +123,7 @@ func setup_ui():
 	meshlib_tab.add_child(margin)
 	
 	meshlib_browser = MeshLibraryBrowser.new()
+	meshlib_browser.set_category_manager(category_manager)
 	meshlib_browser.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	meshlib_browser.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	margin.add_child(meshlib_browser)
@@ -356,6 +365,10 @@ func _on_asset_selected(asset_info: Dictionary):
 	# Load the resource and emit signal
 	var resource = load(asset_info.path)
 	if resource:
+		# Mark asset as used for recent tracking
+		if category_manager:
+			category_manager.mark_as_used(asset_info.path)
+		
 		var settings = placement_settings.get_placement_settings()
 		asset_selected.emit(asset_info.path, resource, settings)
 	else:

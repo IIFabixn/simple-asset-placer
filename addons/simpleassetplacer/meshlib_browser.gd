@@ -4,17 +4,23 @@ extends Control
 class_name MeshLibraryBrowser
 
 const AssetThumbnailItem = preload("res://addons/simpleassetplacer/asset_thumbnail_item.gd")
+const CategoryManager = preload("res://addons/simpleassetplacer/category_manager.gd")
 
 signal meshlib_item_selected(meshlib: MeshLibrary, item_id: int)
 
+var category_filter: OptionButton
 var meshlib_option: OptionButton
 var items_grid: GridContainer
 var scroll_container: ScrollContainer
 var current_meshlib: MeshLibrary
+var current_meshlib_path: String = ""
 var thumbnail_size: int = 64
 var selected_item_id: int = -1
 var selected_button: AssetThumbnailItem = null
 var current_search_text: String = ""
+var current_category_filter: String = ""
+var category_manager: CategoryManager = null
+var meshlib_items_data: Array = []  # Store item metadata
 
 func _ready():
 	setup_ui()
@@ -26,6 +32,11 @@ func setup_ui():
 	var vbox = VBoxContainer.new()
 	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(vbox)
+	
+	# Category filter dropdown
+	category_filter = OptionButton.new()
+	category_filter.add_item("All Categories")
+	vbox.add_child(category_filter)
 	
 	meshlib_option = OptionButton.new()
 	meshlib_option.add_item("Select MeshLibrary...")
@@ -48,7 +59,11 @@ func setup_ui():
 	scroll_container.add_child(items_grid)
 	
 	# Connect signals
+	category_filter.item_selected.connect(_on_category_filter_changed)
 	meshlib_option.item_selected.connect(_on_meshlib_selected)
+
+func set_category_manager(manager: CategoryManager):
+	category_manager = manager
 
 func update_grid_columns(available_width: float):
 	if items_grid:
@@ -67,7 +82,7 @@ func set_search_text(search_text: String):
 	current_search_text = search_text
 	# Refresh the items display with new search filter
 	if current_meshlib:
-		populate_meshlib_items(current_meshlib)
+		update_meshlib_grid()
 
 func populate_meshlib_options(meshlib_paths: Array):
 	meshlib_option.clear()
@@ -81,6 +96,8 @@ func populate_meshlib_options(meshlib_paths: Array):
 func _on_meshlib_selected(index: int):
 	if index == 0:  # "Select MeshLibrary..." option
 		current_meshlib = null
+		current_meshlib_path = ""
+		meshlib_items_data.clear()
 		clear_items()
 		return
 	
@@ -89,7 +106,9 @@ func _on_meshlib_selected(index: int):
 	
 	if meshlib is MeshLibrary:
 		current_meshlib = meshlib
+		current_meshlib_path = meshlib_path
 		populate_meshlib_items(meshlib)
+		populate_category_filter()
 
 func clear_items():
 	for child in items_grid.get_children():
@@ -97,24 +116,89 @@ func clear_items():
 
 func populate_meshlib_items(meshlib: MeshLibrary):
 	clear_items()
+	meshlib_items_data.clear()
 	
 	var item_ids = meshlib.get_item_list()
 	
+	# Build item metadata with category info
 	for item_id in item_ids:
-		# Apply search filter if active
-		if current_search_text != "":
-			var item_name = meshlib.get_item_name(item_id)
-			if item_name == "":
-				item_name = "Item " + str(item_id)
-			
-			# Skip items that don't match search
-			if not item_name.to_lower().contains(current_search_text.to_lower()):
-				continue
+		var item_name = meshlib.get_item_name(item_id)
+		if item_name == "":
+			item_name = "Item " + str(item_id)
 		
+		var item_data = {
+			"id": item_id,
+			"name": item_name,
+			"meshlib_path": current_meshlib_path,
+			"folder_categories": [],
+			"custom_tags": []
+		}
+		
+		# Extract categories from meshlib path
+		if category_manager and not current_meshlib_path.is_empty():
+			item_data["folder_categories"] = category_manager.extract_folder_categories(current_meshlib_path)
+			# Use meshlib path + item name as key for custom tags
+			var tag_key = current_meshlib_path + ":" + item_name
+			item_data["custom_tags"] = category_manager.get_custom_tags(tag_key)
+		
+		meshlib_items_data.append(item_data)
+	
+	# Apply filters and display items
+	update_meshlib_grid()
+
+func update_meshlib_grid():
+	clear_items()
+	
+	var filtered_items = get_filtered_meshlib_items()
+	
+	for item_data in filtered_items:
 		# Create thumbnail item using the new AssetThumbnailItem class
-		var thumbnail_item = AssetThumbnailItem.new(meshlib, item_id, thumbnail_size)
+		var thumbnail_item = AssetThumbnailItem.new(current_meshlib, item_data["id"], thumbnail_size)
 		thumbnail_item.thumbnail_item_selected.connect(_on_meshlib_item_selected)
 		items_grid.add_child(thumbnail_item)
+
+func get_filtered_meshlib_items() -> Array:
+	var filtered = []
+	
+	for item_data in meshlib_items_data:
+		# Search filter
+		if current_search_text != "":
+			if not item_data["name"].to_lower().contains(current_search_text.to_lower()):
+				continue
+		
+		# Category filter
+		if current_category_filter != "":
+			var passes_category_filter = false
+			
+			# Handle special categories
+			if current_category_filter == "⭐ Favorites":
+				if category_manager:
+					var fav_key = item_data["meshlib_path"] + ":" + item_data["name"]
+					if category_manager.is_favorite(fav_key):
+						passes_category_filter = true
+			elif current_category_filter == "🕐 Recent":
+				if category_manager:
+					var recent_key = item_data["meshlib_path"] + ":" + item_data["name"]
+					if category_manager.is_recent(recent_key):
+						passes_category_filter = true
+			else:
+				# Remove leading spaces from hierarchical display
+				var clean_category = current_category_filter.strip_edges()
+				
+				# Check folder categories
+				if clean_category in item_data["folder_categories"]:
+					passes_category_filter = true
+				
+				# Check custom tags
+				if clean_category in item_data["custom_tags"]:
+					passes_category_filter = true
+			
+			if not passes_category_filter:
+				continue
+		
+		filtered.append(item_data)
+	
+	return filtered
 
 func _on_meshlib_item_selected(meshlib: MeshLibrary, item_id: int):
 	# Clear previous selection
@@ -136,3 +220,90 @@ func _on_meshlib_item_selected(meshlib: MeshLibrary, item_id: int):
 	
 	meshlib_item_selected.emit(meshlib, item_id)
 
+func _on_category_filter_changed(index: int):
+	if index == 0:
+		current_category_filter = ""
+	else:
+		# Check if this item has metadata (for folder categories with full paths)
+		var metadata = category_filter.get_item_metadata(index)
+		if metadata != null:
+			# Use the leaf folder name for matching
+			current_category_filter = metadata
+		else:
+			# Use the display text (for special categories and custom tags)
+			current_category_filter = category_filter.get_item_text(index)
+	update_meshlib_grid()
+
+func populate_category_filter():
+	if not category_manager:
+		return
+	
+	category_filter.clear()
+	category_filter.add_item("All Categories")
+	
+	# Add special categories first
+	var has_special = false
+	
+	# Note: For MeshLib items, we use meshlib_path:item_name as the key
+	# Check if any items are favorited or recent
+	for item_data in meshlib_items_data:
+		var item_key = item_data["meshlib_path"] + ":" + item_data["name"]
+		if category_manager.is_favorite(item_key) or category_manager.is_recent(item_key):
+			has_special = true
+			break
+	
+	if has_special:
+		# Only show if items exist in these categories
+		var has_favorites = false
+		var has_recent = false
+		
+		for item_data in meshlib_items_data:
+			var item_key = item_data["meshlib_path"] + ":" + item_data["name"]
+			if category_manager.is_favorite(item_key):
+				has_favorites = true
+			if category_manager.is_recent(item_key):
+				has_recent = true
+		
+		if has_favorites:
+			category_filter.add_item("⭐ Favorites")
+		if has_recent:
+			category_filter.add_item("🕐 Recent")
+		
+		category_filter.add_separator()
+	
+	# Get all folder categories from meshlib path with full hierarchy
+	var folder_categories = []
+	if not current_meshlib_path.is_empty():
+		folder_categories = category_manager.extract_folder_categories(current_meshlib_path)
+	
+	if folder_categories.size() > 0:
+		category_filter.add_item("📁 Folder Categories")
+		category_filter.set_item_disabled(category_filter.get_item_count() - 1, true)
+		
+		# Build cumulative path for display
+		var path_parts = []
+		for cat in folder_categories:
+			path_parts.append(cat)
+			var full_path = " > ".join(path_parts)
+			category_filter.add_item("  " + full_path)
+			# Store leaf name for matching
+			category_filter.set_item_metadata(category_filter.get_item_count() - 1, cat)
+	
+	# Get custom tags used by any item
+	var all_tags_set = {}
+	for item_data in meshlib_items_data:
+		for tag in item_data["custom_tags"]:
+			all_tags_set[tag] = true
+	
+	var custom_tags = all_tags_set.keys()
+	custom_tags.sort()
+	
+	if custom_tags.size() > 0:
+		if folder_categories.size() > 0:
+			category_filter.add_separator()
+		
+		category_filter.add_item("🏷️ Custom Tags")
+		category_filter.set_item_disabled(category_filter.get_item_count() - 1, true)
+		
+		for tag in custom_tags:
+			category_filter.add_item("  " + tag)

@@ -165,11 +165,136 @@ func handles(object) -> bool:
 	"""Check if we should handle input for this object"""
 	return TransformationManager.is_any_mode_active()
 
+func _shortcut_input(event: InputEvent) -> void:
+	"""Handle shortcut input with high priority to prevent conflicts"""
+	
+	# Only handle input when plugin modes are active
+	if not TransformationManager.is_any_mode_active():
+		return
+	
+	# Handle key events to prevent conflicts with Godot shortcuts
+	if event is InputEventKey and event.pressed:
+		var key_string = OS.get_keycode_string(event.keycode)
+		
+		# Build full key string with modifiers
+		var full_key_string = ""
+		if event.ctrl_pressed:
+			full_key_string += "CTRL+"
+		if event.alt_pressed:
+			full_key_string += "ALT+"
+		if event.shift_pressed:
+			full_key_string += "SHIFT+"
+		full_key_string += key_string
+		
+		# Get current dock settings for key mappings
+		var current_settings = {}
+		if dock and dock.has_method("get_placement_settings"):
+			var dock_settings = dock.get_placement_settings()
+			current_settings.merge(_settings, true)
+			current_settings.merge(dock_settings, true)
+		
+		# Check if this key matches any of our plugin keybindings
+		if _is_plugin_key(full_key_string, current_settings) or _is_plugin_key(key_string, current_settings):
+			# This is our key - consume it to prevent Godot from processing it
+			get_viewport().set_input_as_handled()
+
 func _forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
-	"""Forward 3D GUI input - delegate to transformation manager if needed"""
-	# The architecture handles input through the process loop
-	# This is just for any special viewport-specific input
+	"""Forward 3D GUI input - intercept and consume plugin-related keys"""
+	
+	# Only handle input when plugin modes are active
+	if not TransformationManager.is_any_mode_active():
+		return EditorPlugin.AFTER_GUI_INPUT_PASS
+	
+	# Handle key events to prevent conflicts with Godot shortcuts
+	if event is InputEventKey and event.pressed:
+		var key_string = OS.get_keycode_string(event.keycode)
+		
+		# Build full key string with modifiers
+		var full_key_string = ""
+		if event.ctrl_pressed:
+			full_key_string += "CTRL+"
+		if event.alt_pressed:
+			full_key_string += "ALT+"
+		if event.shift_pressed:
+			full_key_string += "SHIFT+"
+		full_key_string += key_string
+		
+		# Get current dock settings for key mappings
+		var current_settings = {}
+		if dock and dock.has_method("get_placement_settings"):
+			var dock_settings = dock.get_placement_settings()
+			current_settings.merge(_settings, true)
+			current_settings.merge(dock_settings, true)
+		
+		# Check if this key matches any of our plugin keybindings
+		if _is_plugin_key(full_key_string, current_settings) or _is_plugin_key(key_string, current_settings):
+			# This is our key - consume it to prevent Godot from processing it
+			# Mark the event as handled to prevent further processing
+			get_viewport().set_input_as_handled()
+			return EditorPlugin.AFTER_GUI_INPUT_PASS
+	
+	# Let Godot handle other inputs
 	return EditorPlugin.AFTER_GUI_INPUT_PASS
+
+func _forward_canvas_gui_input(event: InputEvent) -> bool:
+	"""Handle canvas/2D GUI input - also intercept plugin keys"""
+	
+	# Only handle input when plugin modes are active
+	if not TransformationManager.is_any_mode_active():
+		return false
+	
+	# Handle key events to prevent conflicts with Godot shortcuts
+	if event is InputEventKey and event.pressed:
+		var key_string = OS.get_keycode_string(event.keycode)
+		
+		# Build full key string with modifiers
+		var full_key_string = ""
+		if event.ctrl_pressed:
+			full_key_string += "CTRL+"
+		if event.alt_pressed:
+			full_key_string += "ALT+"
+		if event.shift_pressed:
+			full_key_string += "SHIFT+"
+		full_key_string += key_string
+		
+		# Get current dock settings for key mappings
+		var current_settings = {}
+		if dock and dock.has_method("get_placement_settings"):
+			var dock_settings = dock.get_placement_settings()
+			current_settings.merge(_settings, true)
+			current_settings.merge(dock_settings, true)
+		
+		# Check if this key matches any of our plugin keybindings
+		if _is_plugin_key(full_key_string, current_settings) or _is_plugin_key(key_string, current_settings):
+			# This is our key - consume it to prevent Godot from processing it
+			return true
+	
+	# Let Godot handle other inputs
+	return false
+
+func _is_plugin_key(key_string: String, settings: Dictionary) -> bool:
+	"""Check if a key string matches any plugin keybinding"""
+	var plugin_keys = [
+		"cancel_key",
+		"transform_mode_key", 
+		"height_up_key",
+		"height_down_key",
+		"rotate_x_key",
+		"rotate_y_key", 
+		"rotate_z_key",
+		"reset_rotation_key",
+		"scale_up_key",
+		"scale_down_key",
+		"scale_reset_key",
+		"reverse_modifier_key",
+		"large_increment_modifier_key"
+	]
+	
+	for plugin_key in plugin_keys:
+		if settings.get(plugin_key, "") == key_string:
+			return true
+	
+	return false
 
 ## Asset Selection Handlers (From Dock)
 

@@ -737,12 +737,22 @@ func _input(event: InputEvent):
 			get_viewport().set_input_as_handled()
 			return
 		
-		# Get the key name
-		var key_string = OS.get_keycode_string(event.keycode)
+		# Get the key name and build full key string with modifiers
+		var base_key_string = OS.get_keycode_string(event.keycode)
+		var key_string = ""
 		
-		# Skip modifier keys alone
+		# Handle standalone modifier keys (CTRL, ALT, SHIFT alone)
 		if event.keycode in [KEY_SHIFT, KEY_CTRL, KEY_ALT, KEY_META]:
-			return
+			key_string = base_key_string  # Just "CTRL" or "SHIFT" etc.
+		else:
+			# Handle modifier combinations (CTRL+X, ALT+Y, etc.)
+			if event.ctrl_pressed:
+				key_string += "CTRL+"
+			if event.alt_pressed:
+				key_string += "ALT+"
+			if event.shift_pressed:
+				key_string += "SHIFT+"
+			key_string += base_key_string
 		
 		# Update the appropriate key property
 		var key_property = listening_button.get_meta("key_property")

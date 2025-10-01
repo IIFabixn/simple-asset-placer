@@ -166,7 +166,17 @@ func handles(object) -> bool:
 	return TransformationManager.is_any_mode_active()
 
 func _input(event: InputEvent) -> void:
-	"""Handle input at the highest priority to prevent TAB focus issues"""
+	"""Handle input at the highest priority to prevent TAB focus issues and mouse wheel zoom"""
+	
+	# Handle mouse wheel events when modes are active to prevent viewport zoom
+	if event is InputEventMouseButton and TransformationManager.is_any_mode_active():
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			# Check if we should handle this event (action key is held)
+			if TransformationManager.handle_mouse_wheel_input(event):
+				# Event was handled - consume it IMMEDIATELY to prevent viewport zoom
+				get_viewport().set_input_as_handled()
+				return
+	
 	if event is InputEventKey and event.pressed:
 		var key_string = OS.get_keycode_string(event.keycode)
 		
@@ -250,10 +260,11 @@ func _forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 	# Handle mouse wheel events when modes are active
 	if event is InputEventMouseButton and TransformationManager.is_any_mode_active():
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			# Pass the event to TransformationManager for processing
+			# Check if we should handle this event (action key is held)
 			if TransformationManager.handle_mouse_wheel_input(event):
-				# Event was handled - consume it to prevent viewport zoom
-				get_viewport().set_input_as_handled()
+				# Event was handled - consume it IMMEDIATELY to prevent viewport zoom
+				# Mark as handled first, then return stop
+				event.set_canceled(true)
 				return EditorPlugin.AFTER_GUI_INPUT_STOP
 	
 	# Handle key events to prevent conflicts with Godot shortcuts

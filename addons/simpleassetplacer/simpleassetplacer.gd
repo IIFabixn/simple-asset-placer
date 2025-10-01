@@ -165,12 +165,48 @@ func handles(object) -> bool:
 	"""Check if we should handle input for this object"""
 	return TransformationManager.is_any_mode_active()
 
+func _input(event: InputEvent) -> void:
+	"""Handle input at the highest priority to prevent TAB focus issues"""
+	if event is InputEventKey and event.pressed:
+		var key_string = OS.get_keycode_string(event.keycode)
+		
+		# Build full key string with modifiers
+		var full_key_string = ""
+		if event.ctrl_pressed:
+			full_key_string += "CTRL+"
+		if event.alt_pressed:
+			full_key_string += "ALT+"
+		if event.shift_pressed:
+			full_key_string += "SHIFT+"
+		full_key_string += key_string
+		
+		# Get current settings for transform mode key
+		var current_settings = {}
+		if dock and dock.has_method("get_placement_settings"):
+			var dock_settings = dock.get_placement_settings()
+			current_settings.merge(_settings, true)
+			current_settings.merge(dock_settings, true)
+		
+		# Check if this is the transform mode key
+		var transform_key = current_settings.get("transform_mode_key", "TAB")
+		if key_string == transform_key or full_key_string == transform_key:
+			# Only handle if we have a selected Node3D
+			var selection = EditorInterface.get_selection()
+			var selected_nodes = selection.get_selected_nodes()
+			
+			# Check if we have a valid Node3D selected
+			for node in selected_nodes:
+				if node is Node3D:
+					# This is our transform mode activation - consume the event completely
+					get_viewport().set_input_as_handled()
+					# Prevent it from propagating as a TAB navigation event
+					return
+			
+			# If no valid Node3D selected, let TAB act normally (but consume it anyway for now)
+			get_viewport().set_input_as_handled()
+
 func _shortcut_input(event: InputEvent) -> void:
 	"""Handle shortcut input with high priority to prevent conflicts"""
-	
-	# Only handle input when plugin modes are active
-	if not TransformationManager.is_any_mode_active():
-		return
 	
 	# Handle key events to prevent conflicts with Godot shortcuts
 	if event is InputEventKey and event.pressed:
@@ -193,18 +229,24 @@ func _shortcut_input(event: InputEvent) -> void:
 			current_settings.merge(_settings, true)
 			current_settings.merge(dock_settings, true)
 		
-		# Check if this key matches any of our plugin keybindings
-		if _is_plugin_key(full_key_string, current_settings) or _is_plugin_key(key_string, current_settings):
-			# This is our key - consume it to prevent Godot from processing it
+		# Special handling for transform mode key - intercept even when no mode is active
+		var transform_key = current_settings.get("transform_mode_key", "TAB")
+		if key_string == transform_key or full_key_string == transform_key:
+			# Consume the event immediately to prevent focus change
 			get_viewport().set_input_as_handled()
+			# Let TransformationManager handle the actual mode activation
+			return
+		
+		# For other plugin keys, only handle when modes are active
+		if TransformationManager.is_any_mode_active():
+			# Check if this key matches any of our plugin keybindings
+			if _is_plugin_key(full_key_string, current_settings) or _is_plugin_key(key_string, current_settings):
+				# This is our key - consume it to prevent Godot from processing it
+				get_viewport().set_input_as_handled()
 
 func _forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 	"""Forward 3D GUI input - intercept and consume plugin-related keys"""
 	
-	# Only handle input when plugin modes are active
-	if not TransformationManager.is_any_mode_active():
-		return EditorPlugin.AFTER_GUI_INPUT_PASS
-	
 	# Handle key events to prevent conflicts with Godot shortcuts
 	if event is InputEventKey and event.pressed:
 		var key_string = OS.get_keycode_string(event.keycode)
@@ -226,8 +268,26 @@ func _forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 			current_settings.merge(_settings, true)
 			current_settings.merge(dock_settings, true)
 		
+		# Special handling for transform mode key - intercept even when no mode is active
+		var transform_key = current_settings.get("transform_mode_key", "TAB")
+		if key_string == transform_key or full_key_string == transform_key:
+			# Consume the event to prevent focus change 
+			get_viewport().set_input_as_handled()
+			return EditorPlugin.AFTER_GUI_INPUT_STOP
+		
+		# For other plugin keys, only handle when modes are active
+		if not TransformationManager.is_any_mode_active():
+			return EditorPlugin.AFTER_GUI_INPUT_PASS
+		
+		# Get current dock settings for key mappings
+		var settings_for_keys = {}
+		if dock and dock.has_method("get_placement_settings"):
+			var dock_settings = dock.get_placement_settings()
+			settings_for_keys.merge(_settings, true)
+			settings_for_keys.merge(dock_settings, true)
+		
 		# Check if this key matches any of our plugin keybindings
-		if _is_plugin_key(full_key_string, current_settings) or _is_plugin_key(key_string, current_settings):
+		if _is_plugin_key(full_key_string, settings_for_keys) or _is_plugin_key(key_string, settings_for_keys):
 			# This is our key - consume it to prevent Godot from processing it
 			# Mark the event as handled to prevent further processing
 			get_viewport().set_input_as_handled()

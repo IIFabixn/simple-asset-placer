@@ -37,6 +37,11 @@ static var settings: Dictionary = {}
 static var previous_keys: Dictionary = {}
 static var previous_mouse: Dictionary = {}
 
+# Grace period tracking for tap vs hold detection
+static var key_press_times: Dictionary = {}  # Track when each key was pressed
+static var key_tap_grace_period: float = 0.15  # 150ms to distinguish tap from hold
+static var pending_taps: Dictionary = {}  # Keys that might be taps, waiting for release
+
 ## Core Input Polling
 
 static func update_input_state(input_settings: Dictionary = {}):
@@ -61,6 +66,8 @@ static func update_input_state(input_settings: Dictionary = {}):
 
 static func _update_key_states():
 	"""Update all key states based on current settings"""
+	var current_time = Time.get_ticks_msec() / 1000.0  # Convert to seconds
+	
 	# Core navigation keys
 	current_keys["tab"] = Input.is_key_pressed(string_to_keycode(settings.get("transform_mode_key", "TAB")))
 	current_keys["escape"] = Input.is_key_pressed(KEY_ESCAPE)
@@ -75,13 +82,20 @@ static func _update_key_states():
 	current_keys["height_up"] = Input.is_key_pressed(string_to_keycode(height_up_key))
 	current_keys["height_down"] = Input.is_key_pressed(string_to_keycode(height_down_key))
 	
-
+	# Track key press times for grace period
+	_track_key_press_time("height_up", current_time)
+	_track_key_press_time("height_down", current_time)
 	
 	# Rotation keys
 	current_keys["rotate_x"] = Input.is_key_pressed(string_to_keycode(settings.get("rotate_x_key", "X")))
 	current_keys["rotate_y"] = Input.is_key_pressed(string_to_keycode(settings.get("rotate_y_key", "Y")))
 	current_keys["rotate_z"] = Input.is_key_pressed(string_to_keycode(settings.get("rotate_z_key", "Z")))
 	current_keys["reset_rotation"] = Input.is_key_pressed(string_to_keycode(settings.get("reset_rotation_key", "T")))
+	
+	# Track rotation key press times for grace period
+	_track_key_press_time("rotate_x", current_time)
+	_track_key_press_time("rotate_y", current_time)
+	_track_key_press_time("rotate_z", current_time)
 	
 	# Scale keys
 	var scale_up_key = settings.get("scale_up_key", "PAGE_UP")
@@ -91,6 +105,30 @@ static func _update_key_states():
 	current_keys["scale_down"] = Input.is_key_pressed(string_to_keycode(scale_down_key))
 	current_keys["reset_scale"] = Input.is_key_pressed(string_to_keycode(scale_reset_key))
 	
+	# Track scale key press times for grace period
+	_track_key_press_time("scale_up", current_time)
+	_track_key_press_time("scale_down", current_time)
+
+static func _track_key_press_time(key_name: String, current_time: float):
+	"""Track when a key was just pressed for tap vs hold detection"""
+	var is_pressed = current_keys.get(key_name, false)
+	var was_pressed = previous_keys.get(key_name, false)
+	
+	# If key was just pressed this frame, record the time and mark as pending tap
+	if is_pressed and not was_pressed:
+		key_press_times[key_name] = current_time
+		pending_taps[key_name] = true
+	
+	# If key is still held beyond grace period, remove from pending taps
+	elif is_pressed and was_pressed and pending_taps.has(key_name):
+		var time_held = current_time - key_press_times.get(key_name, current_time)
+		if time_held > key_tap_grace_period:
+			pending_taps.erase(key_name)  # It's a hold, not a tap
+	
+	# If key was released, clean up tracking
+	elif not is_pressed and key_press_times.has(key_name):
+		key_press_times.erase(key_name)
+
 
 
 static func _update_mouse_states():
@@ -111,10 +149,42 @@ static func is_key_pressed(key_name: String) -> bool:
 	return current_keys.get(key_name, false)
 
 static func is_key_just_pressed(key_name: String) -> bool:
-	"""Check if a key was just pressed this frame (edge detection)"""
+	"""Check if a key was just pressed this frame (edge detection)
+	For action keys (rotation, scale, height), this checks if it was a 'tap' (quick press/release)
+	For other keys (tab, cancel, etc.), uses normal edge detection"""
 	var current = current_keys.get(key_name, false)
 	var previous = previous_keys.get(key_name, false)
+	
+	# List of keys that should use tap detection (for mouse wheel combos)
+	var tap_detection_keys = ["height_up", "height_down", "rotate_x", "rotate_y", "rotate_z", "scale_up", "scale_down"]
+	
+	# For tap detection keys, only return true on release if it was a quick tap
+	if key_name in tap_detection_keys:
+		# Check if key was just released after being in pending_taps
+		# This means it was released within the grace period = it's a tap!
+		if not current and previous and pending_taps.has(key_name):
+			pending_taps.erase(key_name)
+			return true  # This was a quick tap, perform the action
+		
+		# Key is still held or was just pressed - no action yet
+		return false
+	
+	# For all other keys (tab, cancel, etc.), use normal edge detection
 	return current and not previous
+
+static func is_key_held_for_wheel(key_name: String) -> bool:
+	"""Check if a key is being held long enough to be used with mouse wheel"""
+	if not is_key_pressed(key_name):
+		return false
+	
+	if not key_press_times.has(key_name):
+		return false
+	
+	var current_time = Time.get_ticks_msec() / 1000.0
+	var time_since_press = current_time - key_press_times[key_name]
+	
+	# Key is held beyond grace period OR still within grace period (waiting to see if it's a tap)
+	return time_since_press >= 0.0
 
 static func is_key_just_released(key_name: String) -> bool:
 	"""Check if a key was just released this frame"""
@@ -232,9 +302,13 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 	# Determine wheel direction (+1 for up, -1 for down)
 	var wheel_direction = 1 if wheel_up else -1
 	
-	# Check which action keys are currently held
+	# Check which action keys are currently held for wheel combo
+	# When wheel is used, any key that's being held (even if just pressed) can be used
 	# Height adjustment keys (Q/E)
-	if is_key_pressed("height_up") or is_key_pressed("height_down"):
+	if is_key_held_for_wheel("height_up") or is_key_held_for_wheel("height_down"):
+		# Remove from pending taps since wheel was used
+		pending_taps.erase("height_up")
+		pending_taps.erase("height_down")
 		return {
 			"action": "height",
 			"direction": wheel_direction,
@@ -242,7 +316,10 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 		}
 	
 	# Scale adjustment keys (PAGE_UP/PAGE_DOWN)
-	if is_key_pressed("scale_up") or is_key_pressed("scale_down"):
+	if is_key_held_for_wheel("scale_up") or is_key_held_for_wheel("scale_down"):
+		# Remove from pending taps since wheel was used
+		pending_taps.erase("scale_up")
+		pending_taps.erase("scale_down")
 		return {
 			"action": "scale",
 			"direction": wheel_direction,
@@ -250,7 +327,8 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 		}
 	
 	# Rotation keys (X/Y/Z)
-	if is_key_pressed("rotate_x"):
+	if is_key_held_for_wheel("rotate_x"):
+		pending_taps.erase("rotate_x")
 		return {
 			"action": "rotation",
 			"axis": "X",
@@ -258,7 +336,8 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 			"large_increment": event.alt_pressed,
 			"reverse_modifier": event.shift_pressed
 		}
-	elif is_key_pressed("rotate_y"):
+	elif is_key_held_for_wheel("rotate_y"):
+		pending_taps.erase("rotate_y")
 		return {
 			"action": "rotation",
 			"axis": "Y",
@@ -266,7 +345,8 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 			"large_increment": event.alt_pressed,
 			"reverse_modifier": event.shift_pressed
 		}
-	elif is_key_pressed("rotate_z"):
+	elif is_key_held_for_wheel("rotate_z"):
+		pending_taps.erase("rotate_z")
 		return {
 			"action": "rotation",
 			"axis": "Z",

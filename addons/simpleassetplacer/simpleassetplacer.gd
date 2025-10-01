@@ -245,7 +245,16 @@ func _shortcut_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 
 func _forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
-	"""Forward 3D GUI input - intercept and consume plugin-related keys"""
+	"""Forward 3D GUI input - intercept and consume plugin-related keys and mouse wheel"""
+	
+	# Handle mouse wheel events when modes are active
+	if event is InputEventMouseButton and TransformationManager.is_any_mode_active():
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			# Pass the event to TransformationManager for processing
+			if TransformationManager.handle_mouse_wheel_input(event):
+				# Event was handled - consume it to prevent viewport zoom
+				get_viewport().set_input_as_handled()
+				return EditorPlugin.AFTER_GUI_INPUT_STOP
 	
 	# Handle key events to prevent conflicts with Godot shortcuts
 	if event is InputEventKey and event.pressed:
@@ -418,10 +427,3 @@ func debug_print_status():
 	print("AssetPlacer System Status:")
 	for key in status:
 		print("  ", key, ": ", status[key])
-
-## Legacy Compatibility (Minimal)
-
-# Keep minimal legacy compatibility for any external code that might reference these
-func string_to_keycode(key_string: String) -> Key:
-	"""Legacy compatibility - delegate to InputHandler"""
-	return InputHandler.string_to_keycode(key_string)

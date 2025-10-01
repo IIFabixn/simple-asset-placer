@@ -396,7 +396,8 @@ static func _apply_height_adjustment(wheel_input: Dictionary):
 	if reverse:
 		direction = -direction
 	
-	var step = placement_settings.get("height_adjustment_step", 0.1)
+	# Mouse wheel uses fine adjustment by default (no large increment for height with mouse wheel currently)
+	var step = placement_settings.get("fine_height_increment", 0.01)
 	
 	if current_mode == "placement":
 		if direction > 0:
@@ -413,7 +414,8 @@ static func _apply_scale_adjustment(wheel_input: Dictionary):
 	var direction = wheel_input.get("direction", 0)
 	var large_increment = wheel_input.get("large_increment", false)
 	
-	var step = placement_settings.get("scale_increment", 0.1)
+	# Mouse wheel uses fine adjustment by default, unless ALT is held for large increment
+	var step = placement_settings.get("fine_scale_increment", 0.01)
 	if large_increment:
 		step = placement_settings.get("large_scale_increment", 0.5)
 	
@@ -437,7 +439,8 @@ static func _apply_rotation_adjustment(wheel_input: Dictionary):
 	var large_increment = wheel_input.get("large_increment", false)
 	var reverse = wheel_input.get("reverse_modifier", false)
 	
-	var step = placement_settings.get("rotation_increment", 15.0)
+	# Mouse wheel uses fine adjustment by default, unless ALT is held for large increment
+	var step = placement_settings.get("fine_rotation_increment", 5.0)
 	if large_increment:
 		step = placement_settings.get("large_rotation_increment", 90.0)
 	

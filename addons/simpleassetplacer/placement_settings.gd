@@ -37,12 +37,15 @@ var scale_up_key_button: Button
 var scale_down_key_button: Button
 var scale_reset_key_button: Button
 var scale_increment_spin: SpinBox
+var fine_scale_increment_spin: SpinBox
 var large_scale_increment_spin: SpinBox
 
 # Height Adjustment Controls
 var height_up_key_button: Button
 var height_down_key_button: Button
 var height_step_spin: SpinBox
+var fine_height_increment_spin: SpinBox
+var large_height_increment_spin: SpinBox
 
 # Modifier Key Controls
 var reverse_modifier_key_button: Button
@@ -80,12 +83,15 @@ var scale_up_key: String = "PAGE_UP"
 var scale_down_key: String = "PAGE_DOWN"
 var scale_reset_key: String = "HOME"
 var scale_increment: float = 0.1
+var fine_scale_increment: float = 0.01
 var large_scale_increment: float = 0.5
 
 # Height Adjustment Settings
 var height_up_key: String = "Q"      # Raise preview height
 var height_down_key: String = "E"    # Lower preview height
 var height_adjustment_step: float = 0.1
+var fine_height_increment: float = 0.01
+var large_height_increment: float = 1.0
 
 # Modifier Key Settings
 var reverse_modifier_key: String = "SHIFT"    # Reverse rotation direction
@@ -450,8 +456,25 @@ func setup_ui():
 	scale_increment_spin.custom_minimum_size.x = 80
 	scale_increment_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scale_increment_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	scale_increment_spin.tooltip_text = "Default scale increment"
+	scale_increment_spin.tooltip_text = "Default scale increment (keyboard keys)"
 	scale_grid.add_child(scale_increment_spin)
+	
+	# Fine Scale Increment
+	var fine_scale_increment_label = Label.new()
+	fine_scale_increment_label.text = "Fine Increment:"
+	fine_scale_increment_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scale_grid.add_child(fine_scale_increment_label)
+	
+	fine_scale_increment_spin = SpinBox.new()
+	fine_scale_increment_spin.min_value = 0.001
+	fine_scale_increment_spin.max_value = 0.1
+	fine_scale_increment_spin.step = 0.001
+	fine_scale_increment_spin.value = fine_scale_increment
+	fine_scale_increment_spin.custom_minimum_size.x = 80
+	fine_scale_increment_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	fine_scale_increment_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	fine_scale_increment_spin.tooltip_text = "Fine scale increment for mouse wheel"
+	scale_grid.add_child(fine_scale_increment_spin)
 	
 	# Large Scale Increment
 	var large_scale_increment_label = Label.new()
@@ -467,7 +490,7 @@ func setup_ui():
 	large_scale_increment_spin.custom_minimum_size.x = 80
 	large_scale_increment_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	large_scale_increment_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	large_scale_increment_spin.tooltip_text = "Alt+Key scale increment"
+	large_scale_increment_spin.tooltip_text = "Large scale increment (with ALT modifier)"
 	scale_grid.add_child(large_scale_increment_spin)
 	
 	# Add separator for height adjustment settings
@@ -530,8 +553,42 @@ func setup_ui():
 	height_step_spin.custom_minimum_size.x = 80
 	height_step_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	height_step_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	height_step_spin.tooltip_text = "Step size for height adjustment"
+	height_step_spin.tooltip_text = "Step size for height adjustment (keyboard keys)"
 	height_grid.add_child(height_step_spin)
+	
+	# Fine Height Increment
+	var fine_height_label = Label.new()
+	fine_height_label.text = "Fine Height Step:"
+	fine_height_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	height_grid.add_child(fine_height_label)
+	
+	fine_height_increment_spin = SpinBox.new()
+	fine_height_increment_spin.min_value = 0.001
+	fine_height_increment_spin.max_value = 0.5
+	fine_height_increment_spin.step = 0.001
+	fine_height_increment_spin.value = fine_height_increment
+	fine_height_increment_spin.custom_minimum_size.x = 80
+	fine_height_increment_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	fine_height_increment_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	fine_height_increment_spin.tooltip_text = "Fine height increment for mouse wheel"
+	height_grid.add_child(fine_height_increment_spin)
+	
+	# Large Height Increment
+	var large_height_label = Label.new()
+	large_height_label.text = "Large Height Step:"
+	large_height_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	height_grid.add_child(large_height_label)
+	
+	large_height_increment_spin = SpinBox.new()
+	large_height_increment_spin.min_value = 0.5
+	large_height_increment_spin.max_value = 10.0
+	large_height_increment_spin.step = 0.1
+	large_height_increment_spin.value = large_height_increment
+	large_height_increment_spin.custom_minimum_size.x = 80
+	large_height_increment_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	large_height_increment_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	large_height_increment_spin.tooltip_text = "Large height increment (with ALT modifier)"
+	height_grid.add_child(large_height_increment_spin)
 	
 	# Add separator for modifier keys
 	var modifier_separator = HSeparator.new()
@@ -678,12 +735,15 @@ func setup_ui():
 	scale_down_key_button.pressed.connect(_on_key_binding_button_pressed.bind(scale_down_key_button, "scale_down_key"))
 	scale_reset_key_button.pressed.connect(_on_key_binding_button_pressed.bind(scale_reset_key_button, "scale_reset_key"))
 	scale_increment_spin.value_changed.connect(_on_scale_increment_changed)
+	fine_scale_increment_spin.value_changed.connect(_on_scale_increment_changed)
 	large_scale_increment_spin.value_changed.connect(_on_scale_increment_changed)
 	
 	# Connect height adjustment control signals
 	height_up_key_button.pressed.connect(_on_key_binding_button_pressed.bind(height_up_key_button, "height_up_key"))
 	height_down_key_button.pressed.connect(_on_key_binding_button_pressed.bind(height_down_key_button, "height_down_key"))
 	height_step_spin.value_changed.connect(_on_height_step_changed)
+	fine_height_increment_spin.value_changed.connect(_on_height_step_changed)
+	large_height_increment_spin.value_changed.connect(_on_height_step_changed)
 	
 	# Connect modifier key control signals
 	reverse_modifier_key_button.pressed.connect(_on_key_binding_button_pressed.bind(reverse_modifier_key_button, "reverse_modifier_key"))
@@ -842,12 +902,15 @@ func _on_rotation_increment_changed(value: float):
 func _on_scale_increment_changed(value: float):
 	# Update scale increment settings
 	scale_increment = scale_increment_spin.value
+	fine_scale_increment = fine_scale_increment_spin.value
 	large_scale_increment = large_scale_increment_spin.value
 	settings_changed.emit()
 
 func _on_height_step_changed(value: float):
-	# Update height adjustment step
-	height_adjustment_step = value
+	# Update height adjustment steps
+	height_adjustment_step = height_step_spin.value
+	fine_height_increment = fine_height_increment_spin.value
+	large_height_increment = large_height_increment_spin.value
 	settings_changed.emit()
 
 func _on_clear_cache_pressed():
@@ -877,10 +940,13 @@ func get_placement_settings() -> Dictionary:
 		"scale_down_key": scale_down_key,
 		"scale_reset_key": scale_reset_key,
 		"scale_increment": scale_increment,
+		"fine_scale_increment": fine_scale_increment,
 		"large_scale_increment": large_scale_increment,
 		"height_up_key": height_up_key,
 		"height_down_key": height_down_key,
 		"height_adjustment_step": height_adjustment_step,
+		"fine_height_increment": fine_height_increment,
+		"large_height_increment": large_height_increment,
 		"reverse_modifier_key": reverse_modifier_key,
 		"large_increment_modifier_key": large_increment_modifier_key,
 		"cancel_key": cancel_key,
@@ -922,12 +988,15 @@ func save_settings():
 	editor_settings.set_setting("simple_asset_placer/scale_down_key", scale_down_key)
 	editor_settings.set_setting("simple_asset_placer/scale_reset_key", scale_reset_key)
 	editor_settings.set_setting("simple_asset_placer/scale_increment", scale_increment)
+	editor_settings.set_setting("simple_asset_placer/fine_scale_increment", fine_scale_increment)
 	editor_settings.set_setting("simple_asset_placer/large_scale_increment", large_scale_increment)
 	
 	# Save height adjustment settings
 	editor_settings.set_setting("simple_asset_placer/height_up_key", height_up_key)
 	editor_settings.set_setting("simple_asset_placer/height_down_key", height_down_key)
 	editor_settings.set_setting("simple_asset_placer/height_adjustment_step", height_adjustment_step)
+	editor_settings.set_setting("simple_asset_placer/fine_height_increment", fine_height_increment)
+	editor_settings.set_setting("simple_asset_placer/large_height_increment", large_height_increment)
 	
 	# Save modifier key settings
 	editor_settings.set_setting("simple_asset_placer/reverse_modifier_key", reverse_modifier_key)
@@ -990,6 +1059,8 @@ func load_settings():
 		scale_reset_key = editor_settings.get_setting("simple_asset_placer/scale_reset_key")
 	if editor_settings.has_setting("simple_asset_placer/scale_increment"):
 		scale_increment = editor_settings.get_setting("simple_asset_placer/scale_increment")
+	if editor_settings.has_setting("simple_asset_placer/fine_scale_increment"):
+		fine_scale_increment = editor_settings.get_setting("simple_asset_placer/fine_scale_increment")
 	if editor_settings.has_setting("simple_asset_placer/large_scale_increment"):
 		large_scale_increment = editor_settings.get_setting("simple_asset_placer/large_scale_increment")
 	
@@ -1000,6 +1071,10 @@ func load_settings():
 		height_down_key = editor_settings.get_setting("simple_asset_placer/height_down_key")
 	if editor_settings.has_setting("simple_asset_placer/height_adjustment_step"):
 		height_adjustment_step = editor_settings.get_setting("simple_asset_placer/height_adjustment_step")
+	if editor_settings.has_setting("simple_asset_placer/fine_height_increment"):
+		fine_height_increment = editor_settings.get_setting("simple_asset_placer/fine_height_increment")
+	if editor_settings.has_setting("simple_asset_placer/large_height_increment"):
+		large_height_increment = editor_settings.get_setting("simple_asset_placer/large_height_increment")
 	
 	# Load modifier key settings
 	if editor_settings.has_setting("simple_asset_placer/reverse_modifier_key"):
@@ -1072,6 +1147,8 @@ func update_ui_from_settings():
 		scale_reset_key_button.text = scale_reset_key
 	if scale_increment_spin:
 		scale_increment_spin.value = scale_increment
+	if fine_scale_increment_spin:
+		fine_scale_increment_spin.value = fine_scale_increment
 	if large_scale_increment_spin:
 		large_scale_increment_spin.value = large_scale_increment
 	
@@ -1082,6 +1159,10 @@ func update_ui_from_settings():
 		height_down_key_button.text = height_down_key
 	if height_step_spin:
 		height_step_spin.value = height_adjustment_step
+	if fine_height_increment_spin:
+		fine_height_increment_spin.value = fine_height_increment
+	if large_height_increment_spin:
+		large_height_increment_spin.value = large_height_increment
 
 func _disconnect_ui_signals():
 	"""Temporarily disconnect UI signals to prevent unwanted save triggers"""

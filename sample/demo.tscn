@@ -29,3 +29,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.490322, 0, -2.5160465)
 
 [node name="cone_4" type="Node3D" parent="." instance=ExtResource("2_d1emm")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.0636744, 0, 5.552904)
+
+[node name="cone_5" type="Node3D" parent="." instance=ExtResource("2_d1emm")]
+transform = Transform3D(4.81, 0, 0, 0, 4.81, 0, 0, 0, 4.81, 19.637928, 0, -12.426571)

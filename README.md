@@ -1,3 +1,9 @@
+<div align="center">
+  <img src="branding/github-banner.svg" alt="Simple Asset Placer Banner" width="100%"/>
+</div>
+
+---
+
 # 🎯 Simple Asset Placer
 
 **A comprehensive asset placement plugin for Godot 4.x that revolutionizes level design workflows!**

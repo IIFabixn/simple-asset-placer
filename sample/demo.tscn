@@ -1,5 +1,31 @@
-[gd_scene format=3 uid="uid://cnk2n84e48paw"]
+[gd_scene load_steps=4 format=3 uid="uid://cnk2n84e48paw"]
+
+[ext_resource type="PackedScene" uid="uid://cbdvhsajp717t" path="res://sample/assets/fbx/cone.fbx" id="1_iki8g"]
+[ext_resource type="PackedScene" uid="uid://cdp38qgugpkmj" path="res://sample/assets/blend/cone.blend" id="2_d1emm"]
+[ext_resource type="PackedScene" uid="uid://br3tav6w1xur3" path="res://sample/assets/blend/cube.blend" id="3_petcp"]
 
 [node name="Node3D" type="Node3D"]
 
 [node name="CSGBox3D" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.70710677, -0.70710677, 0, 0.70710677, 0.70710677, 7.92328, 1.4901161e-09, 8.834127)
+
+[node name="cone" parent="." instance=ExtResource("1_iki8g")]
+transform = Transform3D(-0.09355225, 0.99561435, 0, -0.99561435, -0.09355225, 0, 0, 0, 1, -1.3494326, 0, -0.0712502)
+
+[node name="cone2" parent="." instance=ExtResource("1_iki8g")]
+transform = Transform3D(-0.035108786, -0.9993835, 0, 0.9993835, -0.035108786, 0, 0, 0, 1, 1.2480098, 0, -0.022910595)
+
+[node name="cone_2" type="Node3D" parent="." instance=ExtResource("2_d1emm")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.354916, 0, 2.4619265)
+
+[node name="cube" type="Node3D" parent="." instance=ExtResource("3_petcp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5306473, 0, 9.509982)
+
+[node name="cube_2" type="Node3D" parent="." instance=ExtResource("3_petcp")]
+transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, -3.5610409, 0, 8.13282)
+
+[node name="cone_3" type="Node3D" parent="." instance=ExtResource("2_d1emm")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.490322, 0, -2.5160465)
+
+[node name="cone_4" type="Node3D" parent="." instance=ExtResource("2_d1emm")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.0636744, 0, 5.552904)

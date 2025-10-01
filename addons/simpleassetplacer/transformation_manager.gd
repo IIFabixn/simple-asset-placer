@@ -53,6 +53,9 @@ static var mesh_placed_callback: Callable
 # Settings reference
 static var settings: Dictionary = {}
 
+# Focus management
+static var focus_grab_counter: int = 0  # Counter for repeated focus grabs
+
 ## MODE COORDINATION
 
 static func start_placement_mode(mesh: Mesh = null, meshlib: MeshLibrary = null, item_id: int = -1, asset_path: String = "", placement_settings: Dictionary = {}, dock_instance = null):
@@ -91,6 +94,11 @@ static func start_placement_mode(mesh: Mesh = null, meshlib: MeshLibrary = null,
 	# Configure position manager for placement
 	PositionManager.configure(placement_settings)
 	
+	# Grab focus for the 3D viewport to ensure keyboard input works
+	# Set counter to grab focus for next 3 frames to ensure it sticks
+	focus_grab_counter = 3
+	_grab_3d_viewport_focus()
+	
 	print("TransformationManager: Started placement mode")
 
 static func start_transform_mode(target_node: Node3D, dock_instance = null):
@@ -118,6 +126,11 @@ static func start_transform_mode(target_node: Node3D, dock_instance = null):
 	# Initialize position manager with node's current position
 	PositionManager.start_transform_positioning(target_node)
 	
+	# Grab focus for the 3D viewport to ensure keyboard input works
+	# Set counter to grab focus for next 3 frames to ensure it sticks
+	focus_grab_counter = 3
+	_grab_3d_viewport_focus()
+	
 	print("TransformationManager: Started transform mode for ", target_node.name)
 
 static func exit_placement_mode():
@@ -141,7 +154,8 @@ static func exit_placement_mode():
 	# Reset mode
 	current_mode = ""
 	
-	# Update overlays
+	# Hide and cleanup overlays
+	OverlayManager.hide_transform_overlay()
 	OverlayManager.set_mode("")
 	
 	print("TransformationManager: Exited placement mode")
@@ -166,7 +180,8 @@ static func exit_transform_mode(confirm_changes: bool = true):
 	# Reset mode
 	current_mode = ""
 	
-	# Update overlays
+	# Hide and cleanup overlays
+	OverlayManager.hide_transform_overlay()
 	OverlayManager.set_mode("")
 	
 	print("TransformationManager: Exited transform mode (confirmed: ", confirm_changes, ")")
@@ -188,6 +203,11 @@ static func process_frame_input(camera: Camera3D, input_settings: Dictionary = {
 	
 	# Update input system
 	InputHandler.update_input_state(input_settings)
+	
+	# Keep grabbing focus for the first few frames after mode starts
+	if focus_grab_counter > 0:
+		focus_grab_counter -= 1
+		_grab_3d_viewport_focus()
 	
 	# Process mode-specific input
 	match current_mode:
@@ -212,11 +232,18 @@ static func _process_placement_input(camera: Camera3D):
 	var mouse_pos = position_input.mouse_position
 	var world_pos = PositionManager.update_position_from_mouse(camera, mouse_pos)
 	
-	# Handle height adjustments
+	# Handle height adjustments with reverse modifier support
+	var reverse_height = position_input.shift_held  # SHIFT = reverse direction
 	if position_input.height_up_pressed:
-		PositionManager.increase_height()
+		if reverse_height:
+			PositionManager.decrease_height()
+		else:
+			PositionManager.increase_height()
 	elif position_input.height_down_pressed:
-		PositionManager.decrease_height()
+		if reverse_height:
+			PositionManager.increase_height()
+		else:
+			PositionManager.decrease_height()
 	
 	# Update preview position
 	PreviewManager.update_preview_position(PositionManager.get_current_position())
@@ -247,11 +274,14 @@ static func _process_transform_input(camera: Camera3D):
 	# Store current Y position before mouse update (only if node is in tree)
 	var current_y = target_node.global_position.y if target_node.is_inside_tree() else 0.0
 	
-	# Handle height adjustments first
+	# Handle height adjustments first with reverse modifier support
+	var height_step = placement_settings.get("height_adjustment_step", 0.1)
+	var reverse_height = position_input.shift_held  # SHIFT = reverse direction
+	
 	if position_input.height_up_pressed:
-		current_y += placement_settings.get("height_adjustment_step", 0.1)
+		current_y += height_step if not reverse_height else -height_step
 	elif position_input.height_down_pressed:
-		current_y -= placement_settings.get("height_adjustment_step", 0.1)
+		current_y -= height_step if not reverse_height else -height_step
 	
 	# Always update position from mouse (for XZ movement)
 	var mouse_pos = position_input.mouse_position
@@ -336,10 +366,91 @@ static func _process_navigation_input():
 
 ## TAB KEY COORDINATION
 
+static func _grab_3d_viewport_focus():
+	"""Grab keyboard focus for the 3D viewport to ensure input works during transform mode"""
+	var viewport_3d = EditorInterface.get_editor_viewport_3d(0)
+	if not viewport_3d:
+		return
+	
+	var base_control = EditorInterface.get_base_control()
+	if not base_control:
+		return
+	
+	# Find the 3D editor control area
+	var spatial_editor = _find_spatial_editor(base_control)
+	if spatial_editor:
+		# Enable focus mode on the spatial editor so it can receive focus
+		if spatial_editor.focus_mode == Control.FOCUS_NONE:
+			spatial_editor.focus_mode = Control.FOCUS_ALL
+		
+		# Grab focus immediately first
+		spatial_editor.grab_focus()
+		# Then grab it again deferred to override anything that steals it
+		spatial_editor.call_deferred("grab_focus")
+
+static func _find_spatial_editor(node: Node) -> Control:
+	"""Find the Node3DEditor (spatial editor) control"""
+	if node and node.get_class() == "Node3DEditor":
+		if node is Control:
+			return node
+	
+	if node:
+		for child in node.get_children():
+			var result = _find_spatial_editor(child)
+			if result:
+				return result
+	
+	return null
+
+static func _is_3d_context_focused() -> bool:
+	"""Check if 3D viewport or scene tree has focus (contexts where transform mode should work)"""
+	# Instead of checking keyboard focus, check if we're editing a 3D scene
+	# and have a valid camera (which means a 3D viewport is active)
+	var edited_scene = EditorInterface.get_edited_scene_root()
+	if not edited_scene:
+		return false
+	
+	# Check if we can get a 3D viewport camera (means 3D editor is active)
+	var viewport_3d = EditorInterface.get_editor_viewport_3d(0)
+	if not viewport_3d:
+		return false
+	
+	var camera = viewport_3d.get_camera_3d()
+	if not camera:
+		return false
+	
+	# Get the currently focused control to check if we're NOT in specific UI elements
+	var base_control = EditorInterface.get_base_control()
+	if base_control:
+		var focused_control = base_control.get_viewport().gui_get_focus_owner()
+		if focused_control:
+			# Check if focus is in Inspector - we want to block TAB there
+			var current = focused_control
+			var depth = 0
+			while current and depth < 20:
+				var control_class = current.get_class()
+				var control_name = current.name if current.name else ""
+				
+				# Block TAB if we're in Inspector property fields
+				if "Inspector" in control_class or "Inspector" in control_name or "EditorProperty" in control_class:
+					return false
+				
+				current = current.get_parent()
+				depth += 1
+	
+	# We have a 3D scene open with a viewport, and we're not in Inspector
+	return true
+
 static func handle_tab_key_activation(dock_instance = null):
 	"""Handle TAB key activation - coordinate between placement and transform modes"""
 	# Don't handle TAB if already in a mode
 	if is_any_mode_active():
+		return
+	
+	# Check if 3D viewport or scene tree has focus before activating transform mode
+	# This prevents TAB from activating when user is in Inspector or other UI elements
+	if not _is_3d_context_focused():
+		# Not in 3D context - don't intercept TAB key
 		return
 	
 	var selection = EditorInterface.get_selection()

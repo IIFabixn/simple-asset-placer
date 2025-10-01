@@ -346,6 +346,8 @@ static func hide_transform_overlay():
 	"""Hide the unified transform overlay"""
 	if status_overlay:
 		status_overlay.visible = false
+		# Also hide it deferred to ensure it stays hidden
+		status_overlay.call_deferred("set_visible", false)
 	current_mode = ""
 
 static func hide_status_overlay():

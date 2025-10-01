@@ -367,62 +367,36 @@ static func _process_navigation_input():
 ## MOUSE WHEEL INPUT HANDLING
 
 static func handle_mouse_wheel_input(event: InputEventMouseButton) -> bool:
-	"""Handle mouse wheel input based on currently held keys
-	Mouse wheel modifies whatever action key is being held (rotation, scale, height)
+	"""Process mouse wheel input using semantic data from InputHandler
 	Returns true if the event was handled (should be consumed)"""
 	
-	if not event.pressed:
+	# Get semantic wheel input interpretation from InputHandler
+	var wheel_input = InputHandler.get_mouse_wheel_input(event)
+	
+	# If no action key is held, don't consume the event
+	if wheel_input.is_empty():
 		return false
 	
-	var wheel_up = event.button_index == MOUSE_BUTTON_WHEEL_UP
-	var wheel_down = event.button_index == MOUSE_BUTTON_WHEEL_DOWN
+	# Process the semantic action
+	match wheel_input.get("action"):
+		"height":
+			_apply_height_adjustment(wheel_input)
+		"scale":
+			_apply_scale_adjustment(wheel_input)
+		"rotation":
+			_apply_rotation_adjustment(wheel_input)
 	
-	if not wheel_up and not wheel_down:
-		return false
-	
-	# Determine wheel direction (+1 for up, -1 for down)
-	var wheel_direction = 1 if wheel_up else -1
-	
-	# Check which action keys are currently held using Input directly
-	# Height adjustment keys
-	var height_up_key = placement_settings.get("height_up_key", "Q")
-	var height_down_key = placement_settings.get("height_down_key", "E")
-	if Input.is_key_pressed(InputHandler.string_to_keycode(height_up_key)) or Input.is_key_pressed(InputHandler.string_to_keycode(height_down_key)):
-		_handle_wheel_height(wheel_direction, event.shift_pressed)
-		return true
-	
-	# Scale adjustment keys
-	var scale_up_key = placement_settings.get("scale_up_key", "PAGE_UP")
-	var scale_down_key = placement_settings.get("scale_down_key", "PAGE_DOWN")
-	if Input.is_key_pressed(InputHandler.string_to_keycode(scale_up_key)) or Input.is_key_pressed(InputHandler.string_to_keycode(scale_down_key)):
-		_handle_wheel_scale(wheel_direction, event.alt_pressed)
-		return true
-	
-	# Rotation keys (X, Y, Z)
-	var rotate_x_key = placement_settings.get("rotate_x_key", "X")
-	var rotate_y_key = placement_settings.get("rotate_y_key", "Y")
-	var rotate_z_key = placement_settings.get("rotate_z_key", "Z")
-	
-	if Input.is_key_pressed(InputHandler.string_to_keycode(rotate_x_key)):
-		_handle_wheel_rotation_axis(wheel_direction, "X", event.alt_pressed, event.shift_pressed)
-		return true
-	elif Input.is_key_pressed(InputHandler.string_to_keycode(rotate_y_key)):
-		_handle_wheel_rotation_axis(wheel_direction, "Y", event.alt_pressed, event.shift_pressed)
-		return true
-	elif Input.is_key_pressed(InputHandler.string_to_keycode(rotate_z_key)):
-		_handle_wheel_rotation_axis(wheel_direction, "Z", event.alt_pressed, event.shift_pressed)
-		return true
-	
-	# No action key held - don't consume the event, let viewport zoom work
-	return false
+	return true  # Event was handled
 
-static func _handle_wheel_height(direction: int, reverse: bool):
-	"""Handle mouse wheel for height adjustment"""
-	var step = placement_settings.get("height_adjustment_step", 0.1)
+static func _apply_height_adjustment(wheel_input: Dictionary):
+	"""Apply height adjustment based on wheel input"""
+	var direction = wheel_input.get("direction", 0)
+	var reverse = wheel_input.get("reverse_modifier", false)
 	
-	# Apply reverse if SHIFT was also held (CTRL+SHIFT)
 	if reverse:
 		direction = -direction
+	
+	var step = placement_settings.get("height_adjustment_step", 0.1)
 	
 	if current_mode == "placement":
 		if direction > 0:
@@ -434,8 +408,11 @@ static func _handle_wheel_height(direction: int, reverse: bool):
 		if target_node and target_node.is_inside_tree():
 			target_node.global_position.y += step * direction
 
-static func _handle_wheel_scale(direction: int, large_increment: bool):
-	"""Handle mouse wheel for scale adjustment"""
+static func _apply_scale_adjustment(wheel_input: Dictionary):
+	"""Apply scale adjustment based on wheel input"""
+	var direction = wheel_input.get("direction", 0)
+	var large_increment = wheel_input.get("large_increment", false)
+	
 	var step = placement_settings.get("scale_increment", 0.1)
 	if large_increment:
 		step = placement_settings.get("large_scale_increment", 0.5)
@@ -453,13 +430,17 @@ static func _handle_wheel_scale(direction: int, large_increment: bool):
 			ScaleManager.decrease_scale(step)
 		ScaleManager.apply_uniform_scale_to_node(target_node)
 
-static func _handle_wheel_rotation_axis(direction: int, axis: String, large_increment: bool, reverse: bool):
-	"""Handle mouse wheel for rotation adjustment on specific axis"""
+static func _apply_rotation_adjustment(wheel_input: Dictionary):
+	"""Apply rotation adjustment based on wheel input"""
+	var direction = wheel_input.get("direction", 0)
+	var axis = wheel_input.get("axis", "Y")
+	var large_increment = wheel_input.get("large_increment", false)
+	var reverse = wheel_input.get("reverse_modifier", false)
+	
 	var step = placement_settings.get("rotation_increment", 15.0)
 	if large_increment:
 		step = placement_settings.get("large_rotation_increment", 90.0)
 	
-	# Apply reverse direction modifier
 	if reverse:
 		direction = -direction
 	

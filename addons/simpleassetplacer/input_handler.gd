@@ -215,6 +215,69 @@ static func get_navigation_input() -> Dictionary:
 		"escape_pressed": is_key_just_pressed("escape")
 	}
 
+static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
+	"""Interpret mouse wheel event based on currently held action keys
+	Returns semantic action data: what should be adjusted and by how much
+	Returns empty dict if no action key is held (event should not be consumed)"""
+	
+	if not event.pressed:
+		return {}
+	
+	var wheel_up = event.button_index == MOUSE_BUTTON_WHEEL_UP
+	var wheel_down = event.button_index == MOUSE_BUTTON_WHEEL_DOWN
+	
+	if not wheel_up and not wheel_down:
+		return {}
+	
+	# Determine wheel direction (+1 for up, -1 for down)
+	var wheel_direction = 1 if wheel_up else -1
+	
+	# Check which action keys are currently held
+	# Height adjustment keys (Q/E)
+	if is_key_pressed("height_up") or is_key_pressed("height_down"):
+		return {
+			"action": "height",
+			"direction": wheel_direction,
+			"reverse_modifier": event.shift_pressed  # SHIFT reverses direction
+		}
+	
+	# Scale adjustment keys (PAGE_UP/PAGE_DOWN)
+	if is_key_pressed("scale_up") or is_key_pressed("scale_down"):
+		return {
+			"action": "scale",
+			"direction": wheel_direction,
+			"large_increment": event.alt_pressed  # ALT for large steps
+		}
+	
+	# Rotation keys (X/Y/Z)
+	if is_key_pressed("rotate_x"):
+		return {
+			"action": "rotation",
+			"axis": "X",
+			"direction": wheel_direction,
+			"large_increment": event.alt_pressed,
+			"reverse_modifier": event.shift_pressed
+		}
+	elif is_key_pressed("rotate_y"):
+		return {
+			"action": "rotation",
+			"axis": "Y",
+			"direction": wheel_direction,
+			"large_increment": event.alt_pressed,
+			"reverse_modifier": event.shift_pressed
+		}
+	elif is_key_pressed("rotate_z"):
+		return {
+			"action": "rotation",
+			"axis": "Z",
+			"direction": wheel_direction,
+			"large_increment": event.alt_pressed,
+			"reverse_modifier": event.shift_pressed
+		}
+	
+	# No action key held - return empty dict (don't consume event, allow viewport zoom)
+	return {}
+
 ## Debug and Inspection
 
 static func get_all_pressed_keys() -> Array:

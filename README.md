@@ -161,7 +161,36 @@ Right-click any asset for quick actions:
 - 🏷️ **All Tags**: Browse all available tags
 - ➕ **New Tag**: Create new custom tag
 - ⭐ **Add to Favorites**: Mark as favorite
-- ✏️ **Manage Tags**: Bulk tag operations
+
+### **Advanced Tag Management Dialog**
+Click the "Manage Tags..." button next to the category filter for powerful bulk operations:
+
+**Features:**
+- 📋 **Asset Table**: See all assets with their current tags
+- 🔍 **Dual Search**: Filter assets and tags independently
+- ✅ **Multi-Select**: Ctrl+Click or Shift+Click to select multiple assets
+- ➕ **Bulk Add Tags**: Add selected tags to multiple assets at once
+- ➖ **Bulk Remove Tags**: Remove tags from multiple assets
+- 📊 **Live Statistics**: Real-time overview of tagged/untagged assets and tag usage
+- ✏️ **Rename Tags**: Rename tags across all assets
+- 🔀 **Merge Tags**: Combine multiple tags into one
+- 🗑️ **Delete Tags**: Remove unused tags from the system
+
+**Tag Management Workflow:**
+```
+1. Click "Manage Tags..." button
+2. Select multiple assets (Ctrl+Click)
+3. Select tag(s) from the right panel
+4. Click "Add to Selected" or "Remove from Selected"
+5. Use Rename/Merge/Delete for tag maintenance
+→ Changes auto-save and refresh the asset grid
+```
+
+**Use Cases:**
+- 🎯 **Batch Tagging**: Import 50 assets → Select all → Add "medieval" tag
+- 🧹 **Tag Cleanup**: Merge "outdoor" and "exterior" into one tag
+- 📊 **Audit Tags**: See which tags are most used, clean up duplicates
+- 🔄 **Reorganize**: Rename tags to match new naming conventions
 
 ### **Best Practices**
 

@@ -1,6 +1,15 @@
-[gd_scene format=3 uid="uid://cnk2n84e48paw"]
+[gd_scene load_steps=3 format=3 uid="uid://cnk2n84e48paw"]
+
+[ext_resource type="PackedScene" uid="uid://cdp38qgugpkmj" path="res://sample/assets/blend/cone_blend.blend" id="1_ed2lv"]
+[ext_resource type="PackedScene" uid="uid://df3t2ckbpo65j" path="res://sample/assets/glb/cube_glb.glb" id="2_d1emm"]
 
 [node name="Node3D" type="Node3D"]
 
 [node name="CSGBox3D" type="CSGBox3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.70710677, -0.70710677, 0, 0.70710677, 0.70710677, 7.92328, 1.4901161e-09, 8.834127)
+
+[node name="cone_blend" type="Node3D" parent="." instance=ExtResource("1_ed2lv")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.858139, 0, -17.088188)
+
+[node name="cube_glb" type="Node3D" parent="." instance=ExtResource("2_d1emm")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 34.57052, 0, 2.9935188)

@@ -5,6 +5,7 @@ class_name ModelLibraryBrowser
 
 const AssetThumbnailItem = preload("res://addons/simpleassetplacer/asset_thumbnail_item.gd")
 const CategoryManager = preload("res://addons/simpleassetplacer/category_manager.gd")
+const TagManagementDialog = preload("res://addons/simpleassetplacer/tag_management_dialog.gd")
 
 signal asset_item_selected(asset_info: Dictionary)
 
@@ -19,6 +20,8 @@ var current_search_text: String = ""
 var current_category_filter: String = ""
 var supported_extensions = ["obj", "fbx", "gltf", "glb", "dae", "blend", "tscn", "scn", "tres", "res"]
 var category_manager: CategoryManager = null
+var tag_management_dialog: TagManagementDialog = null
+var manage_tags_button: Button = null
 
 func _ready():
 	setup_ui()
@@ -31,10 +34,21 @@ func setup_ui():
 	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(vbox)
 	
-	# Category filter dropdown
+	# Category filter with manage button
+	var category_hbox = HBoxContainer.new()
+	vbox.add_child(category_hbox)
+	
 	category_filter = OptionButton.new()
 	category_filter.add_item("All Categories")
-	vbox.add_child(category_filter)
+	category_filter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	category_hbox.add_child(category_filter)
+	
+	manage_tags_button = Button.new()
+	manage_tags_button.text = "Manage Tags..."
+	manage_tags_button.tooltip_text = "Open advanced tag management dialog for bulk operations"
+	manage_tags_button.custom_minimum_size = Vector2(110, 0)
+	manage_tags_button.pressed.connect(_on_manage_tags_pressed)
+	category_hbox.add_child(manage_tags_button)
 	
 	# Filter options for 3D models
 	filter_options = OptionButton.new()
@@ -567,3 +581,29 @@ func _show_all_tags_dialog(asset_path: String):
 	)
 	
 	dialog.popup_centered()
+
+func _on_manage_tags_pressed() -> void:
+	if not category_manager:
+		return
+	
+	# Create dialog if it doesn't exist
+	if not tag_management_dialog or not is_instance_valid(tag_management_dialog):
+		tag_management_dialog = TagManagementDialog.new()
+		# Add to the editor's root to ensure it appears properly
+		var editor_interface = Engine.get_singleton("EditorInterface")
+		if editor_interface:
+			var base_control = editor_interface.get_base_control()
+			base_control.add_child(tag_management_dialog)
+		else:
+			add_child(tag_management_dialog)
+		
+		# Connect to refresh signal
+		tag_management_dialog.tags_modified.connect(_on_tags_modified_in_dialog)
+	
+	# Setup with current assets and show
+	tag_management_dialog.setup(category_manager, discovered_assets)
+	tag_management_dialog.popup_centered()
+
+func _on_tags_modified_in_dialog() -> void:
+	# Refresh the asset grid and category filter when tags are modified
+	discover_assets()

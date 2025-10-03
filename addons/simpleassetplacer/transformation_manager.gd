@@ -459,15 +459,29 @@ static func _process_transform_input(camera: Camera3D):
 	# Get accumulated height delta from transform_data
 	var accumulated_y_delta = transform_data.get("accumulated_y_delta", 0.0)
 	
-	# Handle height adjustments first with reverse modifier support
-	var height_step = settings.get("height_adjustment_step", 0.1)
+	# Handle height adjustments with reverse modifier and increment size support
 	var reverse_height = position_input.shift_held  # SHIFT = reverse direction
+	
+	# Determine height step based on modifiers (matching placement mode logic)
+	var height_step = PositionManager.height_step_size  # Base step
+	
+	# Apply Y snap step if Y snapping is enabled (same as placement mode)
+	if PositionManager.snap_y_enabled:
+		height_step = PositionManager.snap_y_step
+	
+	# Apply modifier keys for increment size
+	if position_input.ctrl_held:
+		# CTRL = fine adjustment (10% of base step)
+		height_step *= 0.1
+	elif position_input.alt_held:
+		# ALT = large adjustment (10x base step)
+		height_step *= 10.0
 	
 	if position_input.height_up_pressed:
 		var height_change = height_step if not reverse_height else -height_step
 		accumulated_y_delta += height_change
 	elif position_input.height_down_pressed:
-		var height_change = -(height_step if not reverse_height else -height_step)
+		var height_change = -height_step if not reverse_height else height_step
 		accumulated_y_delta += height_change
 	elif position_input.reset_height_pressed:
 		# Reset accumulated height delta to 0
@@ -731,11 +745,13 @@ static func _apply_height_adjustment(wheel_input: Dictionary):
 		else:
 			PositionManager.adjust_height(-step)
 	elif current_mode == Mode.TRANSFORM:
-		# Apply height adjustment to ALL nodes in transform mode
-		var target_nodes = transform_data.get("target_nodes", [])
-		for node in target_nodes:
-			if node and node.is_inside_tree():
-				node.global_position.y += step * direction
+		# In transform mode, update the accumulated height delta
+		var accumulated_y_delta = transform_data.get("accumulated_y_delta", 0.0)
+		accumulated_y_delta += step * direction
+		transform_data["accumulated_y_delta"] = accumulated_y_delta
+		
+		# The actual position update will happen in _process_transform_input
+		# This ensures consistency with keyboard height adjustments
 
 static func _apply_scale_adjustment(wheel_input: Dictionary):
 	"""Apply scale adjustment based on wheel input"""

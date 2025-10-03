@@ -37,6 +37,8 @@ static var collision_enabled: bool = true
 static var snap_to_ground: bool = true
 static var height_step_size: float = 0.1
 static var collision_mask: int = 1  # Default collision layer
+static var snap_enabled: bool = false  # Grid snapping enabled
+static var snap_step: float = 1.0  # Grid size for snapping
 
 ## Core Position Management
 
@@ -54,11 +56,22 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 		var new_pos = _raycast_to_world(from, to, collision_layer)
 		if new_pos != Vector3.INF:
 			target_position = new_pos + Vector3(0, height_offset, 0)
+			
+			# Apply grid snapping if enabled
+			if snap_enabled:
+				target_position = _apply_grid_snap(target_position)
+			
 			current_position = target_position
 			return current_position
 	
 	# Fallback: project to horizontal plane
-	return _project_to_plane(from, to)
+	var pos = _project_to_plane(from, to)
+	
+	# Apply grid snapping if enabled
+	if snap_enabled:
+		pos = _apply_grid_snap(pos)
+	
+	return pos
 
 static func _raycast_to_world(from: Vector3, to: Vector3, collision_layer: int) -> Vector3:
 	"""Perform raycast collision detection"""
@@ -101,6 +114,20 @@ static func _project_to_plane(from: Vector3, to: Vector3, plane_y: float = 0.0) 
 		return current_position
 	
 	return current_position
+
+static func _apply_grid_snap(pos: Vector3) -> Vector3:
+	"""Apply grid snapping to a position"""
+	if not snap_enabled or snap_step <= 0.0:
+		return pos
+	
+	# Snap X and Z coordinates to grid
+	var snapped_pos = Vector3(
+		snappedf(pos.x, snap_step),
+		pos.y,  # Keep Y unchanged (height is managed separately)
+		snappedf(pos.z, snap_step)
+	)
+	
+	return snapped_pos
 
 ## Height Management
 
@@ -209,6 +236,8 @@ static func configure(config: Dictionary):
 	collision_mask = config.get("collision_mask", 1)
 	interpolation_enabled = config.get("interpolation_enabled", false)
 	interpolation_speed = config.get("interpolation_speed", 10.0)
+	snap_enabled = config.get("snap_enabled", false)
+	snap_step = config.get("snap_step", 1.0)
 
 static func get_configuration() -> Dictionary:
 	"""Get current configuration"""
@@ -218,6 +247,8 @@ static func get_configuration() -> Dictionary:
 		"height_step_size": height_step_size,
 		"collision_mask": collision_mask,
 		"interpolation_enabled": interpolation_enabled,
+		"snap_enabled": snap_enabled,
+		"snap_step": snap_step,
 		"interpolation_speed": interpolation_speed
 	}
 
@@ -233,6 +264,11 @@ static func update_transform_node_position(transform_node: Node3D, camera: Camer
 	
 	# Apply position to transform node (with height offset applied)
 	world_pos.y = base_height + height_offset
+	
+	# Apply grid snapping if enabled
+	if snap_enabled:
+		world_pos = _apply_grid_snap(world_pos)
+	
 	if transform_node.is_inside_tree():
 		transform_node.global_position = world_pos
 

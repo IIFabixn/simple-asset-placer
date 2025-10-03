@@ -112,9 +112,10 @@ static func start_placement_mode(mesh: Mesh = null, meshlib: MeshLibrary = null,
 	
 	# Reset position manager for new placement
 	# The first mouse update will set the initial position from raycast
-	# Reset height offset only if the setting is enabled
+	# Reset height and position offsets only if the corresponding settings are enabled
 	var reset_height = placement_settings.get("reset_height_on_exit", false)
-	PositionManager.reset_for_new_placement(reset_height)
+	var reset_position = placement_settings.get("reset_position_on_exit", false)
+	PositionManager.reset_for_new_placement(reset_height, reset_position)
 	
 	# Reset rotation for new placement (unless user wants to keep rotation)
 	if not settings.get("keep_rotation_between_placements", false):

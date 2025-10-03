@@ -1,3 +1,8 @@
-[gd_scene format=3 uid="uid://bs7orqq2mvo0n"]
+[gd_scene load_steps=2 format=3 uid="uid://bs7orqq2mvo0n"]
+
+[ext_resource type="PackedScene" uid="uid://clw7x30hj8y3q" path="res://sample/assets/kenny_retro-medival-kit/wall-low.glb" id="5_qqf5t"]
 
 [node name="Node3D" type="Node3D"]
+
+[node name="wall-low" type="Node3D" parent="." instance=ExtResource("5_qqf5t")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, 0.5)

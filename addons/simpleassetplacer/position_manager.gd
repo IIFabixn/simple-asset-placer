@@ -85,12 +85,7 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 			
 			if should_update_base_height:
 				# Update base_height from raycast and apply offset
-				# If this is initial position and we're preserving height_offset, compensate for it
-				# This prevents double-application when raycast hits previously placed objects at elevated heights
-				if is_initial_position and height_offset != 0.0:
-					base_height = new_pos.y - height_offset
-				else:
-					base_height = new_pos.y
+				base_height = new_pos.y
 				last_raycast_xz = Vector2(new_pos.x, new_pos.z)  # Store XZ for next frame comparison
 				
 				# When aligning with normal, apply height offset along the surface normal direction
@@ -139,11 +134,7 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 	
 	if should_update_base_height_fallback:
 		# Set base_height from plane and mark as initialized
-		# If this is initial position and we're preserving height_offset, compensate for it
-		if is_initial_position and height_offset != 0.0:
-			base_height = pos.y - height_offset
-		else:
-			base_height = pos.y
+		base_height = pos.y
 		last_raycast_xz = Vector2(pos.x, pos.z)  # Store XZ for next frame comparison
 		
 		# When aligning with normal, apply height offset along surface normal
@@ -403,19 +394,22 @@ static func set_base_height(y: float):
 	target_position.y = base_height + height_offset
 	current_position = target_position
 
-static func reset_for_new_placement(reset_height_offset: bool = true):
+static func reset_for_new_placement(reset_height_offset: bool = true, reset_position_offset: bool = true):
 	"""Reset position manager state for a new placement session
 	
-	reset_height_offset: If true, reset height_offset to 0. If false, preserve current height."""
+	reset_height_offset: If true, reset height_offset to 0. If false, preserve current height.
+	reset_position_offset: If true, reset manual_position_offset to 0. If false, preserve current position offset."""
 	is_initial_position = true
 	if reset_height_offset:
 		height_offset = 0.0
+	
 	current_position = Vector3.ZERO
 	target_position = Vector3.ZERO
 	base_height = 0.0
 	surface_normal = Vector3.UP
 	last_raycast_xz = Vector2.ZERO
-	manual_position_offset = Vector3.ZERO  # Reset WASD offset for new placement
+	if reset_position_offset:
+		manual_position_offset = Vector3.ZERO  # Reset WASD offset for new placement
 
 ## Position Getters and Setters
 

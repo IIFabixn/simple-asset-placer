@@ -309,37 +309,23 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 					has_any_material = true
 					break
 	
-	# ALWAYS apply a material to ensure visibility and proper coloring
-	var material = StandardMaterial3D.new()
-	
-	# Use different colors based on vertex count and shape to make shapes distinguishable
-	var mesh_vertex_count = 0
+	# Apply a neutral material override only if the mesh has no materials
+	# This ensures visibility while preserving actual asset materials when present
+	var needs_material = true
 	if mesh.get_surface_count() > 0:
-		var arrays = mesh.surface_get_arrays(0)
-		if arrays and arrays.size() > 0 and arrays[0]:
-			mesh_vertex_count = arrays[0].size()
+		for i in range(mesh.get_surface_count()):
+			if mesh.surface_get_material(i) != null:
+				needs_material = false
+				break
 	
-	# Color based on vertex count and name
-	var asset_name = asset_path.get_file().to_lower()
-	if mesh_vertex_count > 100 or "cone" in asset_name:
-		material.albedo_color = Color(0.9, 0.6, 0.4, 1.0)  # Orange for cones (higher vertex count)
-	elif mesh_vertex_count < 50 or "cube" in asset_name:
-		material.albedo_color = Color(0.4, 0.7, 0.9, 1.0)  # Blue for cubes (lower vertex count)
-	else:
-		material.albedo_color = Color(0.7, 0.8, 0.6, 1.0)  # Green for others
-	
-	material.metallic = 0.1
-	material.roughness = 0.6
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
-	
-	# Add a subtle texture to help differentiate shapes
-	if mesh_vertex_count > 100:
-		material.roughness = 0.3  # Smoother for high poly (cones)
-	else:
-		material.roughness = 0.8  # Rougher for low poly (cubes)
-	
-	# Apply the material to the mesh instance
-	mesh_instance.material_override = material
+	if needs_material:
+		# Only add material if mesh has no materials of its own
+		var material = StandardMaterial3D.new()
+		material.albedo_color = Color(0.8, 0.8, 0.8, 1.0)  # Neutral gray
+		material.metallic = 0.2
+		material.roughness = 0.6
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+		mesh_instance.material_override = material
 	
 	# Use simple, consistent camera positioning to focus on shape differences
 	_position_camera_simple(mesh)

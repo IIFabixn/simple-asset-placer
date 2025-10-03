@@ -56,7 +56,7 @@ static var align_with_normal: bool = false  # Align rotation with surface normal
 static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, collision_layer: int = 1, lock_y_axis: bool = false) -> Vector3:
 	"""Update target position based on mouse position and camera raycast
 	lock_y_axis: If true, only XZ is updated after initial setup, Y is calculated from base_height + height_offset
-	However, when align_with_normal is enabled, Y always follows the surface to prevent clipping"""
+	However, when snap_to_ground or align_with_normal is enabled, Y always follows the surface"""
 	if not camera:
 		return current_position
 	
@@ -68,11 +68,11 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 	if collision_enabled:
 		var new_pos = _raycast_to_world(from, to, collision_layer)
 		if new_pos != Vector3.INF:
-			# Determine Y position based on lock_y_axis flag, alignment mode, and whether this is initial positioning
-			# When aligning with normal, Y should always follow the surface to prevent clipping
-			if align_with_normal or not lock_y_axis or is_initial_position:
+			# Determine Y position based on lock_y_axis flag, alignment mode, snap_to_ground, and whether this is initial positioning
+			# When aligning with normal or snap_to_ground, Y should always follow the surface
+			if align_with_normal or snap_to_ground or not lock_y_axis or is_initial_position:
 				# Update base_height from raycast and apply offset
-				# This happens when: aligning with surface, Y not locked, or first update
+				# This happens when: aligning with surface, snapping to ground, Y not locked, or first update
 				base_height = new_pos.y
 				
 				# When aligning with normal, apply height offset along the surface normal direction
@@ -107,8 +107,8 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 	# Fallback: project to horizontal plane
 	var pos = _project_to_plane(from, to)
 	
-	# When aligning with normal or not initial, handle Y appropriately
-	if align_with_normal or not lock_y_axis or is_initial_position:
+	# When aligning with normal, snapping to ground, or not initial, handle Y appropriately
+	if align_with_normal or snap_to_ground or not lock_y_axis or is_initial_position:
 		# Set base_height from plane and mark as initialized
 		base_height = pos.y
 		

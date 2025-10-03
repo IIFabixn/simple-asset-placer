@@ -1,10 +1,11 @@
-[gd_scene load_steps=15 format=3 uid="uid://cnk2n84e48paw"]
+[gd_scene load_steps=16 format=3 uid="uid://cnk2n84e48paw"]
 
 [ext_resource type="Texture2D" uid="uid://0yj4xwx83qd7" path="res://sample/textures/rock_face/rock_face_03_diff_1k.jpg" id="1_petcp"]
 [ext_resource type="Texture2D" uid="uid://bnoudrgjh6ld1" path="res://sample/textures/rock_face/rock_face_03_nor_gl_1k.jpg" id="2_8qmtt"]
 [ext_resource type="Texture2D" uid="uid://14lix33xubj1" path="res://sample/textures/rocky_terrain/rocky_terrain_02_diff_1k.jpg" id="3_xo1bm"]
 [ext_resource type="Texture2D" uid="uid://c543l1656t8jc" path="res://sample/textures/rocky_terrain/rocky_terrain_02_nor_gl_1k.jpg" id="4_k5nd4"]
 [ext_resource type="PackedScene" uid="uid://bi526m4rgyylo" path="res://sample/building_a.tscn" id="5_8qmtt"]
+[ext_resource type="PackedScene" uid="uid://bs7orqq2mvo0n" path="res://sample/building_b.tscn" id="6_xo1bm"]
 
 [sub_resource type="Gradient" id="Gradient_krguf"]
 offsets = PackedFloat32Array(0.2, 1)
@@ -96,4 +97,7 @@ top_level = true
 metadata/_edit_lock_ = true
 
 [node name="Building_A" parent="." instance=ExtResource("5_8qmtt")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -53, 30, 2)
+transform = Transform3D(0.258819, 0, -0.96592563, 0, 1, 0, 0.96592563, 0, 0.258819, -55, 30, 1)
+
+[node name="building_b" type="Node3D" parent="." instance=ExtResource("6_xo1bm")]
+transform = Transform3D(-0.9659259, 0, 0.25881892, 0, 1, 0, -0.25881892, 0, -0.9659259, -53.8, 30.000006, 6.1)

@@ -3,6 +3,9 @@ extends RefCounted
 
 class_name OverlayManager
 
+# Forward reference to TransformationManager for Mode enum
+const TransformationManager = preload("res://addons/simpleassetplacer/transformation_manager.gd")
+
 """
 CENTRALIZED UI OVERLAY SYSTEM  
 =============================
@@ -36,7 +39,7 @@ static var grid_overlay: Node3D = null  # 3D grid visualization
 
 # Overlay state
 static var overlays_initialized: bool = false
-static var current_mode: String = ""
+static var current_mode: TransformationManager.Mode = TransformationManager.Mode.NONE
 static var show_overlays: bool = true
 
 ## Core Overlay Management
@@ -286,7 +289,7 @@ static func _create_status_overlay():
 	
 	status_overlay.visible = false
 
-static func show_transform_overlay(mode: String, node_name: String = "", position: Vector3 = Vector3.ZERO, rotation: Vector3 = Vector3.ZERO, scale: float = 1.0, height_offset: float = 0.0):
+static func show_transform_overlay(mode: TransformationManager.Mode, node_name: String = "", position: Vector3 = Vector3.ZERO, rotation: Vector3 = Vector3.ZERO, scale: float = 1.0, height_offset: float = 0.0):
 	"""Show unified transform overlay with all current transformation data"""
 	if not show_overlays or not status_overlay:
 		return
@@ -297,10 +300,10 @@ static func show_transform_overlay(mode: String, node_name: String = "", positio
 	if status_label and transform_label:
 		# Set mode-specific status message
 		match mode:
-			"placement":
+			TransformationManager.Mode.PLACEMENT:
 				status_label.text = "🎯 PLACEMENT MODE" + (" - " + node_name if node_name != "" else "")
 				status_label.add_theme_color_override("font_color", Color.YELLOW)
-			"transform":
+			TransformationManager.Mode.TRANSFORM:
 				status_label.text = "⚙️ TRANSFORM MODE" + (" - " + node_name if node_name != "" else "")
 				status_label.add_theme_color_override("font_color", Color.CYAN)
 			_:
@@ -316,7 +319,11 @@ static func show_transform_overlay(mode: String, node_name: String = "", positio
 		if height_offset != 0.0:
 			transform_text += "Height Offset: %.2f" % height_offset
 		else:
-			transform_text += "Keys: O/P (Height)  L/K (Scale)  Mouse (Rotate)"
+			# Show mode-specific keybinds
+			if mode == TransformationManager.Mode.PLACEMENT:
+				transform_text += "WASD (Move)  Q/E (Height)  Mouse (Rotate)  PgUp/PgDn (Scale)"
+			else:  # transform mode
+				transform_text += "WASD (Move)  Q/E (Height)  Mouse+X/Y/Z (Rotate)  CTRL/ALT (Modifiers)"
 		
 		transform_label.text = transform_text
 	
@@ -341,7 +348,7 @@ static func show_status_message(message: String, color: Color = Color.GREEN, dur
 	# Auto-hide after duration if specified
 	if duration > 0.0:
 		await Engine.get_main_loop().create_timer(duration).timeout
-		if status_overlay and current_mode == "":  # Only hide if not in active mode
+		if status_overlay and current_mode == TransformationManager.Mode.NONE:  # Only hide if not in active mode
 			status_overlay.visible = false
 
 static func hide_transform_overlay():
@@ -350,7 +357,7 @@ static func hide_transform_overlay():
 		status_overlay.visible = false
 		# Also hide it deferred to ensure it stays hidden
 		status_overlay.call_deferred("set_visible", false)
-	current_mode = ""
+	current_mode = TransformationManager.Mode.NONE
 
 static func hide_status_overlay():
 	"""Hide status overlay (legacy compatibility)"""
@@ -358,18 +365,18 @@ static func hide_status_overlay():
 
 ## Mode-Specific Display
 
-static func set_mode(mode: String):
+static func set_mode(mode: TransformationManager.Mode):
 	"""Set current mode and update displays accordingly"""
 	current_mode = mode
 	
 	match mode:
-		"placement":
+		TransformationManager.Mode.PLACEMENT:
 			# Mode will be properly displayed via show_transform_overlay calls
 			pass
-		"transform":
+		TransformationManager.Mode.TRANSFORM:
 			# Mode will be properly displayed via show_transform_overlay calls  
 			pass
-		"":
+		TransformationManager.Mode.NONE:
 			hide_transform_overlay()
 
 static func update_mode_display(mode_data: Dictionary):
@@ -378,7 +385,7 @@ static func update_mode_display(mode_data: Dictionary):
 		return
 	
 	match current_mode:
-		"placement":
+		TransformationManager.Mode.PLACEMENT:
 			if mode_data.has("position"):
 				show_position_overlay(mode_data.position, mode_data.get("height_offset", 0.0))
 			if mode_data.has("rotation"):
@@ -386,7 +393,7 @@ static func update_mode_display(mode_data: Dictionary):
 			if mode_data.has("scale"):
 				show_scale_overlay(mode_data.scale)
 		
-		"transform":
+		TransformationManager.Mode.TRANSFORM:
 			if mode_data.has("position"):
 				show_position_overlay(mode_data.position)
 			if mode_data.has("rotation"):
@@ -399,11 +406,11 @@ static func show_all_overlays():
 	show_overlays = true
 	
 	if rotation_overlay:
-		rotation_overlay.visible = (current_mode in ["placement", "transform"])
+		rotation_overlay.visible = (current_mode in [TransformationManager.Mode.PLACEMENT, TransformationManager.Mode.TRANSFORM])
 	if scale_overlay:
-		scale_overlay.visible = (current_mode == "placement")
+		scale_overlay.visible = (current_mode == TransformationManager.Mode.PLACEMENT)
 	if position_overlay:
-		position_overlay.visible = (current_mode in ["placement", "transform"])
+		position_overlay.visible = (current_mode in [TransformationManager.Mode.PLACEMENT, TransformationManager.Mode.TRANSFORM])
 	if status_overlay:
 		status_overlay.visible = true
 

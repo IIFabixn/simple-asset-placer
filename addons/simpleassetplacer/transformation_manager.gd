@@ -95,7 +95,7 @@ static func start_placement_mode(mesh: Mesh = null, meshlib: MeshLibrary = null,
 	
 	# Initialize managers for placement mode
 	OverlayManager.initialize_overlays()
-	OverlayManager.set_mode("placement")
+	OverlayManager.set_mode(Mode.PLACEMENT)
 	
 	# Setup preview if we have something to place
 	if mesh:
@@ -188,7 +188,7 @@ static func start_transform_mode(target_nodes, dock_instance = null):
 	
 	# Initialize managers for transform mode
 	OverlayManager.initialize_overlays()
-	OverlayManager.set_mode("transform")
+	OverlayManager.set_mode(Mode.TRANSFORM)
 	
 	# Initialize position manager with center position
 	PositionManager.set_position(center_pos)
@@ -225,7 +225,7 @@ static func exit_placement_mode():
 	
 	# Hide and cleanup overlays
 	OverlayManager.hide_transform_overlay()
-	OverlayManager.set_mode("")
+	OverlayManager.set_mode(Mode.NONE)
 	OverlayManager.remove_grid_overlay()
 	
 	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Exited placement mode")
@@ -255,7 +255,7 @@ static func exit_transform_mode(confirm_changes: bool = true):
 	
 	# Hide and cleanup overlays
 	OverlayManager.hide_transform_overlay()
-	OverlayManager.set_mode("")
+	OverlayManager.set_mode(Mode.NONE)
 	OverlayManager.remove_grid_overlay()
 	
 	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Exited transform mode (confirmed: " + str(confirm_changes) + ")")
@@ -1071,7 +1071,7 @@ static func _update_placement_overlays():
 	var current_asset_name = placement_data.get("asset_path", "").get_file().get_basename() if placement_data.get("asset_path", "") != "" else "Mesh"
 	
 	OverlayManager.show_transform_overlay(
-		"placement",
+		Mode.PLACEMENT,
 		current_asset_name,
 		PositionManager.get_current_position(),
 		PreviewManager.get_preview_rotation(),
@@ -1086,7 +1086,7 @@ static func _update_transform_overlays(target_node: Node3D):
 	
 	if target_node.is_inside_tree():
 		OverlayManager.show_transform_overlay(
-			"transform",
+			Mode.TRANSFORM,
 			target_node.name,
 			target_node.global_position,
 			target_node.rotation,

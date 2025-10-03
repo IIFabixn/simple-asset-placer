@@ -98,6 +98,10 @@ static func start_placement_mode(mesh: Mesh = null, meshlib: MeshLibrary = null,
 	# The first mouse update will set the initial position from raycast
 	PositionManager.reset_for_new_placement()
 	
+	# Reset rotation for new placement (unless user wants to keep rotation)
+	if not placement_settings.get("keep_rotation_between_placements", false):
+		RotationManager.reset_all_rotation()
+	
 	# Grab focus for the 3D viewport to ensure keyboard input works
 	# Set counter to grab focus for next 3 frames to ensure it sticks
 	focus_grab_counter = 3
@@ -141,7 +145,8 @@ static func start_transform_mode(target_nodes, dock_instance = null):
 	transform_data = {
 		"target_nodes": valid_nodes,  # Array of nodes
 		"original_transforms": original_transforms,  # Dictionary mapping node to original transform
-		"dock_reference": dock_instance
+		"dock_reference": dock_instance,
+		"accumulated_xz_delta": Vector3.ZERO  # Track accumulated WASD position adjustments
 	}
 	
 	# Calculate center position of all nodes for positioning reference
@@ -163,11 +168,6 @@ static func start_transform_mode(target_nodes, dock_instance = null):
 	# Set counter to grab focus for next 3 frames to ensure it sticks
 	focus_grab_counter = 3
 	_grab_3d_viewport_focus()
-	
-	if valid_nodes.size() == 1:
-		print("TransformationManager: Started transform mode for ", valid_nodes[0].name)
-	else:
-		print("TransformationManager: Started transform mode for ", valid_nodes.size(), " nodes")
 
 static func exit_placement_mode():
 	"""Coordinate exiting placement mode"""
@@ -276,7 +276,12 @@ static func _process_placement_input(camera: Camera3D):
 	
 	# Update position from mouse - lock Y axis so only XZ is affected by mouse
 	# Y position is controlled by base_height + height_offset (manual Q/E keys)
+	# Manual WASD offsets are preserved via manual_position_offset in PositionManager
 	var mouse_pos = position_input.mouse_position
+	
+	# Set half-step mode based on CTRL key state
+	PositionManager.use_half_step = position_input.ctrl_held
+	
 	var world_pos = PositionManager.update_position_from_mouse(camera, mouse_pos, 1, true)
 	
 	# Handle height adjustments with reverse modifier support
@@ -293,6 +298,27 @@ static func _process_placement_input(camera: Camera3D):
 			PositionManager.decrease_height()
 	elif position_input.reset_height_pressed:
 		PositionManager.reset_height()
+	
+	# Handle position adjustments (WASD-style movement - camera relative)
+	var position_delta = placement_settings.get("position_increment", 0.1)
+	if position_input.ctrl_held:
+		position_delta = placement_settings.get("fine_position_increment", 0.01)
+	elif position_input.alt_held:
+		position_delta = placement_settings.get("large_position_increment", 1.0)
+	
+	if position_input.position_left_pressed:
+		PositionManager.move_left(position_delta, camera)
+	elif position_input.position_right_pressed:
+		PositionManager.move_right(position_delta, camera)
+	
+	if position_input.position_forward_pressed:
+		PositionManager.move_forward(position_delta, camera)
+	elif position_input.position_backward_pressed:
+		PositionManager.move_backward(position_delta, camera)
+	
+	# Handle position reset
+	if position_input.reset_position_pressed:
+		PositionManager.reset_position()
 	
 	# Get the updated position but preserve only manual height changes
 	var preview_pos = PositionManager.get_current_position()
@@ -373,50 +399,116 @@ static func _process_transform_input(camera: Camera3D):
 				y_delta = -center_y
 				current_y = 0.0
 	
+	# Handle position adjustments (WASD-style movement) - this adds to XZ position
+	var position_delta = placement_settings.get("position_increment", 0.1)
+	if position_input.ctrl_held:
+		position_delta = placement_settings.get("fine_position_increment", 0.01)
+	elif position_input.alt_held:
+		position_delta = placement_settings.get("large_position_increment", 1.0)
+	
+	# Get accumulated delta from transform_data
+	var accumulated_delta = transform_data.get("accumulated_xz_delta", Vector3.ZERO)
+	
+	# Get camera-relative directions snapped to nearest axis
+	var camera_forward = Vector3(0, 0, -1)
+	var camera_right = Vector3(1, 0, 0)
+	if camera:
+		# Get camera forward and project to XZ plane
+		var cam_forward = -camera.global_transform.basis.z
+		cam_forward.y = 0
+		cam_forward = cam_forward.normalized()
+		
+		# Snap forward to nearest axis (Z or X)
+		if abs(cam_forward.z) > abs(cam_forward.x):
+			camera_forward = Vector3(0, 0, sign(cam_forward.z))
+		else:
+			camera_forward = Vector3(sign(cam_forward.x), 0, 0)
+		
+		# Get camera right and project to XZ plane
+		var cam_right = camera.global_transform.basis.x
+		cam_right.y = 0
+		cam_right = cam_right.normalized()
+		
+		# Snap right to nearest axis (X or Z)
+		if abs(cam_right.x) > abs(cam_right.z):
+			camera_right = Vector3(sign(cam_right.x), 0, 0)
+		else:
+			camera_right = Vector3(0, 0, sign(cam_right.z))
+	
+	# Handle position adjustments (WASD-style movement) - accumulate axis-aligned delta
+	if position_input.position_left_pressed:
+		accumulated_delta -= camera_right * position_delta  # Left is negative right
+	elif position_input.position_right_pressed:
+		accumulated_delta += camera_right * position_delta
+	
+	if position_input.position_forward_pressed:
+		accumulated_delta += camera_forward * position_delta
+	elif position_input.position_backward_pressed:
+		accumulated_delta -= camera_forward * position_delta  # Backward is negative forward
+	
+	# Handle position reset
+	if position_input.reset_position_pressed:
+		accumulated_delta = Vector3.ZERO
+	
+	# Store back the accumulated delta
+	transform_data["accumulated_xz_delta"] = accumulated_delta
+	
 	# Calculate XZ position using offset-from-center approach for proper grid snapping
 	var mouse_pos = position_input.mouse_position
 	
-	# Calculate old center position
-	var old_center = Vector3.ZERO
+	# Calculate combined AABB for all nodes (for edge-based snapping)
+	var combined_aabb = _calculate_combined_aabb(target_nodes)
+	PositionManager.set_mesh_aabb(combined_aabb)
+	
+	# Set half-step mode based on CTRL key state
+	PositionManager.use_half_step = position_input.ctrl_held
+	
+	# Calculate old center position from ORIGINAL transforms (not current positions)
+	# This ensures we always position relative to the original center, not accumulated drift
+	var original_center = Vector3.ZERO
+	var original_transforms = transform_data.get("original_transforms", {})
 	for node in target_nodes:
-		if node and node.is_inside_tree():
-			old_center += node.global_position
-	old_center /= target_nodes.size()
+		if node and node.is_inside_tree() and original_transforms.has(node):
+			var orig_transform = original_transforms[node]
+			# Get original global position by applying original local transform
+			var orig_global_pos = node.get_parent().global_transform * orig_transform.origin if node.get_parent() else orig_transform.origin
+			original_center += orig_global_pos
+	original_center /= target_nodes.size()
 	
-	# Snap the old center to match grid alignment (critical for correct offsets)
-	# This ensures offsets are calculated relative to grid-aligned position
-	var old_snapped_center = old_center
-	if PositionManager.snap_enabled and PositionManager.snap_step > 0.0:
-		old_snapped_center = Vector3(
-			snappedf(old_center.x, PositionManager.snap_step),
-			old_center.y,
-			snappedf(old_center.z, PositionManager.snap_step)
-		)
+	# Snap the original center using AABB-aware snapping
+	var original_snapped_center = original_center
+	if PositionManager.snap_enabled:
+		original_snapped_center = PositionManager._apply_grid_snap(original_center, combined_aabb)
 	
-	# Calculate each node's offset from the old SNAPPED center
+	# Calculate each node's offset from the original SNAPPED center
 	var node_offsets = {}
 	for node in target_nodes:
-		if node and node.is_inside_tree():
-			node_offsets[node] = node.global_position - old_snapped_center
+		if node and node.is_inside_tree() and original_transforms.has(node):
+			var orig_transform = original_transforms[node]
+			var orig_global_pos = node.get_parent().global_transform * orig_transform.origin if node.get_parent() else orig_transform.origin
+			node_offsets[node] = orig_global_pos - original_snapped_center
 	
 	# Update position from mouse to get new snapped center position
 	PositionManager.update_position_from_mouse(camera, mouse_pos)
-	var new_center = PositionManager.get_current_position()
+	var mouse_center = PositionManager.get_current_position()
+	
+	# New center = mouse position + accumulated manual adjustments (relative to original snapped center)
+	var new_center = mouse_center + accumulated_delta
 	
 	# Apply transformations to ALL nodes by repositioning relative to new center
 	for node in target_nodes:
 		if not node or not node.is_inside_tree():
 			continue
 		
-		# Get this node's offset from center
+		# Get this node's offset from original center
 		var offset = node_offsets.get(node, Vector3.ZERO)
 		
-		# Set position as: new_snapped_center + offset (maintains relative position)
+		# Set position as: new_center + offset (maintains relative position from original)
 		node.global_position.x = new_center.x + offset.x
 		node.global_position.z = new_center.z + offset.z
 		
-		# Y position: old center Y + offset + any height adjustment delta
-		node.global_position.y = old_center.y + offset.y + y_delta
+		# Y position: original center Y + offset + any height adjustment delta
+		node.global_position.y = original_center.y + offset.y + y_delta
 	
 	# Update surface normal alignment if enabled, otherwise reset it
 	if placement_settings.get("align_with_normal", false):
@@ -908,6 +1000,64 @@ static func cleanup():
 	transform_data.clear()
 	settings.clear()
 	print("TransformationManager: Cleanup completed")
+
+## HELPER FUNCTIONS
+
+static func _calculate_combined_aabb(nodes: Array) -> AABB:
+	"""Calculate combined AABB from multiple Node3D objects"""
+	var combined = AABB()
+	var first = true
+	
+	for node in nodes:
+		if not node or not node.is_inside_tree():
+			continue
+		
+		var node_aabb = _get_node_aabb(node)
+		if node_aabb.size != Vector3.ZERO:
+			# Transform AABB to world space relative to group center
+			var world_aabb = AABB(node.global_position + node_aabb.position, node_aabb.size)
+			
+			if first:
+				combined = world_aabb
+				first = false
+			else:
+				combined = combined.merge(world_aabb)
+	
+	# Convert back to local space (relative to center)
+	if not first and nodes.size() > 0:
+		var center = Vector3.ZERO
+		var count = 0
+		for node in nodes:
+			if node and node.is_inside_tree():
+				center += node.global_position
+				count += 1
+		if count > 0:
+			center /= count
+			# Adjust AABB position to be relative to center
+			combined.position = combined.position - center
+	
+	return combined
+
+static func _get_node_aabb(node: Node) -> AABB:
+	"""Get AABB from a single node"""
+	if node is MeshInstance3D and node.mesh:
+		return node.mesh.get_aabb()
+	elif node is GeometryInstance3D:
+		# Try to get AABB from visual instance
+		return node.get_aabb()
+	else:
+		# Recursively check children
+		var combined = AABB()
+		var first = true
+		for child in node.get_children():
+			var child_aabb = _get_node_aabb(child)
+			if child_aabb.size != Vector3.ZERO:
+				if first:
+					combined = child_aabb
+					first = false
+				else:
+					combined = combined.merge(child_aabb)
+		return combined
 
 ## RESET MANAGEMENT
 

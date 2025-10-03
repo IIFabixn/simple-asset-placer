@@ -27,12 +27,16 @@ USED BY: TransformationManager for placement mode preview operations
 DEPENDS ON: Godot scene system, material system, resource loading
 """
 
+# Import PositionManager for AABB snapping
+const PositionManager = preload("res://addons/simpleassetplacer/position_manager.gd")
+
 # Preview state
 static var preview_mesh: Node3D = null
 static var preview_material: StandardMaterial3D = null
 static var current_position: Vector3 = Vector3.ZERO
 static var current_rotation: Vector3 = Vector3.ZERO
 static var current_scale: Vector3 = Vector3.ONE
+static var original_aabb: AABB = AABB()  # Store original unrotated AABB
 
 # Preview configuration
 static var preview_opacity: float = 0.6
@@ -62,6 +66,11 @@ static func start_preview_mesh(mesh: Mesh, settings: Dictionary = {}):
 	preview_mesh.name = "AssetPlacerPreview"
 	preview_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	preview_mesh.layers = 1  # Default render layer
+	
+	# Store original AABB and set it in PositionManager for edge-based snapping
+	if mesh:
+		original_aabb = mesh.get_aabb()
+		PositionManager.set_mesh_aabb(original_aabb)
 	
 	# Add to scene first
 	current_scene.add_child(preview_mesh)
@@ -117,6 +126,10 @@ static func start_preview_asset(asset_path: String, settings: Dictionary = {}):
 	# Apply transparency to all mesh instances
 	_apply_preview_transparency_to_children(preview_mesh)
 	
+	# Calculate and store original combined AABB for edge-based snapping
+	original_aabb = _get_combined_aabb(preview_mesh)
+	PositionManager.set_mesh_aabb(original_aabb)
+	
 	# Add to scene first
 	current_scene.add_child(preview_mesh)
 	
@@ -137,6 +150,54 @@ static func _apply_preview_transparency_to_children(node: Node):
 	for child in node.get_children():
 		_apply_preview_transparency_to_children(child)
 
+static func _get_combined_aabb(node: Node) -> AABB:
+	"""Calculate combined AABB from all MeshInstance3D children"""
+	var combined = AABB()
+	var first = true
+	
+	if node is MeshInstance3D and node.mesh:
+		combined = node.mesh.get_aabb()
+		first = false
+	
+	for child in node.get_children():
+		var child_aabb = _get_combined_aabb(child)
+		if child_aabb.size != Vector3.ZERO:
+			if first:
+				combined = child_aabb
+				first = false
+			else:
+				combined = combined.merge(child_aabb)
+	
+	return combined
+
+static func _rotate_aabb_by_y_axis(aabb: AABB, y_rotation_rad: float) -> AABB:
+	"""Rotate AABB dimensions based on Y-axis rotation (for 90-degree increments)"""
+	# Normalize rotation to 0-360 degrees
+	var degrees = fmod(rad_to_deg(y_rotation_rad), 360.0)
+	if degrees < 0:
+		degrees += 360.0
+	
+	# Round to nearest 90 degrees
+	var rounded_degrees = round(degrees / 90.0) * 90.0
+	var rotations = int(rounded_degrees / 90.0) % 4
+	
+	# Start with original AABB
+	var rotated = aabb
+	
+	# For each 90-degree rotation, swap X and Z dimensions
+	if rotations == 1 or rotations == 3:  # 90° or 270°
+		# Swap X and Z size
+		var new_size = Vector3(aabb.size.z, aabb.size.y, aabb.size.x)
+		# Swap X and Z position offset
+		var new_pos = Vector3(aabb.position.z, aabb.position.y, aabb.position.x)
+		rotated = AABB(new_pos, new_size)
+		print("PreviewManager: Rotated AABB by ", rounded_degrees, "° - Original size: ", aabb.size, " -> Rotated size: ", new_size)
+	else:
+		print("PreviewManager: AABB at ", rounded_degrees, "° - Size unchanged: ", aabb.size)
+	# 0° and 180° rotations keep the same AABB dimensions
+	
+	return rotated
+
 ## Preview Updates
 
 static func update_preview_position(position: Vector3):
@@ -150,6 +211,9 @@ static func update_preview_rotation(rotation: Vector3):
 	current_rotation = rotation
 	if preview_mesh and is_instance_valid(preview_mesh) and preview_mesh.is_inside_tree():
 		preview_mesh.rotation = rotation
+		# Update AABB based on Y rotation for proper edge snapping
+		var rotated_aabb = _rotate_aabb_by_y_axis(original_aabb, rotation.y)
+		PositionManager.set_mesh_aabb(rotated_aabb)
 
 static func update_preview_scale(scale: Vector3):
 	"""Update preview scale"""
@@ -230,6 +294,7 @@ static func cleanup_preview():
 	if preview_mesh and is_instance_valid(preview_mesh):
 		preview_mesh.queue_free()
 		preview_mesh = null
+		original_aabb = AABB()  # Reset stored AABB
 		print("PreviewManager: Cleaned up preview")
 
 ## Configuration

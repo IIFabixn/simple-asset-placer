@@ -49,6 +49,16 @@ var height_step_spin: SpinBox
 var fine_height_increment_spin: SpinBox
 var large_height_increment_spin: SpinBox
 
+# Position Adjustment Controls
+var position_left_key_button: Button
+var position_right_key_button: Button
+var position_forward_key_button: Button
+var position_backward_key_button: Button
+var reset_position_key_button: Button
+var position_increment_spin: SpinBox
+var fine_position_increment_spin: SpinBox
+var large_position_increment_spin: SpinBox
+
 # Modifier Key Controls
 var reverse_modifier_key_button: Button
 var large_increment_modifier_key_button: Button
@@ -62,6 +72,10 @@ var snap_to_ground: bool = false
 var align_with_normal: bool = false  # Align object rotation with surface normal
 var snap_enabled: bool = false  # User can enable when desired
 var snap_step: float = 1.0
+var snap_by_aabb: bool = true  # Snap by bounding box edges instead of pivot
+var snap_offset: Vector3 = Vector3.ZERO  # Grid offset from world origin
+var snap_y_enabled: bool = false  # Enable Y-axis (height) snapping
+var snap_y_step: float = 1.0  # Grid size for Y-axis snapping
 var random_rotation: bool = false
 var scale_multiplier: float = 1.0
 var add_collision: bool = false
@@ -96,6 +110,16 @@ var reset_height_key: String = "R"   # Reset height offset to zero
 var height_adjustment_step: float = 0.1
 var fine_height_increment: float = 0.01
 var large_height_increment: float = 1.0
+
+# Position Adjustment Settings (manual XZ movement)
+var position_left_key: String = "A"       # Move left (-X)
+var position_right_key: String = "D"      # Move right (+X)
+var position_forward_key: String = "W"    # Move forward (-Z)
+var position_backward_key: String = "S"   # Move backward (+Z)
+var reset_position_key: String = "G"      # Reset position offset to zero
+var position_increment: float = 0.1       # Default position step
+var fine_position_increment: float = 0.01 # Fine position step (with CTRL)
+var large_position_increment: float = 1.0 # Large position step (with ALT)
 
 # Modifier Key Settings
 var reverse_modifier_key: String = "SHIFT"    # Reverse rotation direction
@@ -195,6 +219,78 @@ func setup_ui():
 	snap_step_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	snap_step_spin.tooltip_text = "Grid spacing for snapping"
 	settings_grid.add_child(snap_step_spin)
+	
+	# Snap by AABB checkbox (spans both columns)
+	var snap_aabb_check = CheckBox.new()
+	snap_aabb_check.name = "SnapAABBCheck"
+	snap_aabb_check.text = "Snap by Bounding Box Edges"
+	snap_aabb_check.button_pressed = true  # Default enabled
+	snap_aabb_check.tooltip_text = "Snap assets by their edges instead of pivot point (aligns edges to grid)"
+	snap_aabb_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(snap_aabb_check)
+	
+	# Y-axis snapping checkbox (spans both columns)
+	var snap_y_check = CheckBox.new()
+	snap_y_check.name = "SnapYCheck"
+	snap_y_check.text = "Enable Vertical (Y) Snapping"
+	snap_y_check.button_pressed = false
+	snap_y_check.tooltip_text = "Snap height to grid (useful for stacking objects)"
+	snap_y_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(snap_y_check)
+	
+	# Y-axis snap step
+	var snap_y_label = Label.new()
+	snap_y_label.text = "Vertical Grid Size:"
+	snap_y_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	settings_grid.add_child(snap_y_label)
+	
+	var snap_y_step_spin = SpinBox.new()
+	snap_y_step_spin.name = "SnapYStepSpin"
+	snap_y_step_spin.min_value = 0.1
+	snap_y_step_spin.max_value = 1000.0
+	snap_y_step_spin.step = 0.1
+	snap_y_step_spin.value = 1.0
+	snap_y_step_spin.custom_minimum_size.x = 80
+	snap_y_step_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	snap_y_step_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	snap_y_step_spin.tooltip_text = "Grid spacing for Y-axis snapping"
+	settings_grid.add_child(snap_y_step_spin)
+	
+	# Grid offset X
+	var offset_x_label = Label.new()
+	offset_x_label.text = "Grid Offset X:"
+	offset_x_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	settings_grid.add_child(offset_x_label)
+	
+	var offset_x_spin = SpinBox.new()
+	offset_x_spin.name = "GridOffsetXSpin"
+	offset_x_spin.min_value = -1000.0
+	offset_x_spin.max_value = 1000.0
+	offset_x_spin.step = 0.1
+	offset_x_spin.value = 0.0
+	offset_x_spin.custom_minimum_size.x = 80
+	offset_x_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	offset_x_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	offset_x_spin.tooltip_text = "Offset the grid from world origin on X-axis"
+	settings_grid.add_child(offset_x_spin)
+	
+	# Grid offset Z
+	var offset_z_label = Label.new()
+	offset_z_label.text = "Grid Offset Z:"
+	offset_z_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	settings_grid.add_child(offset_z_label)
+	
+	var offset_z_spin = SpinBox.new()
+	offset_z_spin.name = "GridOffsetZSpin"
+	offset_z_spin.min_value = -1000.0
+	offset_z_spin.max_value = 1000.0
+	offset_z_spin.step = 0.1
+	offset_z_spin.value = 0.0
+	offset_z_spin.custom_minimum_size.x = 80
+	offset_z_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	offset_z_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	offset_z_spin.tooltip_text = "Offset the grid from world origin on Z-axis"
+	settings_grid.add_child(offset_z_spin)
 	
 	# Random rotation option (spans both columns)
 	random_rotation_check = CheckBox.new()
@@ -614,6 +710,138 @@ func setup_ui():
 	large_height_increment_spin.tooltip_text = "Large height increment (with ALT modifier)"
 	height_grid.add_child(large_height_increment_spin)
 	
+	# Add separator for position adjustment
+	var position_separator = HSeparator.new()
+	position_separator.add_theme_constant_override("separation", 8)
+	vbox.add_child(position_separator)
+	
+	# Position Adjustment section
+	var position_label = Label.new()
+	position_label.text = "Position Adjustment (XZ Manual Movement)"
+	position_label.add_theme_font_size_override("font_size", 14)
+	position_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.9))
+	vbox.add_child(position_label)
+	
+	# Grid for position controls
+	var position_grid = GridContainer.new()
+	position_grid.columns = 2
+	position_grid.add_theme_constant_override("h_separation", 8)
+	position_grid.add_theme_constant_override("v_separation", 4)
+	vbox.add_child(position_grid)
+	
+	# Move Left key
+	var position_left_label = Label.new()
+	position_left_label.text = "Move Left (-X):"
+	position_left_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	position_grid.add_child(position_left_label)
+	
+	position_left_key_button = Button.new()
+	position_left_key_button.text = position_left_key
+	position_left_key_button.custom_minimum_size.x = 80
+	position_left_key_button.pressed.connect(_on_key_binding_button_pressed.bind(position_left_key_button, "position_left_key"))
+	position_grid.add_child(position_left_key_button)
+	
+	# Move Right key
+	var position_right_label = Label.new()
+	position_right_label.text = "Move Right (+X):"
+	position_right_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	position_grid.add_child(position_right_label)
+	
+	position_right_key_button = Button.new()
+	position_right_key_button.text = position_right_key
+	position_right_key_button.custom_minimum_size.x = 80
+	position_right_key_button.pressed.connect(_on_key_binding_button_pressed.bind(position_right_key_button, "position_right_key"))
+	position_grid.add_child(position_right_key_button)
+	
+	# Move Forward key
+	var position_forward_label = Label.new()
+	position_forward_label.text = "Move Forward (-Z):"
+	position_forward_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	position_grid.add_child(position_forward_label)
+	
+	position_forward_key_button = Button.new()
+	position_forward_key_button.text = position_forward_key
+	position_forward_key_button.custom_minimum_size.x = 80
+	position_forward_key_button.pressed.connect(_on_key_binding_button_pressed.bind(position_forward_key_button, "position_forward_key"))
+	position_grid.add_child(position_forward_key_button)
+	
+	# Move Backward key
+	var position_backward_label = Label.new()
+	position_backward_label.text = "Move Backward (+Z):"
+	position_backward_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	position_grid.add_child(position_backward_label)
+	
+	position_backward_key_button = Button.new()
+	position_backward_key_button.text = position_backward_key
+	position_backward_key_button.custom_minimum_size.x = 80
+	position_backward_key_button.pressed.connect(_on_key_binding_button_pressed.bind(position_backward_key_button, "position_backward_key"))
+	position_grid.add_child(position_backward_key_button)
+	
+	# Reset Position key
+	var reset_position_label = Label.new()
+	reset_position_label.text = "Reset Position Offset:"
+	reset_position_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	position_grid.add_child(reset_position_label)
+	
+	reset_position_key_button = Button.new()
+	reset_position_key_button.text = reset_position_key
+	reset_position_key_button.custom_minimum_size.x = 80
+	reset_position_key_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reset_position_key_button.tooltip_text = "Click to set key for resetting position offset to zero. Press ESC to cancel."
+	reset_position_key_button.pressed.connect(_on_key_binding_button_pressed.bind(reset_position_key_button, "reset_position_key"))
+	position_grid.add_child(reset_position_key_button)
+	
+	# Position Step
+	var position_step_label = Label.new()
+	position_step_label.text = "Position Step:"
+	position_step_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	position_grid.add_child(position_step_label)
+	
+	position_increment_spin = SpinBox.new()
+	position_increment_spin.min_value = 0.01
+	position_increment_spin.max_value = 10.0
+	position_increment_spin.step = 0.01
+	position_increment_spin.value = position_increment
+	position_increment_spin.custom_minimum_size.x = 80
+	position_increment_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	position_increment_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	position_increment_spin.tooltip_text = "Normal position increment"
+	position_grid.add_child(position_increment_spin)
+	
+	# Fine Position Step
+	var fine_position_label = Label.new()
+	fine_position_label.text = "Fine Position Step:"
+	fine_position_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	position_grid.add_child(fine_position_label)
+	
+	fine_position_increment_spin = SpinBox.new()
+	fine_position_increment_spin.min_value = 0.001
+	fine_position_increment_spin.max_value = 1.0
+	fine_position_increment_spin.step = 0.001
+	fine_position_increment_spin.value = fine_position_increment
+	fine_position_increment_spin.custom_minimum_size.x = 80
+	fine_position_increment_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	fine_position_increment_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	fine_position_increment_spin.tooltip_text = "Fine position increment (with CTRL modifier)"
+	position_grid.add_child(fine_position_increment_spin)
+	
+	# Large Position Step
+	var large_position_label = Label.new()
+	large_position_label.text = "Large Position Step:"
+	large_position_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	position_grid.add_child(large_position_label)
+	
+	large_position_increment_spin = SpinBox.new()
+	large_position_increment_spin.min_value = 0.5
+	large_position_increment_spin.max_value = 10.0
+	large_position_increment_spin.step = 0.1
+	large_position_increment_spin.value = large_position_increment
+	large_position_increment_spin.custom_minimum_size.x = 80
+	large_position_increment_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	large_position_increment_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	large_position_increment_spin.tooltip_text = "Large position increment (with ALT modifier)"
+	position_grid.add_child(large_position_increment_spin)
+	
 	# Add separator for modifier keys
 	var modifier_separator = HSeparator.new()
 	modifier_separator.add_theme_constant_override("separation", 8)
@@ -806,6 +1034,24 @@ func _on_setting_changed(value = null):
 	add_collision = collision_check.button_pressed
 	group_instances = grouping_check.button_pressed
 	
+	# New snap settings
+	var snap_aabb_check = get_node_or_null("VBoxContainer/SnapAABBCheck")
+	if snap_aabb_check:
+		snap_by_aabb = snap_aabb_check.button_pressed
+	
+	var snap_y_check = get_node_or_null("VBoxContainer/SnapYCheck")
+	if snap_y_check:
+		snap_y_enabled = snap_y_check.button_pressed
+	
+	var snap_y_step_spin = get_node_or_null("VBoxContainer/SettingsGrid/SnapYStepSpin")
+	if snap_y_step_spin:
+		snap_y_step = snap_y_step_spin.value
+	
+	var offset_x_spin = get_node_or_null("VBoxContainer/SettingsGrid/GridOffsetXSpin")
+	var offset_z_spin = get_node_or_null("VBoxContainer/SettingsGrid/GridOffsetZSpin")
+	if offset_x_spin and offset_z_spin:
+		snap_offset = Vector3(offset_x_spin.value, snap_offset.y, offset_z_spin.value)
+	
 	# Reset behavior settings
 	reset_height_on_exit = reset_height_on_exit_check.button_pressed
 	reset_scale_on_exit = reset_scale_on_exit_check.button_pressed
@@ -879,6 +1125,16 @@ func _input(event: InputEvent):
 				height_up_key = key_string
 			"height_down_key":
 				height_down_key = key_string
+			"position_left_key":
+				position_left_key = key_string
+			"position_right_key":
+				position_right_key = key_string
+			"position_forward_key":
+				position_forward_key = key_string
+			"position_backward_key":
+				position_backward_key = key_string
+			"reset_position_key":
+				reset_position_key = key_string
 			"reverse_modifier_key":
 				reverse_modifier_key = key_string
 			"large_increment_modifier_key":
@@ -924,6 +1180,16 @@ func _cancel_key_binding():
 			listening_button.text = height_up_key
 		"height_down_key":
 			listening_button.text = height_down_key
+		"position_left_key":
+			listening_button.text = position_left_key
+		"position_right_key":
+			listening_button.text = position_right_key
+		"position_forward_key":
+			listening_button.text = position_forward_key
+		"position_backward_key":
+			listening_button.text = position_backward_key
+		"reset_position_key":
+			listening_button.text = reset_position_key
 		"reverse_modifier_key":
 			listening_button.text = reverse_modifier_key
 		"large_increment_modifier_key":
@@ -1054,6 +1320,10 @@ func get_placement_settings() -> Dictionary:
 		"align_with_normal": align_with_normal,
 		"snap_enabled": snap_enabled,
 		"snap_step": snap_step,
+		"snap_by_aabb": snap_by_aabb,
+		"snap_offset": snap_offset,
+		"snap_y_enabled": snap_y_enabled,
+		"snap_y_step": snap_y_step,
 		"random_rotation": random_rotation,
 		"scale_multiplier": scale_multiplier,
 		"add_collision": add_collision,
@@ -1077,6 +1347,14 @@ func get_placement_settings() -> Dictionary:
 		"height_adjustment_step": height_adjustment_step,
 		"fine_height_increment": fine_height_increment,
 		"large_height_increment": large_height_increment,
+		"position_left_key": position_left_key,
+		"position_right_key": position_right_key,
+		"position_forward_key": position_forward_key,
+		"position_backward_key": position_backward_key,
+		"reset_position_key": reset_position_key,
+		"position_increment": position_increment,
+		"fine_position_increment": fine_position_increment,
+		"large_position_increment": large_position_increment,
 		"reverse_modifier_key": reverse_modifier_key,
 		"large_increment_modifier_key": large_increment_modifier_key,
 		"cancel_key": cancel_key,
@@ -1095,6 +1373,10 @@ func save_settings():
 	editor_settings.set_setting("simple_asset_placer/align_with_normal", align_with_normal)
 	editor_settings.set_setting("simple_asset_placer/snap_enabled", snap_enabled)
 	editor_settings.set_setting("simple_asset_placer/snap_step", snap_step)
+	editor_settings.set_setting("simple_asset_placer/snap_by_aabb", snap_by_aabb)
+	editor_settings.set_setting("simple_asset_placer/snap_offset", snap_offset)
+	editor_settings.set_setting("simple_asset_placer/snap_y_enabled", snap_y_enabled)
+	editor_settings.set_setting("simple_asset_placer/snap_y_step", snap_y_step)
 	editor_settings.set_setting("simple_asset_placer/random_rotation", random_rotation)
 	editor_settings.set_setting("simple_asset_placer/scale_multiplier", scale_multiplier)
 	editor_settings.set_setting("simple_asset_placer/add_collision", add_collision)
@@ -1151,6 +1433,14 @@ func load_settings():
 		snap_enabled = editor_settings.get_setting("simple_asset_placer/snap_enabled")
 	if editor_settings.has_setting("simple_asset_placer/snap_step"):
 		snap_step = editor_settings.get_setting("simple_asset_placer/snap_step")
+	if editor_settings.has_setting("simple_asset_placer/snap_by_aabb"):
+		snap_by_aabb = editor_settings.get_setting("simple_asset_placer/snap_by_aabb")
+	if editor_settings.has_setting("simple_asset_placer/snap_offset"):
+		snap_offset = editor_settings.get_setting("simple_asset_placer/snap_offset")
+	if editor_settings.has_setting("simple_asset_placer/snap_y_enabled"):
+		snap_y_enabled = editor_settings.get_setting("simple_asset_placer/snap_y_enabled")
+	if editor_settings.has_setting("simple_asset_placer/snap_y_step"):
+		snap_y_step = editor_settings.get_setting("simple_asset_placer/snap_y_step")
 	if editor_settings.has_setting("simple_asset_placer/random_rotation"):
 		random_rotation = editor_settings.get_setting("simple_asset_placer/random_rotation")
 	if editor_settings.has_setting("simple_asset_placer/scale_multiplier"):

@@ -91,9 +91,27 @@ static func _update_key_states():
 	current_keys["height_down"] = Input.is_key_pressed(string_to_keycode(height_down_key))
 	current_keys["reset_height"] = Input.is_key_pressed(string_to_keycode(reset_height_key))
 	
+	# Position adjustment keys
+	var position_left_key = settings.get("position_left_key", "A")
+	var position_right_key = settings.get("position_right_key", "D")
+	var position_forward_key = settings.get("position_forward_key", "W")
+	var position_backward_key = settings.get("position_backward_key", "S")
+	var reset_position_key = settings.get("reset_position_key", "G")
+	current_keys["position_left"] = Input.is_key_pressed(string_to_keycode(position_left_key))
+	current_keys["position_right"] = Input.is_key_pressed(string_to_keycode(position_right_key))
+	current_keys["position_forward"] = Input.is_key_pressed(string_to_keycode(position_forward_key))
+	current_keys["position_backward"] = Input.is_key_pressed(string_to_keycode(position_backward_key))
+	current_keys["reset_position"] = Input.is_key_pressed(string_to_keycode(reset_position_key))
+	
 	# Track key press times for grace period
 	_track_key_press_time("height_up", current_time)
 	_track_key_press_time("height_down", current_time)
+	_track_key_press_time("reset_height", current_time)
+	_track_key_press_time("position_left", current_time)
+	_track_key_press_time("position_right", current_time)
+	_track_key_press_time("position_forward", current_time)
+	_track_key_press_time("position_backward", current_time)
+	_track_key_press_time("reset_position", current_time)
 	
 	# Rotation keys
 	current_keys["rotate_x"] = Input.is_key_pressed(string_to_keycode(settings.get("rotate_x_key", "X")))
@@ -299,9 +317,16 @@ static func get_position_input() -> Dictionary:
 		"height_up_pressed": is_key_just_pressed("height_up"),
 		"height_down_pressed": is_key_just_pressed("height_down"),
 		"reset_height_pressed": is_key_just_pressed("reset_height"),
+		"position_left_pressed": is_key_just_pressed("position_left"),
+		"position_right_pressed": is_key_just_pressed("position_right"),
+		"position_forward_pressed": is_key_just_pressed("position_forward"),
+		"position_backward_pressed": is_key_just_pressed("position_backward"),
+		"reset_position_pressed": is_key_just_pressed("reset_position"),
 		"mouse_position": get_mouse_position(),
 		"left_clicked": is_mouse_button_just_pressed("left") and is_mouse_in_viewport(),
-		"shift_held": is_shift_held()
+		"shift_held": is_shift_held(),
+		"ctrl_held": is_ctrl_held(),
+		"alt_held": is_alt_held()
 	}
 
 static func get_navigation_input() -> Dictionary:

@@ -415,12 +415,8 @@ static func _process_transform_input(camera: Camera3D):
 		node.global_position.x = new_center.x + offset.x
 		node.global_position.z = new_center.z + offset.z
 		
-		# Apply Y movement delta
-		if y_delta != 0.0:
-			node.global_position.y += y_delta
-		else:
-			# If no Y delta, maintain the Y offset from center
-			node.global_position.y = old_center.y + offset.y
+		# Y position: old center Y + offset + any height adjustment delta
+		node.global_position.y = old_center.y + offset.y + y_delta
 	
 	# Update surface normal alignment if enabled, otherwise reset it
 	if placement_settings.get("align_with_normal", false):
@@ -548,9 +544,11 @@ static func _apply_height_adjustment(wheel_input: Dictionary):
 		else:
 			PositionManager.adjust_height(-step)
 	elif current_mode == "transform":
-		var target_node = transform_data.get("target_node")
-		if target_node and target_node.is_inside_tree():
-			target_node.global_position.y += step * direction
+		# Apply height adjustment to ALL nodes in transform mode
+		var target_nodes = transform_data.get("target_nodes", [])
+		for node in target_nodes:
+			if node and node.is_inside_tree():
+				node.global_position.y += step * direction
 
 static func _apply_scale_adjustment(wheel_input: Dictionary):
 	"""Apply scale adjustment based on wheel input"""
@@ -562,18 +560,26 @@ static func _apply_scale_adjustment(wheel_input: Dictionary):
 	if large_increment:
 		step = placement_settings.get("large_scale_increment", 0.5)
 	
-	var target_node = null
 	if current_mode == "placement":
-		target_node = PreviewManager.preview_mesh
+		var target_node = PreviewManager.preview_mesh
+		if target_node:
+			if direction > 0:
+				ScaleManager.increase_scale(step)
+			else:
+				ScaleManager.decrease_scale(step)
+			ScaleManager.apply_uniform_scale_to_node(target_node)
 	elif current_mode == "transform":
-		target_node = transform_data.get("target_node")
-	
-	if target_node:
-		if direction > 0:
-			ScaleManager.increase_scale(step)
-		else:
-			ScaleManager.decrease_scale(step)
-		ScaleManager.apply_uniform_scale_to_node(target_node)
+		# Apply scale adjustment to ALL nodes in transform mode
+		var target_nodes = transform_data.get("target_nodes", [])
+		if not target_nodes.is_empty():
+			if direction > 0:
+				ScaleManager.increase_scale(step)
+			else:
+				ScaleManager.decrease_scale(step)
+			# Apply to all nodes
+			for node in target_nodes:
+				if node and node.is_inside_tree():
+					ScaleManager.apply_uniform_scale_to_node(node)
 
 static func _apply_rotation_adjustment(wheel_input: Dictionary):
 	"""Apply rotation adjustment based on wheel input"""
@@ -590,14 +596,16 @@ static func _apply_rotation_adjustment(wheel_input: Dictionary):
 	if reverse:
 		direction = -direction
 	
-	var target_node = null
 	if current_mode == "placement":
-		target_node = PreviewManager.preview_mesh
+		var target_node = PreviewManager.preview_mesh
+		if target_node:
+			RotationManager.apply_rotation_step(target_node, axis, step * direction)
 	elif current_mode == "transform":
-		target_node = transform_data.get("target_node")
-	
-	if target_node:
-		RotationManager.apply_rotation_step(target_node, axis, step * direction)
+		# Apply rotation to ALL nodes in transform mode
+		var target_nodes = transform_data.get("target_nodes", [])
+		for node in target_nodes:
+			if node and node.is_inside_tree():
+				RotationManager.apply_rotation_step(node, axis, step * direction)
 
 ## TAB KEY COORDINATION
 

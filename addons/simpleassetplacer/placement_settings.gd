@@ -10,6 +10,7 @@ signal cache_cleared()
 
 # UI Controls
 var snap_to_ground_check: CheckBox
+var align_with_normal_check: CheckBox
 var snap_enabled_check: CheckBox
 var snap_step_spin: SpinBox
 var random_rotation_check: CheckBox
@@ -57,6 +58,7 @@ var transform_mode_key_button: Button
 
 # Settings
 var snap_to_ground: bool = false
+var align_with_normal: bool = false  # Align object rotation with surface normal
 var snap_enabled: bool = false  # User can enable when desired
 var snap_step: float = 1.0
 var random_rotation: bool = false
@@ -151,6 +153,13 @@ func setup_ui():
 	snap_to_ground_check.tooltip_text = "Place objects on the ground/surface below"
 	snap_to_ground_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_child(snap_to_ground_check)
+	
+	# Align with surface normal option
+	align_with_normal_check = CheckBox.new()
+	align_with_normal_check.text = "Align with Surface Normal"
+	align_with_normal_check.tooltip_text = "Rotate objects to match the angle of the surface they're placed on"
+	align_with_normal_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(align_with_normal_check)
 	
 	# Grid snapping option
 	snap_enabled_check = CheckBox.new()
@@ -709,6 +718,7 @@ func setup_ui():
 	
 	# Connect signals
 	snap_to_ground_check.toggled.connect(_on_setting_changed)
+	align_with_normal_check.toggled.connect(_on_setting_changed)
 	snap_enabled_check.toggled.connect(_on_setting_changed)
 	snap_step_spin.value_changed.connect(_on_snap_step_changed)
 	random_rotation_check.toggled.connect(_on_setting_changed)
@@ -757,6 +767,7 @@ func setup_ui():
 
 func _on_setting_changed(value = null):
 	snap_to_ground = snap_to_ground_check.button_pressed
+	align_with_normal = align_with_normal_check.button_pressed
 	snap_enabled = snap_enabled_check.button_pressed
 	random_rotation = random_rotation_check.button_pressed
 	add_collision = collision_check.button_pressed
@@ -923,6 +934,7 @@ func _on_clear_cache_pressed():
 func get_placement_settings() -> Dictionary:
 	return {
 		"snap_to_ground": snap_to_ground,
+		"align_with_normal": align_with_normal,
 		"snap_enabled": snap_enabled,
 		"snap_step": snap_step,
 		"random_rotation": random_rotation,
@@ -962,6 +974,7 @@ func save_settings():
 	# Save settings to editor settings
 	var editor_settings = EditorInterface.get_editor_settings()
 	editor_settings.set_setting("simple_asset_placer/snap_to_ground", snap_to_ground)
+	editor_settings.set_setting("simple_asset_placer/align_with_normal", align_with_normal)
 	editor_settings.set_setting("simple_asset_placer/snap_enabled", snap_enabled)
 	editor_settings.set_setting("simple_asset_placer/snap_step", snap_step)
 	editor_settings.set_setting("simple_asset_placer/random_rotation", random_rotation)
@@ -1013,6 +1026,8 @@ func load_settings():
 	# Load with default values if setting doesn't exist
 	if editor_settings.has_setting("simple_asset_placer/snap_to_ground"):
 		snap_to_ground = editor_settings.get_setting("simple_asset_placer/snap_to_ground")
+	if editor_settings.has_setting("simple_asset_placer/align_with_normal"):
+		align_with_normal = editor_settings.get_setting("simple_asset_placer/align_with_normal")
 	if editor_settings.has_setting("simple_asset_placer/snap_enabled"):
 		snap_enabled = editor_settings.get_setting("simple_asset_placer/snap_enabled")
 	if editor_settings.has_setting("simple_asset_placer/snap_step"):
@@ -1098,6 +1113,8 @@ func update_ui_from_settings():
 	# Update UI controls to match the loaded settings
 	if snap_to_ground_check:
 		snap_to_ground_check.button_pressed = snap_to_ground
+	if align_with_normal_check:
+		align_with_normal_check.button_pressed = align_with_normal
 	if snap_enabled_check:
 		snap_enabled_check.button_pressed = snap_enabled
 	if snap_step_spin:
@@ -1168,6 +1185,8 @@ func _disconnect_ui_signals():
 	"""Temporarily disconnect UI signals to prevent unwanted save triggers"""
 	if snap_to_ground_check and snap_to_ground_check.toggled.is_connected(_on_setting_changed):
 		snap_to_ground_check.toggled.disconnect(_on_setting_changed)
+	if align_with_normal_check and align_with_normal_check.toggled.is_connected(_on_setting_changed):
+		align_with_normal_check.toggled.disconnect(_on_setting_changed)
 	if snap_enabled_check and snap_enabled_check.toggled.is_connected(_on_setting_changed):
 		snap_enabled_check.toggled.disconnect(_on_setting_changed)
 	if random_rotation_check and random_rotation_check.toggled.is_connected(_on_setting_changed):
@@ -1187,6 +1206,8 @@ func _connect_ui_signals():
 	"""Reconnect UI signals after updating UI from loaded settings"""
 	if snap_to_ground_check and not snap_to_ground_check.toggled.is_connected(_on_setting_changed):
 		snap_to_ground_check.toggled.connect(_on_setting_changed)
+	if align_with_normal_check and not align_with_normal_check.toggled.is_connected(_on_setting_changed):
+		align_with_normal_check.toggled.connect(_on_setting_changed)
 	if snap_enabled_check and not snap_enabled_check.toggled.is_connected(_on_setting_changed):
 		snap_enabled_check.toggled.connect(_on_setting_changed)
 	if random_rotation_check and not random_rotation_check.toggled.is_connected(_on_setting_changed):

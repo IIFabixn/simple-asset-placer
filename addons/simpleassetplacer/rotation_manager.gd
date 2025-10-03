@@ -108,12 +108,43 @@ static func add_rotation_degrees(delta_rotation_degrees: Vector3):
 ## Node Application
 
 static func apply_rotation_to_node(node: Node3D):
-	"""Apply current rotation to a node"""
-	if node:
+	"""Apply current rotation to a Node3D"""
+	if node and is_instance_valid(node) and node.is_inside_tree():
 		node.rotation = current_rotation
 
+static func align_with_surface_normal(surface_normal: Vector3):
+	"""Calculate rotation to align object's up vector with surface normal
+	This creates a rotation where the object's Y-axis points along the surface normal"""
+	
+	# Normalize the surface normal
+	var normal = surface_normal.normalized()
+	
+	# If normal is pointing down, we might want to flip it
+	# but for now we'll align directly with it
+	
+	# Create a basis that aligns Y-axis with the normal
+	# We'll use the Basis.looking_at approach but for the up vector
+	var up = normal
+	
+	# Choose an arbitrary forward direction perpendicular to the normal
+	# Use the world forward (Z-axis) unless it's parallel to the normal
+	var forward = Vector3.FORWARD
+	if abs(normal.dot(forward)) > 0.99:  # Nearly parallel
+		forward = Vector3.RIGHT  # Use a different reference
+	
+	# Create perpendicular vectors
+	var right = forward.cross(up).normalized()
+	forward = up.cross(right).normalized()
+	
+	# Create basis from these vectors
+	var basis = Basis(right, up, forward)
+	
+	# Extract Euler angles from the basis
+	current_rotation = basis.get_euler()
+	_normalize_rotation()
+
 static func apply_rotation_step(node: Node3D, axis: String, degrees: float):
-	"""Apply a rotation step directly to a node"""
+	"""Apply a rotation step and update the node immediately"""
 	if not node:
 		return
 	

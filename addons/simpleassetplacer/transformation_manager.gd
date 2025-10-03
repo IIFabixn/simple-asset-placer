@@ -251,6 +251,11 @@ static func _process_placement_input(camera: Camera3D):
 	# Update preview position
 	PreviewManager.update_preview_position(PositionManager.get_current_position())
 	
+	# Apply surface normal alignment if enabled
+	if placement_settings.get("align_with_normal", false):
+		RotationManager.align_with_surface_normal(PositionManager.get_surface_normal())
+		RotationManager.apply_rotation_to_node(PreviewManager.preview_mesh)
+	
 	# Handle rotation input
 	_process_rotation_input(rotation_input, PreviewManager.preview_mesh)
 	
@@ -293,6 +298,11 @@ static func _process_transform_input(camera: Camera3D):
 	# Restore the adjusted Y position (overriding the mouse raycast Y)
 	if target_node.is_inside_tree():
 		target_node.global_position.y = current_y
+	
+	# Apply surface normal alignment if enabled
+	if placement_settings.get("align_with_normal", false):
+		RotationManager.align_with_surface_normal(PositionManager.get_surface_normal())
+		RotationManager.apply_rotation_to_node(target_node)
 	
 	# Handle rotation input
 	_process_rotation_input(rotation_input, target_node)

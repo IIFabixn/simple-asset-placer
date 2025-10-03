@@ -31,6 +31,7 @@ static var current_position: Vector3 = Vector3.ZERO
 static var target_position: Vector3 = Vector3.ZERO
 static var height_offset: float = 0.0
 static var base_height: float = 0.0
+static var surface_normal: Vector3 = Vector3.UP  # Normal of the surface at current position
 
 # Position calculation settings
 static var collision_enabled: bool = true
@@ -39,6 +40,7 @@ static var height_step_size: float = 0.1
 static var collision_mask: int = 1  # Default collision layer
 static var snap_enabled: bool = false  # Grid snapping enabled
 static var snap_step: float = 1.0  # Grid size for snapping
+static var align_with_normal: bool = false  # Align rotation with surface normal
 
 ## Core Position Management
 
@@ -96,8 +98,15 @@ static func _raycast_to_world(from: Vector3, to: Vector3, collision_layer: int) 
 	
 	var result = space_state.intersect_ray(query)
 	if result:
+		# Store the surface normal for rotation alignment
+		if result.has("normal"):
+			surface_normal = result.normal
+		else:
+			surface_normal = Vector3.UP
 		return result.position
 	
+	# No collision - reset to default up normal
+	surface_normal = Vector3.UP
 	return Vector3.INF
 
 static func _project_to_plane(from: Vector3, to: Vector3, plane_y: float = 0.0) -> Vector3:
@@ -107,6 +116,9 @@ static func _project_to_plane(from: Vector3, to: Vector3, plane_y: float = 0.0) 
 	# Create horizontal plane
 	var plane = Plane(Vector3.UP, base_height + height_offset + plane_y)
 	var intersection = plane.intersects_ray(from, ray_dir)
+	
+	# No actual surface, so normal is always up
+	surface_normal = Vector3.UP
 	
 	if intersection:
 		target_position = intersection
@@ -178,6 +190,10 @@ static func get_height_offset() -> float:
 	"""Get the current height offset from base"""
 	return height_offset
 
+static func get_surface_normal() -> Vector3:
+	"""Get the surface normal at the current position"""
+	return surface_normal
+
 ## Position Validation and Constraints
 
 static func is_valid_position(pos: Vector3) -> bool:
@@ -238,6 +254,7 @@ static func configure(config: Dictionary):
 	interpolation_speed = config.get("interpolation_speed", 10.0)
 	snap_enabled = config.get("snap_enabled", false)
 	snap_step = config.get("snap_step", 1.0)
+	align_with_normal = config.get("align_with_normal", false)
 
 static func get_configuration() -> Dictionary:
 	"""Get current configuration"""

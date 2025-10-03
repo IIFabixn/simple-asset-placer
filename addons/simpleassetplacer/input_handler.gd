@@ -86,8 +86,10 @@ static func _update_key_states():
 	current_keys["cancel"] = Input.is_key_pressed(string_to_keycode(settings.get("cancel_key", "ESCAPE")))
 	var height_up_key = settings.get("height_up_key", "Q")
 	var height_down_key = settings.get("height_down_key", "E")
+	var reset_height_key = settings.get("reset_height_key", "R")
 	current_keys["height_up"] = Input.is_key_pressed(string_to_keycode(height_up_key))
 	current_keys["height_down"] = Input.is_key_pressed(string_to_keycode(height_down_key))
+	current_keys["reset_height"] = Input.is_key_pressed(string_to_keycode(reset_height_key))
 	
 	# Track key press times for grace period
 	_track_key_press_time("height_up", current_time)
@@ -285,6 +287,7 @@ static func get_position_input() -> Dictionary:
 	return {
 		"height_up_pressed": is_key_just_pressed("height_up"),
 		"height_down_pressed": is_key_just_pressed("height_down"),
+		"reset_height_pressed": is_key_just_pressed("reset_height"),
 		"mouse_position": get_mouse_position(),
 		"left_clicked": is_mouse_button_just_pressed("left"),
 		"shift_held": is_shift_held()

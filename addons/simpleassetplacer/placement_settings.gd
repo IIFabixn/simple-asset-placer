@@ -44,6 +44,7 @@ var large_scale_increment_spin: SpinBox
 # Height Adjustment Controls
 var height_up_key_button: Button
 var height_down_key_button: Button
+var reset_height_key_button: Button
 var height_step_spin: SpinBox
 var fine_height_increment_spin: SpinBox
 var large_height_increment_spin: SpinBox
@@ -91,6 +92,7 @@ var large_scale_increment: float = 0.5
 # Height Adjustment Settings
 var height_up_key: String = "Q"      # Raise preview height
 var height_down_key: String = "E"    # Lower preview height
+var reset_height_key: String = "R"   # Reset height offset to zero
 var height_adjustment_step: float = 0.1
 var fine_height_increment: float = 0.01
 var large_height_increment: float = 1.0
@@ -548,6 +550,19 @@ func setup_ui():
 	height_down_key_button.tooltip_text = "Click to set key for lowering preview height. Press ESC to cancel."
 	height_grid.add_child(height_down_key_button)
 	
+	# Reset Height Key
+	var reset_height_label = Label.new()
+	reset_height_label.text = "Reset Height:"
+	reset_height_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	height_grid.add_child(reset_height_label)
+	
+	reset_height_key_button = Button.new()
+	reset_height_key_button.text = reset_height_key
+	reset_height_key_button.custom_minimum_size.x = 80
+	reset_height_key_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reset_height_key_button.tooltip_text = "Click to set key for resetting height to base level. Press ESC to cancel."
+	height_grid.add_child(reset_height_key_button)
+	
 	# Height Step
 	var height_step_label = Label.new()
 	height_step_label.text = "Height Step:"
@@ -739,6 +754,11 @@ func setup_ui():
 	rotation_increment_spin.value_changed.connect(_on_rotation_increment_changed)
 	fine_rotation_increment_spin.value_changed.connect(_on_rotation_increment_changed)
 	large_rotation_increment_spin.value_changed.connect(_on_rotation_increment_changed)
+	
+	# Connect height control signals
+	height_up_key_button.pressed.connect(_on_key_binding_button_pressed.bind(height_up_key_button, "height_up_key"))
+	height_down_key_button.pressed.connect(_on_key_binding_button_pressed.bind(height_down_key_button, "height_down_key"))
+	reset_height_key_button.pressed.connect(_on_key_binding_button_pressed.bind(reset_height_key_button, "reset_height_key"))
 	
 	# Connect scale control signals
 	scale_up_key_button.pressed.connect(_on_key_binding_button_pressed.bind(scale_up_key_button, "scale_up_key"))
@@ -956,6 +976,7 @@ func get_placement_settings() -> Dictionary:
 		"large_scale_increment": large_scale_increment,
 		"height_up_key": height_up_key,
 		"height_down_key": height_down_key,
+		"reset_height_key": reset_height_key,
 		"height_adjustment_step": height_adjustment_step,
 		"fine_height_increment": fine_height_increment,
 		"large_height_increment": large_height_increment,
@@ -1007,6 +1028,7 @@ func save_settings():
 	# Save height adjustment settings
 	editor_settings.set_setting("simple_asset_placer/height_up_key", height_up_key)
 	editor_settings.set_setting("simple_asset_placer/height_down_key", height_down_key)
+	editor_settings.set_setting("simple_asset_placer/reset_height_key", reset_height_key)
 	editor_settings.set_setting("simple_asset_placer/height_adjustment_step", height_adjustment_step)
 	editor_settings.set_setting("simple_asset_placer/fine_height_increment", fine_height_increment)
 	editor_settings.set_setting("simple_asset_placer/large_height_increment", large_height_increment)
@@ -1084,6 +1106,8 @@ func load_settings():
 		height_up_key = editor_settings.get_setting("simple_asset_placer/height_up_key")
 	if editor_settings.has_setting("simple_asset_placer/height_down_key"):
 		height_down_key = editor_settings.get_setting("simple_asset_placer/height_down_key")
+	if editor_settings.has_setting("simple_asset_placer/reset_height_key"):
+		reset_height_key = editor_settings.get_setting("simple_asset_placer/reset_height_key")
 	if editor_settings.has_setting("simple_asset_placer/height_adjustment_step"):
 		height_adjustment_step = editor_settings.get_setting("simple_asset_placer/height_adjustment_step")
 	if editor_settings.has_setting("simple_asset_placer/fine_height_increment"):
@@ -1174,6 +1198,8 @@ func update_ui_from_settings():
 		height_up_key_button.text = height_up_key
 	if height_down_key_button:
 		height_down_key_button.text = height_down_key
+	if reset_height_key_button:
+		reset_height_key_button.text = reset_height_key
 	if height_step_spin:
 		height_step_spin.value = height_adjustment_step
 	if fine_height_increment_spin:

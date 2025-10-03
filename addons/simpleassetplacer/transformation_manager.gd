@@ -252,6 +252,8 @@ static func _process_placement_input(camera: Camera3D):
 			PositionManager.increase_height()
 		else:
 			PositionManager.decrease_height()
+	elif position_input.reset_height_pressed:
+		PositionManager.reset_height()
 	
 	# Get the updated position but preserve only manual height changes
 	var preview_pos = PositionManager.get_current_position()
@@ -298,6 +300,19 @@ static func _process_transform_input(camera: Camera3D):
 		current_y += height_step if not reverse_height else -height_step
 	elif position_input.height_down_pressed:
 		current_y -= height_step if not reverse_height else -height_step
+	elif position_input.reset_height_pressed:
+		# Reset to ground level (Y=0) or get current raycast height
+		var mouse_pos = position_input.mouse_position
+		var ray_from = camera.project_ray_origin(mouse_pos)
+		var ray_to = ray_from + camera.project_ray_normal(mouse_pos) * 1000.0
+		var space_state = target_node.get_world_3d().direct_space_state
+		var query = PhysicsRayQueryParameters3D.create(ray_from, ray_to)
+		query.collision_mask = 1
+		var result = space_state.intersect_ray(query)
+		if result:
+			current_y = result.position.y
+		else:
+			current_y = 0.0
 	
 	# Always update position from mouse (for XZ movement)
 	var mouse_pos = position_input.mouse_position

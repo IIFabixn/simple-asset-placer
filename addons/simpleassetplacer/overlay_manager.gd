@@ -32,6 +32,7 @@ static var rotation_overlay: Control = null
 static var scale_overlay: Control = null
 static var position_overlay: Control = null
 static var status_overlay: Control = null
+static var grid_overlay: Node3D = null  # 3D grid visualization
 
 # Overlay state
 static var overlays_initialized: bool = false
@@ -432,6 +433,10 @@ static func cleanup_all_overlays():
 		status_overlay.queue_free()
 		status_overlay = null
 	
+	if grid_overlay and is_instance_valid(grid_overlay):
+		grid_overlay.queue_free()
+		grid_overlay = null
+	
 	if main_overlay and is_instance_valid(main_overlay):
 		main_overlay.queue_free()
 		main_overlay = null
@@ -471,6 +476,93 @@ static func configure_overlay_positions(positions: Dictionary):
 		if label:
 			label.position = positions.status
 
+## Grid Overlay
+
+static func create_grid_overlay(center: Vector3, grid_size: float, grid_extent: int = 10, offset: Vector3 = Vector3.ZERO):
+	"""Create a 3D grid visualization in the world
+	center: Center position of the grid
+	grid_size: Size of each grid cell
+	grid_extent: Number of cells in each direction from center
+	offset: Grid offset from world origin"""
+	
+	# Clean up existing grid
+	if grid_overlay and is_instance_valid(grid_overlay):
+		grid_overlay.queue_free()
+	
+	# Get the 3D editor viewport
+	var editor_root = EditorInterface.get_edited_scene_root()
+	if not editor_root:
+		return
+	
+	# Create grid node
+	grid_overlay = MeshInstance3D.new()
+	grid_overlay.name = "AssetPlacerGrid"
+	
+	# Create grid mesh
+	var immediate_mesh = ImmediateMesh.new()
+	grid_overlay.mesh = immediate_mesh
+	
+	# Create material for grid lines
+	var material = StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = Color(0.5, 0.8, 1.0, 0.3)  # Light blue, semi-transparent
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.no_depth_test = true  # Always visible
+	material.disable_receive_shadows = true
+	grid_overlay.material_override = material
+	
+	# Draw grid lines
+	immediate_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
+	
+	var start = -grid_extent
+	var end = grid_extent
+	
+	# Draw lines parallel to X axis (running along Z)
+	for i in range(start, end + 1):
+		var z = i * grid_size + offset.z
+		var x_start = start * grid_size + offset.x
+		var x_end = end * grid_size + offset.x
+		var y = center.y  # Grid at ground level
+		
+		immediate_mesh.surface_add_vertex(Vector3(x_start, y, z))
+		immediate_mesh.surface_add_vertex(Vector3(x_end, y, z))
+	
+	# Draw lines parallel to Z axis (running along X)
+	for i in range(start, end + 1):
+		var x = i * grid_size + offset.x
+		var z_start = start * grid_size + offset.z
+		var z_end = end * grid_size + offset.z
+		var y = center.y
+		
+		immediate_mesh.surface_add_vertex(Vector3(x, y, z_start))
+		immediate_mesh.surface_add_vertex(Vector3(x, y, z_end))
+	
+	immediate_mesh.surface_end()
+	
+	# Add to scene
+	editor_root.add_child(grid_overlay)
+	grid_overlay.global_position = Vector3.ZERO  # Lines are already positioned
+
+static func update_grid_overlay(center: Vector3, grid_size: float, grid_extent: int = 10, offset: Vector3 = Vector3.ZERO):
+	"""Update existing grid or create new one"""
+	create_grid_overlay(center, grid_size, grid_extent, offset)
+
+static func hide_grid_overlay():
+	"""Hide the grid overlay"""
+	if grid_overlay and is_instance_valid(grid_overlay):
+		grid_overlay.visible = false
+
+static func show_grid_overlay():
+	"""Show the grid overlay"""
+	if grid_overlay and is_instance_valid(grid_overlay):
+		grid_overlay.visible = true
+
+static func remove_grid_overlay():
+	"""Remove and cleanup grid overlay"""
+	if grid_overlay and is_instance_valid(grid_overlay):
+		grid_overlay.queue_free()
+		grid_overlay = null
+
 ## Debug and Information
 
 static func debug_print_overlay_state():
@@ -484,3 +576,4 @@ static func debug_print_overlay_state():
 	print("  Scale Overlay Valid: ", scale_overlay != null and is_instance_valid(scale_overlay))
 	print("  Position Overlay Valid: ", position_overlay != null and is_instance_valid(position_overlay))
 	print("  Status Overlay Valid: ", status_overlay != null and is_instance_valid(status_overlay))
+	print("  Grid Overlay Valid: ", grid_overlay != null and is_instance_valid(grid_overlay))

@@ -13,6 +13,7 @@ var snap_to_ground_check: CheckBox
 var align_with_normal_check: CheckBox
 var snap_enabled_check: CheckBox
 var snap_step_spin: SpinBox
+var show_grid_check: CheckBox
 var random_rotation_check: CheckBox
 var scale_spin: SpinBox
 var collision_check: CheckBox
@@ -76,6 +77,8 @@ var snap_by_aabb: bool = true  # Snap by bounding box edges instead of pivot
 var snap_offset: Vector3 = Vector3.ZERO  # Grid offset from world origin
 var snap_y_enabled: bool = false  # Enable Y-axis (height) snapping
 var snap_y_step: float = 1.0  # Grid size for Y-axis snapping
+var show_grid: bool = false  # Show visual grid overlay
+var grid_extent: float = 20.0  # Size of grid overlay in world units (radius from center)
 var random_rotation: bool = false
 var scale_multiplier: float = 1.0
 var add_collision: bool = false
@@ -195,6 +198,14 @@ func setup_ui():
 	snap_enabled_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_child(snap_enabled_check)
 	
+	# Show grid option
+	show_grid_check = CheckBox.new()
+	show_grid_check.text = "Show Grid Overlay"
+	show_grid_check.button_pressed = false  # Default to disabled
+	show_grid_check.tooltip_text = "Display a visual grid overlay in the 3D viewport"
+	show_grid_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(show_grid_check)
+	
 	# Create a grid for all labeled input controls
 	var settings_grid = GridContainer.new()
 	settings_grid.columns = 2
@@ -219,6 +230,24 @@ func setup_ui():
 	snap_step_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	snap_step_spin.tooltip_text = "Grid spacing for snapping"
 	settings_grid.add_child(snap_step_spin)
+	
+	# Grid Extent (visual size)
+	var grid_extent_label = Label.new()
+	grid_extent_label.text = "Grid Display Size:"
+	grid_extent_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	settings_grid.add_child(grid_extent_label)
+	
+	var grid_extent_spin = SpinBox.new()
+	grid_extent_spin.name = "GridExtentSpin"
+	grid_extent_spin.min_value = 5.0
+	grid_extent_spin.max_value = 100.0
+	grid_extent_spin.step = 5.0
+	grid_extent_spin.value = 20.0
+	grid_extent_spin.custom_minimum_size.x = 80
+	grid_extent_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid_extent_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	grid_extent_spin.tooltip_text = "Size of the grid overlay in world units (radius from center)"
+	settings_grid.add_child(grid_extent_spin)
 	
 	# Snap by AABB checkbox (spans both columns)
 	var snap_aabb_check = CheckBox.new()
@@ -976,6 +1005,7 @@ func setup_ui():
 	snap_to_ground_check.toggled.connect(_on_setting_changed)
 	align_with_normal_check.toggled.connect(_on_setting_changed)
 	snap_enabled_check.toggled.connect(_on_setting_changed)
+	show_grid_check.toggled.connect(_on_show_grid_changed)
 	snap_step_spin.value_changed.connect(_on_snap_step_changed)
 	random_rotation_check.toggled.connect(_on_setting_changed)
 	scale_spin.value_changed.connect(_on_scale_changed)
@@ -1052,6 +1082,10 @@ func _on_setting_changed(value = null):
 	if offset_x_spin and offset_z_spin:
 		snap_offset = Vector3(offset_x_spin.value, snap_offset.y, offset_z_spin.value)
 	
+	var grid_extent_spin = get_node_or_null("VBoxContainer/SettingsGrid/GridExtentSpin")
+	if grid_extent_spin:
+		grid_extent = grid_extent_spin.value
+	
 	# Reset behavior settings
 	reset_height_on_exit = reset_height_on_exit_check.button_pressed
 	reset_scale_on_exit = reset_scale_on_exit_check.button_pressed
@@ -1065,6 +1099,10 @@ func _on_scale_changed(value: float):
 
 func _on_snap_step_changed(value: float):
 	snap_step = value
+	settings_changed.emit()
+
+func _on_show_grid_changed(value: bool):
+	show_grid = value
 	settings_changed.emit()
 
 func _on_key_binding_button_pressed(button: Button, key_property: String):
@@ -1324,6 +1362,8 @@ func get_placement_settings() -> Dictionary:
 		"snap_offset": snap_offset,
 		"snap_y_enabled": snap_y_enabled,
 		"snap_y_step": snap_y_step,
+		"show_grid": show_grid,
+		"grid_extent": grid_extent,
 		"random_rotation": random_rotation,
 		"scale_multiplier": scale_multiplier,
 		"add_collision": add_collision,

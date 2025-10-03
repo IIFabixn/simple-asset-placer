@@ -193,6 +193,7 @@ static func exit_placement_mode():
 	# Hide and cleanup overlays
 	OverlayManager.hide_transform_overlay()
 	OverlayManager.set_mode("")
+	OverlayManager.remove_grid_overlay()
 	
 	print("TransformationManager: Exited placement mode")
 
@@ -222,6 +223,7 @@ static func exit_transform_mode(confirm_changes: bool = true):
 	# Hide and cleanup overlays
 	OverlayManager.hide_transform_overlay()
 	OverlayManager.set_mode("")
+	OverlayManager.remove_grid_overlay()
 	
 	print("TransformationManager: Exited transform mode (confirmed: ", confirm_changes, ")")
 
@@ -233,6 +235,29 @@ static func exit_any_mode():
 		"transform":
 			exit_transform_mode(false)
 
+## GRID OVERLAY MANAGEMENT
+
+static func _update_grid_overlay():
+	"""Update or create grid overlay based on current settings and mode"""
+	var show_grid = placement_settings.get("show_grid", false)
+	var snap_enabled = placement_settings.get("snap_enabled", false)
+	
+	# Only show grid if both grid display and snapping are enabled
+	if show_grid and snap_enabled and (current_mode == "placement" or current_mode == "transform"):
+		var grid_size = placement_settings.get("snap_step", 1.0)
+		var offset = placement_settings.get("snap_offset", Vector3.ZERO)
+		var center = PositionManager.get_current_position()
+		var grid_extent_units = placement_settings.get("grid_extent", 20.0)
+		
+		# Calculate number of grid cells based on grid size and desired world extent
+		var grid_extent = int(ceil(grid_extent_units / grid_size))
+		grid_extent = clamp(grid_extent, 5, 100)  # Min 5, max 100 cells
+		
+		OverlayManager.create_grid_overlay(center, grid_size, grid_extent, offset)
+	else:
+		# Hide/remove grid if disabled or not in active mode
+		OverlayManager.remove_grid_overlay()
+
 ## INPUT PROCESSING COORDINATION
 
 static func process_frame_input(camera: Camera3D, input_settings: Dictionary = {}):
@@ -243,6 +268,9 @@ static func process_frame_input(camera: Camera3D, input_settings: Dictionary = {
 	# Configure managers with current settings (important for both modes)
 	# This ensures snap settings and other options are always up-to-date
 	PositionManager.configure(input_settings)
+	
+	# Update grid overlay based on settings
+	_update_grid_overlay()
 	
 	# Get the 3D viewport for proper mouse coordinate conversion
 	var viewport_3d = EditorInterface.get_editor_viewport_3d(0)

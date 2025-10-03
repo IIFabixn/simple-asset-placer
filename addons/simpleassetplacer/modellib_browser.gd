@@ -503,9 +503,24 @@ func _on_context_menu_item_selected(id: int, menu_actions: Dictionary, popup: Po
 		
 		"favorite":
 			var asset_path = action["asset_path"]
+			var was_favorite = category_manager.is_favorite(asset_path)
 			category_manager.toggle_favorite(asset_path)
+			
+			# Update category filter dropdown (in case Favorites category needs to be added/removed)
 			populate_category_filter()
-			update_asset_grid()
+			
+			# Only regenerate the grid if necessary:
+			# 1. We're viewing the Favorites category and the asset was removed from it
+			# 2. We're viewing all assets (empty filter) - to update the favorite badge
+			# If viewing other categories, the favorite status doesn't affect visibility
+			if current_category_filter == "⭐ Favorites" and was_favorite:
+				# Asset was removed from favorites, need to update grid
+				update_asset_grid()
+			elif current_category_filter == "":
+				# Viewing all assets - could update badges, but that requires full regeneration
+				# For now, skip update to avoid thumbnail regeneration
+				# TODO: Add a refresh_badges() function to update badges without regenerating thumbnails
+				pass
 		
 		"all_tags_submenu":
 			# Show all tags dialog

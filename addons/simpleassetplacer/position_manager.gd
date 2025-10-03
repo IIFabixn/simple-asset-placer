@@ -377,14 +377,17 @@ static func set_base_height(y: float):
 	current_position = target_position
 
 static func reset_for_new_placement():
-	"""Reset position manager state for a new placement session"""
+	"""Reset position manager state for a new placement session
+	
+	Note: manual_position_offset is NOT reset here - it's only reset when exiting modes
+	if the reset_position_on_exit setting is enabled."""
 	is_initial_position = true
 	height_offset = 0.0
 	current_position = Vector3.ZERO
 	target_position = Vector3.ZERO
 	base_height = 0.0
 	surface_normal = Vector3.UP
-	manual_position_offset = Vector3.ZERO
+	# manual_position_offset is deliberately NOT reset here
 
 ## Position Getters and Setters
 

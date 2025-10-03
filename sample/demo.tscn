@@ -1,9 +1,10 @@
-[gd_scene load_steps=14 format=3 uid="uid://cnk2n84e48paw"]
+[gd_scene load_steps=15 format=3 uid="uid://cnk2n84e48paw"]
 
 [ext_resource type="Texture2D" uid="uid://0yj4xwx83qd7" path="res://sample/textures/rock_face/rock_face_03_diff_1k.jpg" id="1_petcp"]
 [ext_resource type="Texture2D" uid="uid://bnoudrgjh6ld1" path="res://sample/textures/rock_face/rock_face_03_nor_gl_1k.jpg" id="2_8qmtt"]
 [ext_resource type="Texture2D" uid="uid://14lix33xubj1" path="res://sample/textures/rocky_terrain/rocky_terrain_02_diff_1k.jpg" id="3_xo1bm"]
 [ext_resource type="Texture2D" uid="uid://c543l1656t8jc" path="res://sample/textures/rocky_terrain/rocky_terrain_02_nor_gl_1k.jpg" id="4_k5nd4"]
+[ext_resource type="PackedScene" uid="uid://bi526m4rgyylo" path="res://sample/building_a.tscn" id="5_8qmtt"]
 
 [sub_resource type="Gradient" id="Gradient_krguf"]
 offsets = PackedFloat32Array(0.2, 1)
@@ -93,3 +94,6 @@ assets = SubResource("Terrain3DAssets_bo4xe")
 collision_mode = 2
 top_level = true
 metadata/_edit_lock_ = true
+
+[node name="Building_A" parent="." instance=ExtResource("5_8qmtt")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -53, 30, 2)

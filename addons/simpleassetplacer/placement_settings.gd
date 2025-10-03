@@ -23,6 +23,7 @@ var grouping_check: CheckBox
 var reset_height_on_exit_check: CheckBox
 var reset_scale_on_exit_check: CheckBox
 var reset_rotation_on_exit_check: CheckBox
+var reset_position_on_exit_check: CheckBox
 
 # Rotation Controls
 var rotate_y_key_button: Button
@@ -90,6 +91,7 @@ var group_instances: bool = false
 var reset_height_on_exit: bool = false  # Whether to reset height offset when exiting modes
 var reset_scale_on_exit: bool = false   # Whether to reset scale when exiting modes
 var reset_rotation_on_exit: bool = false  # Whether to reset rotation when exiting modes
+var reset_position_on_exit: bool = false  # Whether to reset position offset when exiting modes
 
 # Rotation Settings
 var rotate_y_key: String = "Y"  # Y-axis rotation (yaw) - Y axis
@@ -414,6 +416,13 @@ func setup_ui():
 	reset_rotation_on_exit_check.tooltip_text = "Reset rotation to 0° when exiting placement/transform mode"
 	reset_rotation_on_exit_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_child(reset_rotation_on_exit_check)
+	
+	# Reset position offset on exit
+	reset_position_on_exit_check = CheckBox.new()
+	reset_position_on_exit_check.text = "Reset Position Offset"
+	reset_position_on_exit_check.tooltip_text = "Reset position offset (WASD adjustments) to 0 when exiting placement/transform mode"
+	reset_position_on_exit_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(reset_position_on_exit_check)
 	
 	# Add separator for rotation settings
 	var rotation_separator = HSeparator.new()
@@ -1040,6 +1049,7 @@ func setup_ui():
 	reset_height_on_exit_check.toggled.connect(_on_setting_changed)
 	reset_scale_on_exit_check.toggled.connect(_on_setting_changed)
 	reset_rotation_on_exit_check.toggled.connect(_on_setting_changed)
+	reset_position_on_exit_check.toggled.connect(_on_setting_changed)
 	
 	# Connect rotation control signals
 	rotate_y_key_button.pressed.connect(_on_key_binding_button_pressed.bind(rotate_y_key_button, "rotate_y_key"))
@@ -1123,6 +1133,7 @@ func _on_setting_changed(value = null):
 	reset_height_on_exit = reset_height_on_exit_check.button_pressed
 	reset_scale_on_exit = reset_scale_on_exit_check.button_pressed
 	reset_rotation_on_exit = reset_rotation_on_exit_check.button_pressed
+	reset_position_on_exit = reset_position_on_exit_check.button_pressed
 	
 	settings_changed.emit()
 
@@ -1335,6 +1346,7 @@ func _perform_reset_settings():
 	reset_height_on_exit = false
 	reset_scale_on_exit = false
 	reset_rotation_on_exit = false
+	reset_position_on_exit = false
 	
 	# Reset rotation settings
 	rotate_y_key = "Y"
@@ -1438,7 +1450,8 @@ func get_placement_settings() -> Dictionary:
 		# Reset behavior settings
 		"reset_height_on_exit": reset_height_on_exit,
 		"reset_scale_on_exit": reset_scale_on_exit,
-		"reset_rotation_on_exit": reset_rotation_on_exit
+		"reset_rotation_on_exit": reset_rotation_on_exit,
+		"reset_position_on_exit": reset_position_on_exit
 	}
 
 func save_settings():
@@ -1465,6 +1478,7 @@ func save_settings():
 	editor_settings.set_setting("simple_asset_placer/reset_height_on_exit", reset_height_on_exit)
 	editor_settings.set_setting("simple_asset_placer/reset_scale_on_exit", reset_scale_on_exit)
 	editor_settings.set_setting("simple_asset_placer/reset_rotation_on_exit", reset_rotation_on_exit)
+	editor_settings.set_setting("simple_asset_placer/reset_position_on_exit", reset_position_on_exit)
 	
 	# Save rotation settings
 	editor_settings.set_setting("simple_asset_placer/rotate_y_key", rotate_y_key)
@@ -1554,6 +1568,8 @@ func load_settings():
 		reset_scale_on_exit = editor_settings.get_setting("simple_asset_placer/reset_scale_on_exit")
 	if editor_settings.has_setting("simple_asset_placer/reset_rotation_on_exit"):
 		reset_rotation_on_exit = editor_settings.get_setting("simple_asset_placer/reset_rotation_on_exit")
+	if editor_settings.has_setting("simple_asset_placer/reset_position_on_exit"):
+		reset_position_on_exit = editor_settings.get_setting("simple_asset_placer/reset_position_on_exit")
 	
 	# Load rotation settings
 	if editor_settings.has_setting("simple_asset_placer/rotate_y_key"):
@@ -1675,6 +1691,8 @@ func update_ui_from_settings():
 		reset_scale_on_exit_check.button_pressed = reset_scale_on_exit
 	if reset_rotation_on_exit_check:
 		reset_rotation_on_exit_check.button_pressed = reset_rotation_on_exit
+	if reset_position_on_exit_check:
+		reset_position_on_exit_check.button_pressed = reset_position_on_exit
 	
 	# Reconnect signals after UI update
 	_connect_ui_signals()

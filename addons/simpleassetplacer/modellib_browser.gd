@@ -221,8 +221,23 @@ func get_filtered_assets() -> Array:
 	var search_text = current_search_text.to_lower()
 	var selected_filter = filter_options.get_selected_id()
 	
+	# Check if we're viewing ignored assets specifically
+	var viewing_ignored = current_category_filter == "🚫 Ignored Assets"
+	
 	var filtered = []
 	for asset in discovered_assets:
+		var is_ignored = category_manager and category_manager.is_ignored(asset.path)
+		
+		# Filter based on ignored state and current view
+		if viewing_ignored:
+			# Only show ignored assets in this view
+			if not is_ignored:
+				continue
+		else:
+			# Skip ignored assets in all other views
+			if is_ignored:
+				continue
+		
 		# Search filter
 		if search_text != "" and not asset.name.to_lower().contains(search_text):
 			continue
@@ -238,6 +253,9 @@ func get_filtered_assets() -> Array:
 			elif current_category_filter == "🕐 Recent":
 				if category_manager and category_manager.is_recent(asset.path):
 					passes_category_filter = true
+			elif current_category_filter == "🚫 Ignored Assets":
+				# Already filtered above, so all remaining assets pass
+				passes_category_filter = true
 			else:
 				# Remove leading spaces from hierarchical display
 				var clean_category = current_category_filter.strip_edges()
@@ -324,6 +342,7 @@ func populate_category_filter():
 	# Add special categories first
 	var favorites = category_manager.get_favorites()
 	var recent = category_manager.get_recent_assets()
+	var ignored = category_manager.get_ignored_assets()
 	
 	if favorites.size() > 0:
 		category_filter.add_item("⭐ Favorites")
@@ -335,7 +354,12 @@ func populate_category_filter():
 		if last_category == "🕐 Recent":
 			last_category_index = category_filter.get_item_count() - 1
 	
-	if favorites.size() > 0 or recent.size() > 0:
+	if ignored.size() > 0:
+		category_filter.add_item("🚫 Ignored Assets")
+		if last_category == "🚫 Ignored Assets":
+			last_category_index = category_filter.get_item_count() - 1
+	
+	if favorites.size() > 0 or recent.size() > 0 or ignored.size() > 0:
 		category_filter.add_separator()
 	
 	# Get all folder categories with full paths
@@ -470,6 +494,13 @@ func _on_context_menu_requested(asset_item: AssetThumbnailItem, position: Vector
 	menu_actions[menu_id] = {"type": "favorite", "asset_path": asset_path}
 	menu_id += 1
 	
+	# Ignore asset
+	var is_ignored = category_manager.is_ignored(asset_path)
+	var ignore_text = "✓ Unignore Asset" if is_ignored else "🚫 Ignore Asset"
+	popup.add_item(ignore_text, menu_id)
+	menu_actions[menu_id] = {"type": "ignore", "asset_path": asset_path}
+	menu_id += 1
+	
 	# Connect signal with proper dictionary
 	popup.id_pressed.connect(func(id): _on_context_menu_item_selected(id, menu_actions, popup))
 	
@@ -521,6 +552,24 @@ func _on_context_menu_item_selected(id: int, menu_actions: Dictionary, popup: Po
 				# For now, skip update to avoid thumbnail regeneration
 				# TODO: Add a refresh_badges() function to update badges without regenerating thumbnails
 				pass
+		
+		"ignore":
+			var asset_path = action["asset_path"]
+			var was_ignored = category_manager.is_ignored(asset_path)
+			category_manager.toggle_ignored(asset_path)
+			
+			# Update category filter dropdown (in case Ignored Assets category needs to be added/removed)
+			populate_category_filter()
+			
+			# Update the grid if:
+			# 1. We're viewing the Ignored Assets category
+			# 2. We're viewing a category and the asset was removed/added
+			if current_category_filter == "🚫 Ignored Assets":
+				# Always update when viewing ignored assets
+				update_asset_grid()
+			elif not was_ignored:
+				# Asset was just ignored, remove it from the current view
+				update_asset_grid()
 		
 		"all_tags_submenu":
 			# Show all tags dialog

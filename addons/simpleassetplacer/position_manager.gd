@@ -93,11 +93,12 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 				target_position.z = new_pos.z
 				target_position.y = base_height + height_offset
 			
-			# Apply grid snapping if enabled
+			# Apply grid snapping if enabled (to base position only)
 			if snap_enabled:
 				target_position = _apply_grid_snap(target_position)
 			
-			# Apply manual position offset (from WASD keys)
+			# Apply manual position offset (from WASD keys) AFTER snapping
+			# This allows manual adjustments to work immediately without fighting the snap
 			target_position += manual_position_offset
 			
 			current_position = target_position
@@ -124,12 +125,17 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 		# If Y is locked and not initial, use base_height + offset
 		pos.y = base_height + height_offset
 	
-	# Apply grid snapping if enabled
+	# Apply grid snapping if enabled (to base position only)
 	if snap_enabled:
 		pos = _apply_grid_snap(pos)
 	
-	# Apply manual position offset (from WASD keys)
+	# Apply manual position offset (from WASD keys) AFTER snapping
+	# This allows manual adjustments to work immediately without fighting the snap
 	pos += manual_position_offset
+	
+	# Update current/target positions before returning
+	current_position = pos
+	target_position = pos
 	
 	return pos
 
@@ -248,32 +254,48 @@ static func move_left(delta: float, camera: Camera3D = null):
 	var move_dir = _get_camera_right_direction(camera) * -1.0  # Left is negative right
 	var movement = move_dir * delta
 	manual_position_offset += movement
-	current_position += movement
-	target_position = current_position
+	# Update positions with snapping applied
+	var new_pos = current_position + movement
+	if snap_enabled:
+		new_pos = _apply_grid_snap(new_pos)
+	current_position = new_pos
+	target_position = new_pos
 
 static func move_right(delta: float, camera: Camera3D = null):
 	"""Move the position right relative to camera view"""
 	var move_dir = _get_camera_right_direction(camera)
 	var movement = move_dir * delta
 	manual_position_offset += movement
-	current_position += movement
-	target_position = current_position
+	# Update positions with snapping applied
+	var new_pos = current_position + movement
+	if snap_enabled:
+		new_pos = _apply_grid_snap(new_pos)
+	current_position = new_pos
+	target_position = new_pos
 
 static func move_forward(delta: float, camera: Camera3D = null):
 	"""Move the position forward relative to camera view"""
 	var move_dir = _get_camera_forward_direction(camera)
 	var movement = move_dir * delta
 	manual_position_offset += movement
-	current_position += movement
-	target_position = current_position
+	# Update positions with snapping applied
+	var new_pos = current_position + movement
+	if snap_enabled:
+		new_pos = _apply_grid_snap(new_pos)
+	current_position = new_pos
+	target_position = new_pos
 
 static func move_backward(delta: float, camera: Camera3D = null):
 	"""Move the position backward relative to camera view"""
 	var move_dir = _get_camera_forward_direction(camera) * -1.0  # Backward is negative forward
 	var movement = move_dir * delta
 	manual_position_offset += movement
-	current_position += movement
-	target_position = current_position
+	# Update positions with snapping applied
+	var new_pos = current_position + movement
+	if snap_enabled:
+		new_pos = _apply_grid_snap(new_pos)
+	current_position = new_pos
+	target_position = new_pos
 
 static func _get_camera_forward_direction(camera: Camera3D) -> Vector3:
 	"""Get the nearest axis-aligned direction for camera forward (snaps to +Z or -Z or +X or -X)"""

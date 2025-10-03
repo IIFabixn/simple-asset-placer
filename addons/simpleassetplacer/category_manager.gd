@@ -20,6 +20,7 @@ const CONFIG_FILE_NAME = ".assetcategories"
 const MAX_RECENT_ASSETS = 20
 const EDITOR_SETTINGS_FAVORITES_KEY = "simpleassetplacer/favorites"
 const EDITOR_SETTINGS_RECENT_KEY = "simpleassetplacer/recent_assets"
+const EDITOR_SETTINGS_IGNORED_KEY = "simpleassetplacer/ignored_assets"
 
 # Category types
 enum CategoryType {
@@ -34,6 +35,7 @@ var tag_usage: Dictionary = {}    # {"tag_name": usage_count}
 var folder_categories: Dictionary = {}  # {"category_path": ["asset1", "asset2"]}
 var favorites: Array = []  # Array of asset paths
 var recent_assets: Array = []  # Array of asset paths (most recent first)
+var ignored_assets: Array = []  # Array of ignored asset paths
 var config_file_path: String = ""
 var recently_used_tags: Array = []  # Last used tags for quick access
 
@@ -60,6 +62,13 @@ func load_editor_settings():
 			else:
 				recent_assets = []
 				editor_settings.set_setting(EDITOR_SETTINGS_RECENT_KEY, recent_assets)
+			
+			# Load ignored assets
+			if editor_settings.has_setting(EDITOR_SETTINGS_IGNORED_KEY):
+				ignored_assets = editor_settings.get_setting(EDITOR_SETTINGS_IGNORED_KEY)
+			else:
+				ignored_assets = []
+				editor_settings.set_setting(EDITOR_SETTINGS_IGNORED_KEY, ignored_assets)
 
 
 ## Save favorites and recent assets to EditorSettings
@@ -69,6 +78,7 @@ func save_editor_settings():
 		if editor_settings:
 			editor_settings.set_setting(EDITOR_SETTINGS_FAVORITES_KEY, favorites)
 			editor_settings.set_setting(EDITOR_SETTINGS_RECENT_KEY, recent_assets)
+			editor_settings.set_setting(EDITOR_SETTINGS_IGNORED_KEY, ignored_assets)
 
 
 ## Extract folder-based categories from an asset path
@@ -378,6 +388,40 @@ func is_favorite(asset_path: String) -> bool:
 ## Get all favorite assets
 func get_favorites() -> Array:
 	return favorites.duplicate()
+
+
+## Add asset to ignored list
+func add_to_ignored(asset_path: String):
+	if asset_path not in ignored_assets:
+		ignored_assets.append(asset_path)
+		save_editor_settings()
+		categories_updated.emit()
+
+
+## Remove asset from ignored list
+func remove_from_ignored(asset_path: String):
+	if asset_path in ignored_assets:
+		ignored_assets.erase(asset_path)
+		save_editor_settings()
+		categories_updated.emit()
+
+
+## Toggle ignored status
+func toggle_ignored(asset_path: String):
+	if is_ignored(asset_path):
+		remove_from_ignored(asset_path)
+	else:
+		add_to_ignored(asset_path)
+
+
+## Check if asset is ignored
+func is_ignored(asset_path: String) -> bool:
+	return asset_path in ignored_assets
+
+
+## Get all ignored assets
+func get_ignored_assets() -> Array:
+	return ignored_assets.duplicate()
 
 
 ## Add asset to recent list (called when asset is placed/used)

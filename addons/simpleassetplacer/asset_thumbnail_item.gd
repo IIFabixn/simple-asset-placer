@@ -256,12 +256,12 @@ func _generate_meshlib_thumbnail():
 		_create_simple_mesh_icon(mesh)
 
 func _generate_asset_thumbnail():
-	# For 3D model assets, prioritize 3D thumbnail generation, then fallback to icons
+	# For 3D model assets and scene files, prioritize 3D thumbnail generation, then fallback to icons
 	var extension = asset_info.get("extension", "")
 	var asset_path = asset_info.get("path", "")
 	
-	# For actual 3D model files, try 3D thumbnail generation first
-	if extension in ["fbx", "obj", "gltf", "glb", "dae", "blend"] and asset_path != "":
+	# For actual 3D model files and scene files, try 3D thumbnail generation first
+	if extension in ["fbx", "obj", "gltf", "glb", "dae", "blend", "tscn", "scn"] and asset_path != "":
 		# Use the ThumbnailQueueManager for centralized, sequential processing
 		var queue_manager = ThumbnailQueueManager.get_instance()
 		var thumbnail = await queue_manager.request_asset_thumbnail(asset_path)

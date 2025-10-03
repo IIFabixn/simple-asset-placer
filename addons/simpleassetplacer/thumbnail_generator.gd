@@ -13,6 +13,7 @@ static var cache_access_order: Array = []  # LRU order (most recent at end)
 static var viewport: SubViewport
 static var camera: Camera3D
 static var mesh_instance: MeshInstance3D
+static var scene_container: Node3D  # Container for full scene instances
 static var light: DirectionalLight3D
 static var generation_mutex: Mutex = Mutex.new()
 static var is_generating: bool = false
@@ -106,6 +107,11 @@ static func initialize():
 		return
 	
 	viewport.add_child(mesh_instance)
+	
+	# Create scene container for rendering full scene hierarchies
+	scene_container = Node3D.new()
+	scene_container.name = "SceneContainer"
+	viewport.add_child(scene_container)
 	
 	# Create main directional light
 	light = DirectionalLight3D.new()
@@ -288,103 +294,156 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 	var mesh: Mesh = null
 	
 	# Handle different resource types
+	var use_full_scene = false
 	if resource is Mesh:
 		mesh = resource
 	elif resource is PackedScene:
-		# Try to find a mesh in the scene and preserve its materials
+		# Instantiate the scene first to check its type
 		var scene_instance = resource.instantiate()
-		var mesh_node = find_first_mesh_instance_node(scene_instance)
 		
-		if mesh_node:
-			mesh = mesh_node.mesh
-			# Copy materials from the original mesh instance
-			if mesh_node.material_override:
-				mesh_instance.material_override = mesh_node.material_override
+		# Check if the root node is a Node3D (or derived type)
+		if not scene_instance is Node3D:
+			# Not a 3D scene - try to extract a mesh from it
+			var mesh_node = find_first_mesh_instance_node(scene_instance)
+			if mesh_node:
+				mesh = mesh_node.mesh
+				# Copy materials
+				if mesh_node.material_override:
+					mesh_instance.material_override = mesh_node.material_override
+				else:
+					for i in range(mesh.get_surface_count()):
+						var surface_material = mesh_node.get_surface_override_material(i)
+						if surface_material:
+							mesh_instance.set_surface_override_material(i, surface_material)
 			else:
-				# Copy surface materials
-				for i in range(mesh.get_surface_count()):
-					var surface_material = mesh_node.get_surface_override_material(i)
-					if surface_material:
-						mesh_instance.set_surface_override_material(i, surface_material)
+				# No mesh found in non-3D scene
+				mesh = find_mesh_by_property(scene_instance)
+				if not mesh:
+					mesh = extract_mesh_from_any_node(scene_instance)
+			
+			scene_instance.queue_free()
 		else:
-			# Fallback to other methods if no MeshInstance3D found
-			mesh = find_mesh_by_property(scene_instance)
-			if not mesh:
-				mesh = extract_mesh_from_any_node(scene_instance)
+			# Valid 3D scene - render the complete scene for accurate thumbnails
+			use_full_scene = true
+			
+			# Clear scene container
+			for child in scene_container.get_children():
+				child.queue_free()
+			
+			# Add the complete scene to the container
+			scene_container.add_child(scene_instance)
+			
+			# Hide the single mesh instance since we're using the full scene
+			if mesh_instance:
+				mesh_instance.visible = false
 		
-		scene_instance.queue_free()
+		# Wait a frame for the scene to be fully added to the tree
+		await Engine.get_main_loop().process_frame
+		
+		# Get the AABB of the entire scene container (includes all children)
+		var scene_aabb = VisualInstance3D.new().get_aabb() if scene_container.get_child_count() == 0 else AABB()
+		
+		# Calculate AABB from all VisualInstance3D children
+		var first = true
+		for child in scene_container.get_children():
+			var child_aabb = _get_node_aabb_recursive(child)
+			if child_aabb.has_volume():
+				if first:
+					scene_aabb = child_aabb
+					first = false
+				else:
+					scene_aabb = scene_aabb.merge(child_aabb)
+		
+		# Position camera to view the entire scene
+		if scene_aabb.has_volume():
+			_position_camera_for_aabb(scene_aabb)
+		else:
+			# Fallback if no valid AABB
+			camera.position = Vector3(2, 2, 3)
+			camera.look_at(Vector3.ZERO, Vector3.UP)
 	
-	if not mesh:
+	if not mesh and not use_full_scene:
 		_cleanup_generation()
 		return null
 	
-	# Set the mesh to our instance
-	if not mesh_instance or not is_instance_valid(mesh_instance):
-		PluginLogger.error(PluginConstants.COMPONENT_THUMBNAIL, "mesh_instance is null or invalid!")
-		_cleanup_generation()
-		return null
-	
-	mesh_instance.mesh = mesh
-	
-	# Force the mesh instance to update its internal state
-	mesh_instance.set_surface_override_material(0, null)  # Clear any surface material
-	mesh_instance.force_update_transform()
-	
-	# Debug mesh info
-	var vertex_count = 0
-	var first_vertex = Vector3.ZERO
-	if mesh.get_surface_count() > 0:
-		var arrays = mesh.surface_get_arrays(0)
-		if arrays and arrays.size() > 0 and arrays[0]:
-			vertex_count = arrays[0].size()
-			if vertex_count > 0:
-				first_vertex = arrays[0][0]
-	
-	# Verify the mesh was set
-	if mesh_instance.mesh != mesh:
-		_cleanup_generation()
-		return null	# Use the original materials from the mesh/scene - don't override unless necessary
-	# Only add a fallback material if the mesh has no materials at all
-	var has_any_material = false
-	
-	# Check if mesh instance already has materials from scene copying
-	if mesh_instance.material_override:
-		has_any_material = true
+	# Set the mesh to our instance (skip if using full scene mode)
+	if not use_full_scene:
+		if not mesh_instance or not is_instance_valid(mesh_instance):
+			PluginLogger.error(PluginConstants.COMPONENT_THUMBNAIL, "mesh_instance is null or invalid!")
+			_cleanup_generation()
+			return null
+		
+		# Make sure mesh instance is visible
+		mesh_instance.visible = true
+		mesh_instance.mesh = mesh
+		
+		# Force the mesh instance to update its internal state
+		mesh_instance.set_surface_override_material(0, null)  # Clear any surface material
+		mesh_instance.force_update_transform()
 	else:
-		# Check surface override materials
-		for i in range(mesh.get_surface_count()):
-			if mesh_instance.get_surface_override_material(i):
-				has_any_material = true
-				break
+		# Using full scene - ensure mesh_instance is hidden
+		if mesh_instance:
+			mesh_instance.visible = false
+	
+	# Only do mesh-specific setup if not using full scene mode
+	if not use_full_scene:
+		# Debug mesh info
+		var vertex_count = 0
+		var first_vertex = Vector3.ZERO
+		if mesh.get_surface_count() > 0:
+			var arrays = mesh.surface_get_arrays(0)
+			if arrays and arrays.size() > 0 and arrays[0]:
+				vertex_count = arrays[0].size()
+				if vertex_count > 0:
+					first_vertex = arrays[0][0]
 		
-		# Check if the mesh itself has materials
-		if not has_any_material:
+		# Verify the mesh was set
+		if mesh_instance.mesh != mesh:
+			_cleanup_generation()
+			return null
+		
+		# Use the original materials from the mesh/scene - don't override unless necessary
+		# Only add a fallback material if the mesh has no materials at all
+		var has_any_material = false
+		
+		# Check if mesh instance already has materials from scene copying
+		if mesh_instance.material_override:
+			has_any_material = true
+		else:
+			# Check surface override materials
 			for i in range(mesh.get_surface_count()):
-				var surface_material = mesh.surface_get_material(i)
-				if surface_material:
+				if mesh_instance.get_surface_override_material(i):
 					has_any_material = true
 					break
-	
-	# Apply a neutral material override only if the mesh has no materials
-	# This ensures visibility while preserving actual asset materials when present
-	var needs_material = true
-	if mesh.get_surface_count() > 0:
-		for i in range(mesh.get_surface_count()):
-			if mesh.surface_get_material(i) != null:
-				needs_material = false
-				break
-	
-	if needs_material:
-		# Only add material if mesh has no materials of its own
-		var material = StandardMaterial3D.new()
-		material.albedo_color = Color(0.8, 0.8, 0.8, 1.0)  # Neutral gray
-		material.metallic = 0.2
-		material.roughness = 0.6
-		material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
-		mesh_instance.material_override = material
-	
-	# Use simple, consistent camera positioning to focus on shape differences
-	_position_camera_simple(mesh)
+			
+			# Check if the mesh itself has materials
+			if not has_any_material:
+				for i in range(mesh.get_surface_count()):
+					var surface_material = mesh.surface_get_material(i)
+					if surface_material:
+						has_any_material = true
+						break
+		
+		# Apply a neutral material override only if the mesh has no materials
+		# This ensures visibility while preserving actual asset materials when present
+		var needs_material = true
+		if mesh.get_surface_count() > 0:
+			for i in range(mesh.get_surface_count()):
+				if mesh.surface_get_material(i) != null:
+					needs_material = false
+					break
+		
+		if needs_material:
+			# Only add material if mesh has no materials of its own
+			var material = StandardMaterial3D.new()
+			material.albedo_color = Color(0.8, 0.8, 0.8, 1.0)  # Neutral gray
+			material.metallic = 0.2
+			material.roughness = 0.6
+			material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+			mesh_instance.material_override = material
+		
+		# Use simple, consistent camera positioning to focus on shape differences
+		_position_camera_simple(mesh)
 	
 	# Clear viewport render cache and force complete re-render
 	viewport.render_target_clear_mode = SubViewport.CLEAR_MODE_ALWAYS
@@ -423,23 +482,87 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 	# Cache the result using LRU cache
 	_cache_put(asset_path, texture)
 	
-	# Always clear the mesh after capturing to prevent leftover state
-	if mesh_instance:
-		# Clear surface materials safely before clearing mesh
-		var current_mesh = mesh_instance.mesh
-		if current_mesh:
-			var surface_count = current_mesh.get_surface_count()
-			for i in range(surface_count):
-				mesh_instance.set_surface_override_material(i, null)
-		
-		# Clear the mesh and material override
-		mesh_instance.mesh = null
-		mesh_instance.material_override = null
+	# Always clear the mesh/scene after capturing to prevent leftover state
+	if use_full_scene:
+		# Clean up scene container
+		for child in scene_container.get_children():
+			child.queue_free()
+	else:
+		if mesh_instance:
+			# Clear surface materials safely before clearing mesh
+			var current_mesh = mesh_instance.mesh
+			if current_mesh:
+				var surface_count = current_mesh.get_surface_count()
+				for i in range(surface_count):
+					mesh_instance.set_surface_override_material(i, null)
+			
+			# Clear the mesh and material override
+			mesh_instance.mesh = null
+			mesh_instance.material_override = null
 	
 	# Mark generation as complete
 	_cleanup_generation()
 	
 	return texture
+
+static func _get_node_aabb_recursive(node: Node) -> AABB:
+	"""Recursively calculate the combined AABB of a node and all its children"""
+	var combined_aabb = AABB()
+	var first = true
+	
+	# Check if this node has a visual representation
+	if node is VisualInstance3D:
+		var visual = node as VisualInstance3D
+		var local_aabb = visual.get_aabb()
+		
+		if local_aabb.has_volume():
+			# Transform AABB to global space
+			var transform = visual.global_transform
+			var corners = [
+				transform * (local_aabb.position),
+				transform * (local_aabb.position + Vector3(local_aabb.size.x, 0, 0)),
+				transform * (local_aabb.position + Vector3(0, local_aabb.size.y, 0)),
+				transform * (local_aabb.position + Vector3(0, 0, local_aabb.size.z)),
+				transform * (local_aabb.position + Vector3(local_aabb.size.x, local_aabb.size.y, 0)),
+				transform * (local_aabb.position + Vector3(local_aabb.size.x, 0, local_aabb.size.z)),
+				transform * (local_aabb.position + Vector3(0, local_aabb.size.y, local_aabb.size.z)),
+				transform * (local_aabb.position + local_aabb.size)
+			]
+			
+			combined_aabb = AABB(corners[0], Vector3.ZERO)
+			for corner in corners:
+				combined_aabb = combined_aabb.expand(corner)
+			first = false
+	
+	# Process children recursively
+	for child in node.get_children():
+		var child_aabb = _get_node_aabb_recursive(child)
+		if child_aabb.has_volume():
+			if first:
+				combined_aabb = child_aabb
+				first = false
+			else:
+				combined_aabb = combined_aabb.merge(child_aabb)
+	
+	return combined_aabb
+
+static func _position_camera_for_aabb(aabb: AABB):
+	"""Position camera to view the entire AABB"""
+	if not camera:
+		return
+	
+	var center = aabb.get_center()
+	var size = aabb.size
+	var max_size = max(size.x, max(size.y, size.z))
+	
+	# Calculate camera distance to fit the entire object
+	var fov_rad = deg_to_rad(camera.fov)
+	var distance = (max_size / 2.0) / tan(fov_rad / 2.0) * 1.5  # 1.5 for padding
+	
+	# Position camera at an angle
+	var camera_offset = Vector3(1, 0.7, 1).normalized() * distance
+	camera.position = center + camera_offset
+	camera.look_at(center, Vector3.UP)
 
 static func find_first_mesh_instance_node(node: Node) -> MeshInstance3D:
 	# Check if this node is a MeshInstance3D with a mesh

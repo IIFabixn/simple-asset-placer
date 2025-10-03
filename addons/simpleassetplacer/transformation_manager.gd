@@ -363,28 +363,33 @@ static func _process_placement_input(camera: Camera3D):
 	var rotation_input = InputHandler.get_rotation_input()
 	var scale_input = InputHandler.get_scale_input()
 	
-	# Update position from mouse - lock Y axis so only XZ is affected by mouse
-	# Y position is controlled by base_height + height_offset (manual Q/E keys)
-	# Manual WASD offsets are preserved via manual_position_offset in PositionManager
-	var mouse_pos = position_input.mouse_position
-	
 	# Set half-step mode based on CTRL key state
 	PositionManager.use_half_step = position_input.ctrl_held
 	
-	var world_pos = PositionManager.update_position_from_mouse(camera, mouse_pos, 1, true)
-	
-	# Handle height adjustments with reverse modifier support
+	# Handle height adjustments with reverse modifier and increment size support
 	var reverse_height = position_input.shift_held  # SHIFT = reverse direction
+	
+	# Determine height step based on modifiers (matching transform mode logic)
+	var height_step = PositionManager.height_step_size  # Base step
+	
+	# Apply Y snap step if Y snapping is enabled
+	if PositionManager.snap_y_enabled:
+		height_step = PositionManager.snap_y_step
+	
+	# Apply modifier keys for increment size
+	if position_input.ctrl_held:
+		# CTRL = fine adjustment (10% of base step)
+		height_step *= 0.1
+	elif position_input.alt_held:
+		# ALT = large adjustment (10x base step)
+		height_step *= 10.0
+	
 	if position_input.height_up_pressed:
-		if reverse_height:
-			PositionManager.decrease_height()
-		else:
-			PositionManager.increase_height()
+		var height_change = height_step if not reverse_height else -height_step
+		PositionManager.adjust_height(height_change)
 	elif position_input.height_down_pressed:
-		if reverse_height:
-			PositionManager.increase_height()
-		else:
-			PositionManager.decrease_height()
+		var height_change = -height_step if not reverse_height else height_step
+		PositionManager.adjust_height(height_change)
 	elif position_input.reset_height_pressed:
 		PositionManager.reset_height()
 	
@@ -395,21 +400,55 @@ static func _process_placement_input(camera: Camera3D):
 	elif position_input.alt_held:
 		position_delta = settings.get("large_position_increment", 1.0)
 	
+	# Get camera-relative directions snapped to nearest axis (same as transform mode)
+	var camera_forward = Vector3(0, 0, -1)
+	var camera_right = Vector3(1, 0, 0)
+	if camera:
+		# Get camera forward and project to XZ plane
+		var cam_forward = -camera.global_transform.basis.z
+		cam_forward.y = 0
+		cam_forward = cam_forward.normalized()
+		
+		# Snap forward to nearest axis (Z or X)
+		if abs(cam_forward.z) > abs(cam_forward.x):
+			camera_forward = Vector3(0, 0, sign(cam_forward.z))
+		else:
+			camera_forward = Vector3(sign(cam_forward.x), 0, 0)
+		
+		# Get camera right and project to XZ plane
+		var cam_right = camera.global_transform.basis.x
+		cam_right.y = 0
+		cam_right = cam_right.normalized()
+		
+		# Snap right to nearest axis (X or Z)
+		if abs(cam_right.x) > abs(cam_right.z):
+			camera_right = Vector3(sign(cam_right.x), 0, 0)
+		else:
+			camera_right = Vector3(0, 0, sign(cam_right.z))
+	
+	# Handle position adjustments (WASD-style movement) - directly modify manual offset
 	if position_input.position_left_pressed:
-		PositionManager.move_left(position_delta, camera)
+		PositionManager.manual_position_offset -= camera_right * position_delta
 	elif position_input.position_right_pressed:
-		PositionManager.move_right(position_delta, camera)
+		PositionManager.manual_position_offset += camera_right * position_delta
 	
 	if position_input.position_forward_pressed:
-		PositionManager.move_forward(position_delta, camera)
+		PositionManager.manual_position_offset += camera_forward * position_delta
 	elif position_input.position_backward_pressed:
-		PositionManager.move_backward(position_delta, camera)
+		PositionManager.manual_position_offset -= camera_forward * position_delta
 	
 	# Handle position reset
 	if position_input.reset_position_pressed:
 		PositionManager.reset_position()
 	
-	# Get the updated position but preserve only manual height changes
+	# Update position from mouse AFTER processing WASD input
+	# This ensures manual offsets are included in the same frame
+	# Y position is controlled by base_height + height_offset (manual Q/E keys)
+	# Manual WASD offsets are preserved via manual_position_offset in PositionManager
+	var mouse_pos = position_input.mouse_position
+	var world_pos = PositionManager.update_position_from_mouse(camera, mouse_pos, 1, true)
+	
+	# Get the updated position
 	var preview_pos = PositionManager.get_current_position()
 	
 	# Update preview position
@@ -422,8 +461,8 @@ static func _process_placement_input(camera: Camera3D):
 		RotationManager.reset_surface_alignment()
 	
 	# Handle rotation input (this will be combined with surface alignment)
-	# In placement mode, also rotate the position offset so it follows the mesh
-	_process_rotation_input(rotation_input, PreviewManager.preview_mesh, true)
+	# Don't rotate position offset - this makes rotation behave like transform mode (in-place)
+	_process_rotation_input(rotation_input, PreviewManager.preview_mesh, false)
 	
 	# Handle scale input
 	_process_scale_input(scale_input, PreviewManager.preview_mesh)

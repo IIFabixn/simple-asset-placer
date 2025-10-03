@@ -60,20 +60,29 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 	if collision_enabled:
 		var new_pos = _raycast_to_world(from, to, collision_layer)
 		if new_pos != Vector3.INF:
-			# Update XZ position from raycast
-			target_position.x = new_pos.x
-			target_position.z = new_pos.z
-			
 			# Determine Y position based on lock_y_axis flag, alignment mode, and whether this is initial positioning
 			# When aligning with normal, Y should always follow the surface to prevent clipping
 			if align_with_normal or not lock_y_axis or is_initial_position:
 				# Update base_height from raycast and apply offset
 				# This happens when: aligning with surface, Y not locked, or first update
 				base_height = new_pos.y
-				target_position.y = base_height + height_offset
+				
+				# When aligning with normal, apply height offset along the surface normal direction
+				if align_with_normal and height_offset != 0.0:
+					# Move along the surface normal by the height offset amount
+					var offset_vector = surface_normal.normalized() * height_offset
+					target_position = new_pos + offset_vector
+				else:
+					# Standard: just offset Y-axis
+					target_position.x = new_pos.x
+					target_position.z = new_pos.z
+					target_position.y = base_height + height_offset
+				
 				is_initial_position = false  # Mark that we've set initial position
 			else:
 				# Use base_height + height_offset (manual control only)
+				target_position.x = new_pos.x
+				target_position.z = new_pos.z
 				target_position.y = base_height + height_offset
 			
 			# Apply grid snapping if enabled
@@ -90,6 +99,15 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 	if align_with_normal or not lock_y_axis or is_initial_position:
 		# Set base_height from plane and mark as initialized
 		base_height = pos.y
+		
+		# When aligning with normal, apply height offset along surface normal
+		if align_with_normal and height_offset != 0.0:
+			var offset_vector = surface_normal.normalized() * height_offset
+			pos = pos + offset_vector
+		else:
+			# Standard Y-axis offset
+			pos.y = base_height + height_offset
+		
 		is_initial_position = false
 	else:
 		# If Y is locked and not initial, use base_height + offset
@@ -320,12 +338,8 @@ static func update_transform_node_position(transform_node: Node3D, camera: Camer
 	# Calculate world position from mouse
 	var world_pos = update_position_from_mouse(camera, mouse_pos)
 	
-	# Apply position to transform node (with height offset applied)
-	world_pos.y = base_height + height_offset
-	
-	# Apply grid snapping if enabled
-	if snap_enabled:
-		world_pos = _apply_grid_snap(world_pos)
+	# Position is already calculated with proper height offset in update_position_from_mouse
+	# Just apply it directly (no need to recalculate)
 	
 	if transform_node.is_inside_tree():
 		transform_node.global_position = world_pos

@@ -59,6 +59,7 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 	lock_y_axis: If true, only XZ is updated after initial setup, Y is calculated from base_height + height_offset
 	align_with_normal: Y always follows the surface (updates base_height every frame)
 	snap_to_ground + lock_y_axis: base_height only updates when XZ position changes (not from height offset changes)"""
+	print("PositionManager: update_position_from_mouse START - manual_offset=", manual_position_offset, " height_offset=", height_offset, " base_height=", base_height)
 	if not camera:
 		return current_position
 	
@@ -69,13 +70,16 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 	# Perform collision detection if enabled
 	if collision_enabled:
 		var new_pos = _raycast_to_world(from, to, collision_layer)
+		print("PositionManager: Raycast result new_pos=", new_pos)
 		if new_pos != Vector3.INF:
 			# Determine Y position based on lock_y_axis flag, alignment mode, snap_to_ground, and whether this is initial positioning
 			# When aligning with normal, Y should always follow the surface
 			# When snap_to_ground with lock_y_axis, only update base_height if XZ changed significantly (not from height offset changes)
 			var should_update_base_height = false
+			print("PositionManager: lock_y_axis=", lock_y_axis, " align_with_normal=", align_with_normal, " snap_to_ground=", snap_to_ground, " is_initial=", is_initial_position)
 			if align_with_normal or not lock_y_axis or is_initial_position:
 				should_update_base_height = true
+				print("PositionManager: should_update_base_height=true (reason: align=", align_with_normal, " or not_lock=", not lock_y_axis, " or initial=", is_initial_position, ")")
 			elif snap_to_ground and lock_y_axis:
 				# Only update base height if XZ position changed (not just height offset)
 				# Compare against last raycast XZ position to avoid interference from manual_position_offset
@@ -87,10 +91,15 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 				# Update base_height from raycast and apply offset
 				# If this is initial position and we're preserving height_offset, compensate for it
 				# This prevents double-application when raycast hits previously placed objects at elevated heights
+				print("PositionManager: Updating base_height - raycast Y=", new_pos.y, " is_initial=", is_initial_position, " height_offset=", height_offset)
+				print("PositionManager: BEFORE update - base_height=", base_height)
 				if is_initial_position and height_offset != 0.0:
 					base_height = new_pos.y - height_offset
+					print("PositionManager: Initial position with offset - calculated base_height=", new_pos.y, " - ", height_offset, " = ", base_height)
 				else:
 					base_height = new_pos.y
+					print("PositionManager: Set base_height to raycast Y: ", base_height)
+				print("PositionManager: AFTER update - base_height=", base_height)
 				last_raycast_xz = Vector2(new_pos.x, new_pos.z)  # Store XZ for next frame comparison
 				
 				# When aligning with normal, apply height offset along the surface normal direction
@@ -117,7 +126,9 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 			
 			# Apply manual position offset (from WASD keys) AFTER snapping
 			# This allows manual adjustments to work immediately without fighting the snap
+			print("PositionManager: update_position_from_mouse applying manual_offset=", manual_position_offset, " to target=", target_position)
 			target_position += manual_position_offset
+			print("PositionManager: update_position_from_mouse final target=", target_position)
 			
 			current_position = target_position
 			return current_position
@@ -211,19 +222,18 @@ static func _project_to_plane(from: Vector3, to: Vector3, plane_y: float = 0.0) 
 	"""Project ray to horizontal plane when no collision detected"""
 	var ray_dir = (to - from).normalized()
 	
-	# Create horizontal plane
-	var plane = Plane(Vector3.UP, base_height + height_offset + plane_y)
+	# Create horizontal plane at current base_height (NOT including height_offset yet - that's applied by caller)
+	var plane = Plane(Vector3.UP, base_height + plane_y)
 	var intersection = plane.intersects_ray(from, ray_dir)
 	
 	# No actual surface, so normal is always up
 	surface_normal = Vector3.UP
 	
 	if intersection:
-		target_position = intersection
-		current_position = target_position
-		return current_position
+		return intersection
 	
-	return current_position
+	# If no intersection, return a position at base_height
+	return Vector3(from.x, base_height, from.z)
 
 static func _apply_grid_snap(pos: Vector3) -> Vector3:
 	"""Apply grid snapping to a position (pivot-based with optional center snapping)"""
@@ -285,7 +295,9 @@ static func move_left(delta: float, camera: Camera3D = null):
 	"""Move the position left relative to camera view (state only - position will be updated on next mouse update)"""
 	var move_dir = _get_camera_right_direction(camera) * -1.0  # Left is negative right
 	var movement = move_dir * delta
+	print("PositionManager: move_left delta=", delta, " movement=", movement, " old_offset=", manual_position_offset)
 	manual_position_offset += movement
+	print("PositionManager: move_left new_offset=", manual_position_offset)
 
 static func move_right(delta: float, camera: Camera3D = null):
 	"""Move the position right relative to camera view (state only - position will be updated on next mouse update)"""
@@ -409,9 +421,6 @@ static func set_base_height(y: float):
 static func reset_for_new_placement(reset_height_offset: bool = true):
 	"""Reset position manager state for a new placement session
 	
-	Note: manual_position_offset is NOT reset here - it's only reset when exiting modes
-	if the reset_position_on_exit setting is enabled.
-	
 	reset_height_offset: If true, reset height_offset to 0. If false, preserve current height."""
 	is_initial_position = true
 	if reset_height_offset:
@@ -421,7 +430,7 @@ static func reset_for_new_placement(reset_height_offset: bool = true):
 	base_height = 0.0
 	surface_normal = Vector3.UP
 	last_raycast_xz = Vector2.ZERO
-	# manual_position_offset is deliberately NOT reset here
+	manual_position_offset = Vector3.ZERO  # Reset WASD offset for new placement
 
 ## Position Getters and Setters
 

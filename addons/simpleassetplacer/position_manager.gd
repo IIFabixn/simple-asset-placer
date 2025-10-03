@@ -59,7 +59,6 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 	lock_y_axis: If true, only XZ is updated after initial setup, Y is calculated from base_height + height_offset
 	align_with_normal: Y always follows the surface (updates base_height every frame)
 	snap_to_ground + lock_y_axis: base_height only updates when XZ position changes (not from height offset changes)"""
-	print("PositionManager: update_position_from_mouse START - manual_offset=", manual_position_offset, " height_offset=", height_offset, " base_height=", base_height)
 	if not camera:
 		return current_position
 	
@@ -70,16 +69,13 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 	# Perform collision detection if enabled
 	if collision_enabled:
 		var new_pos = _raycast_to_world(from, to, collision_layer)
-		print("PositionManager: Raycast result new_pos=", new_pos)
 		if new_pos != Vector3.INF:
 			# Determine Y position based on lock_y_axis flag, alignment mode, snap_to_ground, and whether this is initial positioning
 			# When aligning with normal, Y should always follow the surface
 			# When snap_to_ground with lock_y_axis, only update base_height if XZ changed significantly (not from height offset changes)
 			var should_update_base_height = false
-			print("PositionManager: lock_y_axis=", lock_y_axis, " align_with_normal=", align_with_normal, " snap_to_ground=", snap_to_ground, " is_initial=", is_initial_position)
 			if align_with_normal or not lock_y_axis or is_initial_position:
 				should_update_base_height = true
-				print("PositionManager: should_update_base_height=true (reason: align=", align_with_normal, " or not_lock=", not lock_y_axis, " or initial=", is_initial_position, ")")
 			elif snap_to_ground and lock_y_axis:
 				# Only update base height if XZ position changed (not just height offset)
 				# Compare against last raycast XZ position to avoid interference from manual_position_offset
@@ -91,15 +87,10 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 				# Update base_height from raycast and apply offset
 				# If this is initial position and we're preserving height_offset, compensate for it
 				# This prevents double-application when raycast hits previously placed objects at elevated heights
-				print("PositionManager: Updating base_height - raycast Y=", new_pos.y, " is_initial=", is_initial_position, " height_offset=", height_offset)
-				print("PositionManager: BEFORE update - base_height=", base_height)
 				if is_initial_position and height_offset != 0.0:
 					base_height = new_pos.y - height_offset
-					print("PositionManager: Initial position with offset - calculated base_height=", new_pos.y, " - ", height_offset, " = ", base_height)
 				else:
 					base_height = new_pos.y
-					print("PositionManager: Set base_height to raycast Y: ", base_height)
-				print("PositionManager: AFTER update - base_height=", base_height)
 				last_raycast_xz = Vector2(new_pos.x, new_pos.z)  # Store XZ for next frame comparison
 				
 				# When aligning with normal, apply height offset along the surface normal direction
@@ -126,9 +117,7 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 			
 			# Apply manual position offset (from WASD keys) AFTER snapping
 			# This allows manual adjustments to work immediately without fighting the snap
-			print("PositionManager: update_position_from_mouse applying manual_offset=", manual_position_offset, " to target=", target_position)
 			target_position += manual_position_offset
-			print("PositionManager: update_position_from_mouse final target=", target_position)
 			
 			current_position = target_position
 			return current_position
@@ -275,7 +264,6 @@ static func increase_height():
 	"""Increase height by one step"""
 	# Use Y snap step if Y snapping is enabled, otherwise use height step size
 	var step = snap_y_step if snap_y_enabled else height_step_size
-	print("PositionManager: Increase height - Y snap enabled: ", snap_y_enabled, ", step: ", step)
 	adjust_height(step)
 
 static func decrease_height():
@@ -295,9 +283,7 @@ static func move_left(delta: float, camera: Camera3D = null):
 	"""Move the position left relative to camera view (state only - position will be updated on next mouse update)"""
 	var move_dir = _get_camera_right_direction(camera) * -1.0  # Left is negative right
 	var movement = move_dir * delta
-	print("PositionManager: move_left delta=", delta, " movement=", movement, " old_offset=", manual_position_offset)
 	manual_position_offset += movement
-	print("PositionManager: move_left new_offset=", manual_position_offset)
 
 static func move_right(delta: float, camera: Camera3D = null):
 	"""Move the position right relative to camera view (state only - position will be updated on next mouse update)"""
@@ -403,7 +389,6 @@ static func rotate_manual_offset(axis: String, angle_degrees: float):
 				manual_position_offset.z  # Z doesn't change
 			)
 		_:
-			print("PositionManager: Invalid rotation axis: ", axis)
 			return
 	
 	# Update positions to account for the rotated offset
@@ -524,10 +509,6 @@ static func configure(config: Dictionary):
 	snap_center_y = config.get("snap_center_y", false)
 	snap_center_z = config.get("snap_center_z", false)
 	align_with_normal = config.get("align_with_normal", false)
-	
-	# Debug output
-	if snap_offset != Vector3.ZERO:
-		print("PositionManager: Grid offset configured: ", snap_offset)
 
 static func get_configuration() -> Dictionary:
 	"""Get current configuration"""
@@ -592,12 +573,7 @@ static func get_surface_normal_at_position(pos: Vector3) -> Vector3:
 
 static func debug_print_position_state():
 	"""Print current position state for debugging"""
-	print("PositionManager State:")
-	print("  Current Position: ", current_position)
-	print("  Target Position: ", target_position)
-	print("  Base Height: ", base_height)
-	print("  Height Offset: ", height_offset)
-	print("  Collision Enabled: ", collision_enabled)
+	pass
 
 static func get_position_info() -> Dictionary:
 	"""Get comprehensive position information"""

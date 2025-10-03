@@ -205,6 +205,10 @@ static func process_frame_input(camera: Camera3D, input_settings: Dictionary = {
 	# Store current settings for TAB key and other operations
 	placement_settings = input_settings
 	
+	# Configure managers with current settings (important for both modes)
+	# This ensures snap settings and other options are always up-to-date
+	PositionManager.configure(input_settings)
+	
 	# Get the 3D viewport for proper mouse coordinate conversion
 	var viewport_3d = EditorInterface.get_editor_viewport_3d(0)
 	

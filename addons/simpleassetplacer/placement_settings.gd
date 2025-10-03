@@ -706,17 +706,30 @@ func setup_ui():
 	transform_mode_key_button.tooltip_text = "Click to set key for activating transform mode on selected object. Press ESC to cancel."
 	control_grid.add_child(transform_mode_key_button)
 	
-	# Add separator for thumbnail settings
-	var thumbnail_separator = HSeparator.new()
-	thumbnail_separator.add_theme_constant_override("separation", 8)
-	vbox.add_child(thumbnail_separator)
+	# Add separator for utility settings
+	var utility_separator = HSeparator.new()
+	utility_separator.add_theme_constant_override("separation", 8)
+	vbox.add_child(utility_separator)
 	
-	# Thumbnail Cache section
-	var thumbnail_label = Label.new()
-	thumbnail_label.text = "Thumbnail Cache"
-	thumbnail_label.add_theme_font_size_override("font_size", 14)
-	thumbnail_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.9))
-	vbox.add_child(thumbnail_label)
+	# Utility section
+	var utility_label = Label.new()
+	utility_label.text = "Utilities"
+	utility_label.add_theme_font_size_override("font_size", 14)
+	utility_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.9))
+	vbox.add_child(utility_label)
+	
+	# Reset all settings button
+	var reset_settings_button = Button.new()
+	reset_settings_button.text = "Reset All Settings to Defaults"
+	reset_settings_button.tooltip_text = "Reset all plugin settings to their default values"
+	reset_settings_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reset_settings_button.custom_minimum_size.y = 32
+	vbox.add_child(reset_settings_button)
+	
+	# Add small separator between reset and clear cache
+	var mini_separator = Control.new()
+	mini_separator.custom_minimum_size.y = 8
+	vbox.add_child(mini_separator)
 	
 	# Clear thumbnail cache button
 	var clear_cache_button = Button.new()
@@ -783,6 +796,8 @@ func setup_ui():
 	cancel_key_button.pressed.connect(_on_key_binding_button_pressed.bind(cancel_key_button, "cancel_key"))
 	transform_mode_key_button.pressed.connect(_on_key_binding_button_pressed.bind(transform_mode_key_button, "transform_mode_key"))
 	
+	# Connect utility button signals
+	reset_settings_button.pressed.connect(_on_reset_settings_pressed)
 	clear_cache_button.pressed.connect(_on_clear_cache_pressed)
 
 func _on_setting_changed(value = null):
@@ -943,6 +958,90 @@ func _on_height_step_changed(value: float):
 	fine_height_increment = fine_height_increment_spin.value
 	large_height_increment = large_height_increment_spin.value
 	settings_changed.emit()
+
+func _on_reset_settings_pressed():
+	"""Reset all settings to their default values"""
+	# Show confirmation dialog
+	var confirm_dialog = ConfirmationDialog.new()
+	confirm_dialog.dialog_text = "Are you sure you want to reset ALL settings to their default values?\n\nThis will reset:\n• All key bindings\n• All increments and steps\n• All checkboxes and options\n\nThis action cannot be undone."
+	confirm_dialog.title = "Reset All Settings"
+	confirm_dialog.ok_button_text = "Reset"
+	confirm_dialog.cancel_button_text = "Cancel"
+	
+	# Add dialog to tree
+	add_child(confirm_dialog)
+	
+	# Connect confirmed signal
+	confirm_dialog.confirmed.connect(_perform_reset_settings)
+	
+	# Clean up dialog after closing
+	confirm_dialog.close_requested.connect(confirm_dialog.queue_free)
+	confirm_dialog.canceled.connect(confirm_dialog.queue_free)
+	confirm_dialog.confirmed.connect(confirm_dialog.queue_free)
+	
+	# Show the dialog
+	confirm_dialog.popup_centered()
+
+func _perform_reset_settings():
+	"""Actually perform the settings reset after confirmation"""
+	# Reset boolean settings
+	snap_to_ground = false
+	align_with_normal = false
+	snap_enabled = false
+	random_rotation = false
+	add_collision = false
+	group_instances = false
+	
+	# Reset numeric settings
+	snap_step = 1.0
+	scale_multiplier = 1.0
+	
+	# Reset behavior settings
+	reset_height_on_exit = false
+	reset_scale_on_exit = false
+	reset_rotation_on_exit = false
+	
+	# Reset rotation settings
+	rotate_y_key = "Y"
+	rotate_x_key = "X"
+	rotate_z_key = "Z"
+	reset_rotation_key = "T"
+	rotation_increment = 15.0
+	fine_rotation_increment = 5.0
+	large_rotation_increment = 90.0
+	
+	# Reset scale settings
+	scale_up_key = "PAGE_UP"
+	scale_down_key = "PAGE_DOWN"
+	scale_reset_key = "HOME"
+	scale_increment = 0.1
+	fine_scale_increment = 0.01
+	large_scale_increment = 0.5
+	
+	# Reset height settings
+	height_up_key = "Q"
+	height_down_key = "E"
+	reset_height_key = "R"
+	height_adjustment_step = 0.1
+	fine_height_increment = 0.01
+	large_height_increment = 1.0
+	
+	# Reset modifier keys
+	reverse_modifier_key = "SHIFT"
+	large_increment_modifier_key = "ALT"
+	
+	# Reset control keys
+	cancel_key = "ESCAPE"
+	transform_mode_key = "TAB"
+	
+	# Update UI to reflect the reset values
+	update_ui_from_settings()
+	
+	# Save the reset settings and emit change signal
+	save_settings()
+	settings_changed.emit()
+	
+	print("Settings reset to defaults")
 
 func _on_clear_cache_pressed():
 	# Clear the thumbnail cache in ThumbnailGenerator

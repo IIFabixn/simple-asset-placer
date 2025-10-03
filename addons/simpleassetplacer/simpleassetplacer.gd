@@ -309,9 +309,9 @@ func _forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 		# Check if this key matches any of our plugin keybindings
 		if _is_plugin_key(full_key_string, settings_for_keys) or _is_plugin_key(key_string, settings_for_keys):
 			# This is our key - consume it to prevent Godot from processing it
-			# Mark the event as handled to prevent further processing
+			# Mark the event as handled and STOP further processing
 			get_viewport().set_input_as_handled()
-			return EditorPlugin.AFTER_GUI_INPUT_PASS
+			return EditorPlugin.AFTER_GUI_INPUT_STOP
 	
 	# Let Godot handle other inputs
 	return EditorPlugin.AFTER_GUI_INPUT_PASS
@@ -359,6 +359,7 @@ func _is_plugin_key(key_string: String, settings: Dictionary) -> bool:
 		"transform_mode_key", 
 		"height_up_key",
 		"height_down_key",
+		"reset_height_key",
 		"rotate_x_key",
 		"rotate_y_key", 
 		"rotate_z_key",

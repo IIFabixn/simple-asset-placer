@@ -60,6 +60,7 @@ static var transform_data: Dictionary = {}
 
 # Grid overlay tracking
 static var last_grid_center: Vector3 = Vector3.ZERO
+static var last_grid_height: float = 0.0  # Track height offset for grid updates
 static var grid_update_threshold: float = 5.0  # Only update grid when object moves this far
 
 # Callbacks
@@ -303,10 +304,11 @@ static func _update_grid_overlay():
 		var grid_extent = int(ceil(grid_extent_units / grid_size))
 		grid_extent = clamp(grid_extent, 5, 100)  # Min 5, max 100 cells
 		
-		# Only update grid if object has moved significantly from last grid center
-		# or if grid doesn't exist yet
+		# Check if grid needs updating based on position, height, or existence
 		var distance_from_last_center = center.distance_to(last_grid_center)
-		var needs_update = distance_from_last_center > grid_update_threshold
+		var current_height = center.y
+		var height_changed = abs(current_height - last_grid_height) > 0.01
+		var needs_update = distance_from_last_center > grid_update_threshold or height_changed
 		
 		# Also check if grid overlay exists
 		if not OverlayManager.grid_overlay or not is_instance_valid(OverlayManager.grid_overlay):
@@ -315,10 +317,12 @@ static func _update_grid_overlay():
 		if needs_update:
 			OverlayManager.create_grid_overlay(center, grid_size, grid_extent, offset)
 			last_grid_center = center
+			last_grid_height = current_height
 	else:
 		# Hide/remove grid if disabled or not in active mode
 		OverlayManager.remove_grid_overlay()
 		last_grid_center = Vector3.ZERO  # Reset tracking
+		last_grid_height = 0.0
 
 ## INPUT PROCESSING COORDINATION
 

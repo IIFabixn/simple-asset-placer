@@ -1,13 +1,192 @@
 {
 	"recently_used": [
+		"floor",
+		"detail",
+		"wall",
 		"cube"
 	],
 	"tag_usage": {
-		"cube": 1
+		"cube": 1.0,
+		"detail": 6,
+		"floor": 12,
+		"wall": 41
 	},
 	"tags": {
 		"cone_blend": [
 			"cube"
+		],
+		"detail-barrel": [
+			"detail"
+		],
+		"detail-crate": [
+			"detail"
+		],
+		"detail-crate-ropes": [
+			"detail"
+		],
+		"detail-crate-small": [
+			"detail"
+		],
+		"floor": [
+			"floor"
+		],
+		"floor-flat": [
+			"floor"
+		],
+		"floor-stairs": [
+			"floor"
+		],
+		"floor-stairs-corner-inner": [
+			"floor"
+		],
+		"floor-stairs-corner-outer": [
+			"floor"
+		],
+		"floor-steps": [
+			"floor"
+		],
+		"floor-steps-corner-inner": [
+			"floor"
+		],
+		"floor-steps-corner-outer": [
+			"floor"
+		],
+		"structure-wall": [
+			"wall"
+		],
+		"structure-wall-cross": [
+			"wall"
+		],
+		"wall": [
+			"wall"
+		],
+		"wall-detail": [
+			"wall",
+			"detail"
+		],
+		"wall-door": [
+			"wall"
+		],
+		"wall-flat-gate": [
+			"wall"
+		],
+		"wall-fortified": [
+			"wall"
+		],
+		"wall-fortified-door": [
+			"wall"
+		],
+		"wall-fortified-gate": [
+			"wall"
+		],
+		"wall-fortified-gate-half": [
+			"wall"
+		],
+		"wall-fortified-half": [
+			"wall"
+		],
+		"wall-fortified-paint": [
+			"wall"
+		],
+		"wall-fortified-paint-door": [
+			"wall"
+		],
+		"wall-fortified-paint-gate": [
+			"wall"
+		],
+		"wall-fortified-paint-half": [
+			"wall"
+		],
+		"wall-fortified-paint-window": [
+			"wall"
+		],
+		"wall-fortified-window": [
+			"wall"
+		],
+		"wall-gate": [
+			"wall"
+		],
+		"wall-gate-half": [
+			"wall"
+		],
+		"wall-half": [
+			"wall"
+		],
+		"wall-low": [
+			"wall"
+		],
+		"wall-paint": [
+			"wall"
+		],
+		"wall-paint-detail": [
+			"wall",
+			"detail"
+		],
+		"wall-paint-door": [
+			"wall"
+		],
+		"wall-paint-flat": [
+			"wall"
+		],
+		"wall-paint-gate": [
+			"wall"
+		],
+		"wall-paint-half": [
+			"wall"
+		],
+		"wall-paint-window": [
+			"wall"
+		],
+		"wall-pane": [
+			"wall"
+		],
+		"wall-pane-door": [
+			"wall"
+		],
+		"wall-pane-paint": [
+			"wall"
+		],
+		"wall-pane-paint-door": [
+			"wall"
+		],
+		"wall-pane-paint-window": [
+			"wall"
+		],
+		"wall-pane-painted-wood": [
+			"wall"
+		],
+		"wall-pane-painted-wood-door": [
+			"wall"
+		],
+		"wall-pane-painted-wood-window": [
+			"wall"
+		],
+		"wall-pane-window": [
+			"wall"
+		],
+		"wall-pane-wood": [
+			"wall"
+		],
+		"wall-pane-wood-door": [
+			"wall"
+		],
+		"wall-pane-wood-window": [
+			"wall"
+		],
+		"wall-window": [
+			"wall"
+		],
+		"wood-floor": [
+			"floor"
+		],
+		"wood-floor-half": [
+			"floor"
+		],
+		"wood-floor-quarter": [
+			"floor"
+		],
+		"wood-floor-railing": [
+			"floor"
 		]
 	}
 }

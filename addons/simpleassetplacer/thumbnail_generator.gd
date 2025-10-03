@@ -132,8 +132,8 @@ static func initialize():
 	environment.ambient_light_energy = 0.3  # Subtle ambient from sky
 	camera.environment = environment
 	
-	# Clear cache to ensure fresh thumbnails
-	thumbnail_cache.clear()
+	# Don't clear cache on initialization - preserve cached thumbnails across panel visibility changes
+	# Cache will only be cleared explicitly via clear_cache() or cleanup()
 	
 	# Validate initialization
 	if not (viewport and camera and mesh_instance and light):
@@ -191,11 +191,7 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 	# Simple concurrency control - just use the mutex to protect the rendering process
 	generation_mutex.lock()
 	
-	# Temporarily clear cache to force regeneration with new settings
-	# TODO: Remove this after testing - this forces fresh thumbnails with new materials/camera
-	thumbnail_cache.clear()
-	
-	# Check cache first (will be empty due to clear above, but keeping for future)
+	# Check cache first - return cached thumbnail if available
 	if asset_path in thumbnail_cache:
 		_cleanup_generation()
 		return thumbnail_cache[asset_path]

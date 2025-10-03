@@ -60,7 +60,6 @@ func _initialize_systems():
 	InputHandler.update_input_state({})  # Initialize with empty settings initially
 	PositionManager.configure({})
 	OverlayManager.initialize_overlays()
-	PreviewManager.initialize()
 	
 	# Initialize thumbnail system
 	ThumbnailGenerator.initialize()

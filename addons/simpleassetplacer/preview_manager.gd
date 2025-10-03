@@ -38,24 +38,6 @@ static var current_scale: Vector3 = Vector3.ONE
 static var preview_opacity: float = 0.6
 static var preview_color: Color = Color.WHITE
 
-## Core Preview Management
-
-static func initialize():
-	"""Initialize the preview system"""
-	_create_preview_material()
-
-static func _create_preview_material():
-	"""Create the preview material"""
-	if preview_material:
-		return
-	
-	preview_material = StandardMaterial3D.new()
-	preview_material.flags_transparent = true
-	preview_material.albedo_color = Color(preview_color.r, preview_color.g, preview_color.b, preview_opacity)
-	preview_material.no_depth_test = false
-	preview_material.flags_do_not_use_vertex_lighting = true
-	preview_material.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-
 ## Preview Creation
 
 static func start_preview_mesh(mesh: Mesh, settings: Dictionary = {}):
@@ -74,7 +56,9 @@ static func start_preview_mesh(mesh: Mesh, settings: Dictionary = {}):
 	# Create preview mesh instance
 	preview_mesh = MeshInstance3D.new()
 	preview_mesh.mesh = mesh
-	preview_mesh.material_override = preview_material
+	# Don't override materials - preserve original mesh appearance
+	# Instead, use transparency property to make it semi-transparent
+	preview_mesh.transparency = 1.0 - preview_opacity  # transparency: 0.0 = opaque, 1.0 = fully transparent
 	preview_mesh.name = "AssetPlacerPreview"
 	preview_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	preview_mesh.layers = 1  # Default render layer
@@ -113,11 +97,12 @@ static func start_preview_asset(asset_path: String, settings: Dictionary = {}):
 	if asset is PackedScene:
 		preview_node = asset.instantiate()
 		if preview_node:
-			_apply_preview_material_to_children(preview_node)
+			_apply_preview_transparency_to_children(preview_node)
 	elif asset is Mesh:
 		preview_node = MeshInstance3D.new()
 		preview_node.mesh = asset
-		preview_node.material_override = preview_material
+		# Use transparency instead of material override
+		preview_node.transparency = 1.0 - preview_opacity
 	else:
 		print("PreviewManager: Unsupported asset type for: ", asset_path)
 		return
@@ -129,8 +114,8 @@ static func start_preview_asset(asset_path: String, settings: Dictionary = {}):
 	preview_mesh = preview_node
 	preview_mesh.name = "AssetPlacerPreview"
 	
-	# Apply preview material to all mesh instances
-	_apply_preview_material_to_children(preview_mesh)
+	# Apply transparency to all mesh instances
+	_apply_preview_transparency_to_children(preview_mesh)
 	
 	# Add to scene first
 	current_scene.add_child(preview_mesh)
@@ -142,14 +127,15 @@ static func start_preview_asset(asset_path: String, settings: Dictionary = {}):
 	
 	print("PreviewManager: Started asset preview for: ", asset_path)
 
-static func _apply_preview_material_to_children(node: Node):
-	"""Apply preview material to all MeshInstance3D children"""
-	if node is MeshInstance3D:
-		node.material_override = preview_material
+static func _apply_preview_transparency_to_children(node: Node):
+	"""Apply transparency to all GeometryInstance3D children (preserves original materials)"""
+	if node is GeometryInstance3D:
+		# Use transparency property to make it semi-transparent while preserving materials
+		node.transparency = 1.0 - preview_opacity  # 0.0 = opaque, 1.0 = fully transparent
 		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	
 	for child in node.get_children():
-		_apply_preview_material_to_children(child)
+		_apply_preview_transparency_to_children(child)
 
 ## Preview Updates
 
@@ -260,7 +246,6 @@ static func configure(settings: Dictionary):
 	if preview_material:
 		preview_material.queue_free()
 		preview_material = null
-		_create_preview_material()
 
 static func get_configuration() -> Dictionary:
 	"""Get current configuration"""

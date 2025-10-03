@@ -119,25 +119,34 @@ static func align_with_surface_normal(surface_normal: Vector3):
 	# Normalize the surface normal
 	var normal = surface_normal.normalized()
 	
-	# If normal is pointing down, we might want to flip it
-	# but for now we'll align directly with it
+	# Use Godot's built-in method to align the Y-axis with the normal
+	# We need to use align_with_y which rotates the basis so Y points in the given direction
+	var basis = Basis()
 	
-	# Create a basis that aligns Y-axis with the normal
-	# We'll use the Basis.looking_at approach but for the up vector
-	var up = normal
+	# Method 1: Use looking_at but swap the axes
+	# The default "up" for looking_at is Y, but we want Y to point along the normal
+	# So we use a trick: look at a point in the normal direction, using a perpendicular up vector
 	
-	# Choose an arbitrary forward direction perpendicular to the normal
-	# Use the world forward (Z-axis) unless it's parallel to the normal
-	var forward = Vector3.FORWARD
-	if abs(normal.dot(forward)) > 0.99:  # Nearly parallel
-		forward = Vector3.RIGHT  # Use a different reference
+	# Find a perpendicular vector to use as "up" for the looking_at
+	var reference_up = Vector3.UP
+	if abs(normal.dot(reference_up)) > 0.99:  # Nearly parallel to world up
+		reference_up = Vector3.FORWARD
 	
-	# Create perpendicular vectors
-	var right = forward.cross(up).normalized()
-	forward = up.cross(right).normalized()
+	# Create a basis using the normal as the Y-axis
+	# looking_at expects: target position, up vector
+	# But we want to align Y with normal, so we use a different approach
 	
-	# Create basis from these vectors
-	var basis = Basis(right, up, forward)
+	# Better method: Use the from_euler after calculating proper rotation
+	# Calculate rotation needed to rotate from UP to the normal
+	var rotation_axis = Vector3.UP.cross(normal)
+	var rotation_angle = Vector3.UP.angle_to(normal)
+	
+	if rotation_axis.length_squared() > 0.0001:  # Not parallel
+		rotation_axis = rotation_axis.normalized()
+		basis = basis.rotated(rotation_axis, rotation_angle)
+	elif normal.dot(Vector3.UP) < 0:  # Pointing down
+		# 180 degree rotation around X axis
+		basis = basis.rotated(Vector3.RIGHT, PI)
 	
 	# Extract Euler angles from the basis
 	current_rotation = basis.get_euler()

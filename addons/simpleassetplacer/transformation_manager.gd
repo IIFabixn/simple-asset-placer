@@ -94,6 +94,10 @@ static func start_placement_mode(mesh: Mesh = null, meshlib: MeshLibrary = null,
 	# Configure position manager for placement
 	PositionManager.configure(placement_settings)
 	
+	# Reset position manager for new placement
+	# The first mouse update will set the initial position from raycast
+	PositionManager.reset_for_new_placement()
+	
 	# Grab focus for the 3D viewport to ensure keyboard input works
 	# Set counter to grab focus for next 3 frames to ensure it sticks
 	focus_grab_counter = 3
@@ -231,9 +235,10 @@ static func _process_placement_input(camera: Camera3D):
 	var rotation_input = InputHandler.get_rotation_input()
 	var scale_input = InputHandler.get_scale_input()
 	
-	# Update position from mouse
+	# Update position from mouse - lock Y axis so only XZ is affected by mouse
+	# Y position is controlled by base_height + height_offset (manual Q/E keys)
 	var mouse_pos = position_input.mouse_position
-	var world_pos = PositionManager.update_position_from_mouse(camera, mouse_pos)
+	var world_pos = PositionManager.update_position_from_mouse(camera, mouse_pos, 1, true)
 	
 	# Handle height adjustments with reverse modifier support
 	var reverse_height = position_input.shift_held  # SHIFT = reverse direction
@@ -248,8 +253,11 @@ static func _process_placement_input(camera: Camera3D):
 		else:
 			PositionManager.decrease_height()
 	
+	# Get the updated position but preserve only manual height changes
+	var preview_pos = PositionManager.get_current_position()
+	
 	# Update preview position
-	PreviewManager.update_preview_position(PositionManager.get_current_position())
+	PreviewManager.update_preview_position(preview_pos)
 	
 	# Apply surface normal alignment if enabled
 	if placement_settings.get("align_with_normal", false):

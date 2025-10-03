@@ -32,6 +32,7 @@ static var target_position: Vector3 = Vector3.ZERO
 static var height_offset: float = 0.0
 static var base_height: float = 0.0
 static var surface_normal: Vector3 = Vector3.UP  # Normal of the surface at current position
+static var is_initial_position: bool = true  # Track if this is the first position update
 
 # Position calculation settings
 static var collision_enabled: bool = true
@@ -44,8 +45,9 @@ static var align_with_normal: bool = false  # Align rotation with surface normal
 
 ## Core Position Management
 
-static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, collision_layer: int = 1) -> Vector3:
-	"""Update target position based on mouse position and camera raycast"""
+static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, collision_layer: int = 1, lock_y_axis: bool = false) -> Vector3:
+	"""Update target position based on mouse position and camera raycast
+	lock_y_axis: If true, only XZ is updated after initial setup, Y is calculated from base_height + height_offset"""
 	if not camera:
 		return current_position
 	
@@ -57,7 +59,20 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 	if collision_enabled:
 		var new_pos = _raycast_to_world(from, to, collision_layer)
 		if new_pos != Vector3.INF:
-			target_position = new_pos + Vector3(0, height_offset, 0)
+			# Update XZ position from raycast
+			target_position.x = new_pos.x
+			target_position.z = new_pos.z
+			
+			# Determine Y position based on lock_y_axis flag and whether this is initial positioning
+			if lock_y_axis and not is_initial_position:
+				# Use base_height + height_offset (manual control only)
+				target_position.y = base_height + height_offset
+			else:
+				# Update base_height from raycast and apply offset
+				# This happens on first update or when Y is not locked
+				base_height = new_pos.y
+				target_position.y = base_height + height_offset
+				is_initial_position = false  # Mark that we've set initial position
 			
 			# Apply grid snapping if enabled
 			if snap_enabled:
@@ -68,6 +83,14 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 	
 	# Fallback: project to horizontal plane
 	var pos = _project_to_plane(from, to)
+	
+	# If Y is locked and not initial, use base_height + offset
+	if lock_y_axis and not is_initial_position:
+		pos.y = base_height + height_offset
+	else:
+		# Set base_height from plane and mark as initialized
+		base_height = pos.y
+		is_initial_position = false
 	
 	# Apply grid snapping if enabled
 	if snap_enabled:
@@ -143,6 +166,12 @@ static func _apply_grid_snap(pos: Vector3) -> Vector3:
 
 ## Height Management
 
+static func update_base_height_from_raycast(y_position: float):
+	"""Update base height when a new raycast hit is detected (for initial placement)"""
+	base_height = y_position
+	target_position.y = base_height + height_offset
+	current_position.y = target_position.y
+
 static func adjust_height(delta: float):
 	"""Adjust the current height offset"""
 	height_offset += delta
@@ -168,6 +197,15 @@ static func set_base_height(y: float):
 	base_height = y
 	target_position.y = base_height + height_offset
 	current_position = target_position
+
+static func reset_for_new_placement():
+	"""Reset position manager state for a new placement session"""
+	is_initial_position = true
+	height_offset = 0.0
+	current_position = Vector3.ZERO
+	target_position = Vector3.ZERO
+	base_height = 0.0
+	surface_normal = Vector3.UP
 
 ## Position Getters and Setters
 

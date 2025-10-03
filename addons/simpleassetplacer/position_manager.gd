@@ -319,6 +319,57 @@ static func reset_position():
 	# Clear the offset
 	manual_position_offset = Vector3.ZERO
 
+static func rotate_manual_offset(axis: String, angle_degrees: float):
+	"""Rotate the manual position offset around the specified axis
+	This is called when the preview mesh rotates so the offset rotates with it"""
+	if manual_position_offset.length_squared() < 0.0001:
+		# No offset to rotate
+		return
+	
+	# Convert degrees to radians
+	var angle_rad = deg_to_rad(angle_degrees)
+	
+	var rotated_offset = Vector3.ZERO
+	
+	# Rotate around the specified axis
+	match axis.to_upper():
+		"X":
+			# Rotate around X axis (affects Y and Z)
+			var cos_angle = cos(angle_rad)
+			var sin_angle = sin(angle_rad)
+			rotated_offset = Vector3(
+				manual_position_offset.x,  # X doesn't change
+				manual_position_offset.y * cos_angle - manual_position_offset.z * sin_angle,
+				manual_position_offset.y * sin_angle + manual_position_offset.z * cos_angle
+			)
+		"Y":
+			# Rotate around Y axis (affects X and Z)
+			var cos_angle = cos(angle_rad)
+			var sin_angle = sin(angle_rad)
+			rotated_offset = Vector3(
+				manual_position_offset.x * cos_angle - manual_position_offset.z * sin_angle,
+				manual_position_offset.y,  # Y doesn't change
+				manual_position_offset.x * sin_angle + manual_position_offset.z * cos_angle
+			)
+		"Z":
+			# Rotate around Z axis (affects X and Y)
+			var cos_angle = cos(angle_rad)
+			var sin_angle = sin(angle_rad)
+			rotated_offset = Vector3(
+				manual_position_offset.x * cos_angle - manual_position_offset.y * sin_angle,
+				manual_position_offset.x * sin_angle + manual_position_offset.y * cos_angle,
+				manual_position_offset.z  # Z doesn't change
+			)
+		_:
+			print("PositionManager: Invalid rotation axis: ", axis)
+			return
+	
+	# Update positions to account for the rotated offset
+	current_position -= manual_position_offset  # Remove old offset
+	manual_position_offset = rotated_offset  # Update to rotated offset
+	current_position += manual_position_offset  # Apply new offset
+	target_position = current_position
+
 static func set_base_height(y: float):
 	"""Set the base height reference point"""
 	base_height = y

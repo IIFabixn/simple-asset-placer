@@ -422,7 +422,8 @@ static func _process_placement_input(camera: Camera3D):
 		RotationManager.reset_surface_alignment()
 	
 	# Handle rotation input (this will be combined with surface alignment)
-	_process_rotation_input(rotation_input, PreviewManager.preview_mesh)
+	# In placement mode, also rotate the position offset so it follows the mesh
+	_process_rotation_input(rotation_input, PreviewManager.preview_mesh, true)
 	
 	# Handle scale input
 	_process_scale_input(scale_input, PreviewManager.preview_mesh)
@@ -621,8 +622,10 @@ static func _process_transform_input(camera: Camera3D):
 	if target_nodes.size() > 0 and target_nodes[0]:
 		_update_transform_overlays(target_nodes[0])
 
-static func _process_rotation_input(rotation_input: Dictionary, target_node: Node3D):
-	"""Process rotation input for any target node"""
+static func _process_rotation_input(rotation_input: Dictionary, target_node: Node3D, rotate_position_offset: bool = false):
+	"""Process rotation input for any target node
+	
+	rotate_position_offset: If true, also rotates manual position offset (for placement mode)"""
 	if not target_node:
 		return
 	
@@ -643,11 +646,11 @@ static func _process_rotation_input(rotation_input: Dictionary, target_node: Nod
 		rotation_step = -rotation_step
 	
 	if rotation_input.x_pressed:
-		RotationManager.apply_rotation_step(target_node, "X", rotation_step)
+		RotationManager.apply_rotation_step(target_node, "X", rotation_step, rotate_position_offset)
 	elif rotation_input.y_pressed:
-		RotationManager.apply_rotation_step(target_node, "Y", rotation_step)
+		RotationManager.apply_rotation_step(target_node, "Y", rotation_step, rotate_position_offset)
 	elif rotation_input.z_pressed:
-		RotationManager.apply_rotation_step(target_node, "Z", rotation_step)
+		RotationManager.apply_rotation_step(target_node, "Z", rotation_step, rotate_position_offset)
 	elif rotation_input.reset_pressed:
 		RotationManager.reset_node_rotation(target_node)
 

@@ -176,14 +176,18 @@ static func align_with_surface_normal(surface_normal: Vector3):
 	surface_alignment_rotation = basis.get_euler()
 	_normalize_surface_rotation()
 
-static func apply_rotation_step(node: Node3D, axis: String, degrees: float):
+static func apply_rotation_step(node: Node3D, axis: String, degrees: float, rotate_position_offset: bool = false):
 	"""Apply a rotation step to the MANUAL rotation and update the node
-	This rotation is combined with surface alignment rotation"""
+	This rotation is combined with surface alignment rotation
+	
+	rotate_position_offset: If true, also rotates the manual position offset (for placement mode)"""
 	if not node:
 		return
 	
+	var rotation_axis = axis.to_upper()
+	
 	# Update the internal manual rotation state
-	match axis.to_upper():
+	match rotation_axis:
 		"X":
 			rotate_x(degrees)
 		"Y":
@@ -193,6 +197,12 @@ static func apply_rotation_step(node: Node3D, axis: String, degrees: float):
 		_:
 			print("RotationManager: Invalid axis: ", axis)
 			return
+	
+	# If in placement mode, also rotate the position offset so it follows the mesh rotation
+	if rotate_position_offset:
+		# Rotate the position offset to match the mesh rotation
+		var PositionManager = preload("res://addons/simpleassetplacer/position_manager.gd")
+		PositionManager.rotate_manual_offset(rotation_axis, degrees)
 	
 	# Apply the combined rotation (surface alignment + manual) to the node
 	apply_rotation_to_node(node)

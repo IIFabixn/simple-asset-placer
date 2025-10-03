@@ -105,9 +105,26 @@ static func start_placement_mode(mesh: Mesh = null, meshlib: MeshLibrary = null,
 	
 	print("TransformationManager: Started placement mode")
 
-static func start_transform_mode(target_node: Node3D, dock_instance = null):
-	"""Coordinate starting transform mode"""
-	if not target_node:
+static func start_transform_mode(target_nodes, dock_instance = null):
+	"""Coordinate starting transform mode for one or multiple nodes
+	target_nodes: Node3D or Array of Node3D objects to transform together"""
+	
+	# Handle single node parameter - convert to array
+	if target_nodes is Node3D:
+		target_nodes = [target_nodes]
+	elif not target_nodes is Array:
+		return
+	
+	if target_nodes.is_empty():
+		return
+	
+	# Filter to only Node3D objects
+	var valid_nodes = []
+	for node in target_nodes:
+		if node is Node3D:
+			valid_nodes.append(node)
+	
+	if valid_nodes.is_empty():
 		return
 	
 	# Exit any existing mode first  
@@ -116,26 +133,41 @@ static func start_transform_mode(target_node: Node3D, dock_instance = null):
 	# Set mode
 	current_mode = "transform"
 	
-	# Store transform data
+	# Store transform data for all nodes
+	var original_transforms = {}
+	for node in valid_nodes:
+		original_transforms[node] = node.transform
+	
 	transform_data = {
-		"target_node": target_node,
-		"original_transform": target_node.transform,
+		"target_nodes": valid_nodes,  # Array of nodes
+		"original_transforms": original_transforms,  # Dictionary mapping node to original transform
 		"dock_reference": dock_instance
 	}
+	
+	# Calculate center position of all nodes for positioning reference
+	var center_pos = Vector3.ZERO
+	for node in valid_nodes:
+		if node.is_inside_tree():
+			center_pos += node.global_position
+	center_pos /= valid_nodes.size()
 	
 	# Initialize managers for transform mode
 	OverlayManager.initialize_overlays()
 	OverlayManager.set_mode("transform")
 	
-	# Initialize position manager with node's current position
-	PositionManager.start_transform_positioning(target_node)
+	# Initialize position manager with center position
+	PositionManager.set_position(center_pos)
+	PositionManager.start_transform_positioning(valid_nodes[0])  # Use first node as reference
 	
 	# Grab focus for the 3D viewport to ensure keyboard input works
 	# Set counter to grab focus for next 3 frames to ensure it sticks
 	focus_grab_counter = 3
 	_grab_3d_viewport_focus()
 	
-	print("TransformationManager: Started transform mode for ", target_node.name)
+	if valid_nodes.size() == 1:
+		print("TransformationManager: Started transform mode for ", valid_nodes[0].name)
+	else:
+		print("TransformationManager: Started transform mode for ", valid_nodes.size(), " nodes")
 
 static func exit_placement_mode():
 	"""Coordinate exiting placement mode"""
@@ -169,11 +201,14 @@ static func exit_transform_mode(confirm_changes: bool = true):
 	if current_mode != "transform":
 		return
 	
-	var target_node = transform_data.get("target_node")
+	var target_nodes = transform_data.get("target_nodes", [])
+	var original_transforms = transform_data.get("original_transforms", {})
 	
-	if target_node and not confirm_changes:
-		# Restore original transform if not confirming
-		target_node.transform = transform_data.get("original_transform", Transform3D())
+	if not confirm_changes:
+		# Restore original transforms if not confirming changes
+		for node in target_nodes:
+			if node and original_transforms.has(node):
+				node.transform = original_transforms[node]
 	
 	# Reset transforms based on user settings
 	_reset_transforms_on_exit()
@@ -286,46 +321,106 @@ static func _process_placement_input(camera: Camera3D):
 
 static func _process_transform_input(camera: Camera3D):
 	"""Process input for transform mode"""
-	var target_node = transform_data.get("target_node")
-	if not target_node or not camera:
+	var target_nodes = transform_data.get("target_nodes", [])
+	if target_nodes.is_empty() or not camera:
 		return
 	
 	var position_input = InputHandler.get_position_input()
 	var rotation_input = InputHandler.get_rotation_input()
 	var scale_input = InputHandler.get_scale_input()
 	
-	# Store current Y position before mouse update (only if node is in tree)
-	var current_y = target_node.global_position.y if target_node.is_inside_tree() else 0.0
+	# Calculate center position of all nodes
+	var center_y = 0.0
+	var valid_node_count = 0
+	for node in target_nodes:
+		if node and node.is_inside_tree():
+			center_y += node.global_position.y
+			valid_node_count += 1
+	
+	if valid_node_count > 0:
+		center_y /= valid_node_count
+	
+	var current_y = center_y
+	var y_delta = 0.0  # Track height change to apply to all nodes
 	
 	# Handle height adjustments first with reverse modifier support
 	var height_step = placement_settings.get("height_adjustment_step", 0.1)
 	var reverse_height = position_input.shift_held  # SHIFT = reverse direction
 	
 	if position_input.height_up_pressed:
-		current_y += height_step if not reverse_height else -height_step
+		y_delta = height_step if not reverse_height else -height_step
+		current_y += y_delta
 	elif position_input.height_down_pressed:
-		current_y -= height_step if not reverse_height else -height_step
+		y_delta = -(height_step if not reverse_height else -height_step)
+		current_y += y_delta
 	elif position_input.reset_height_pressed:
 		# Reset to ground level (Y=0) or get current raycast height
 		var mouse_pos = position_input.mouse_position
 		var ray_from = camera.project_ray_origin(mouse_pos)
 		var ray_to = ray_from + camera.project_ray_normal(mouse_pos) * 1000.0
-		var space_state = target_node.get_world_3d().direct_space_state
-		var query = PhysicsRayQueryParameters3D.create(ray_from, ray_to)
-		query.collision_mask = 1
-		var result = space_state.intersect_ray(query)
-		if result:
-			current_y = result.position.y
-		else:
-			current_y = 0.0
+		
+		# Use first valid node for raycast
+		var first_node = target_nodes[0]
+		if first_node and first_node.is_inside_tree():
+			var space_state = first_node.get_world_3d().direct_space_state
+			var query = PhysicsRayQueryParameters3D.create(ray_from, ray_to)
+			query.collision_mask = 1
+			var result = space_state.intersect_ray(query)
+			if result:
+				y_delta = result.position.y - center_y
+				current_y = result.position.y
+			else:
+				y_delta = -center_y
+				current_y = 0.0
 	
-	# Always update position from mouse (for XZ movement)
+	# Calculate XZ position using offset-from-center approach for proper grid snapping
 	var mouse_pos = position_input.mouse_position
-	PositionManager.update_transform_node_position(target_node, camera, mouse_pos)
 	
-	# Restore the adjusted Y position (overriding the mouse raycast Y)
-	if target_node.is_inside_tree():
-		target_node.global_position.y = current_y
+	# Calculate old center position
+	var old_center = Vector3.ZERO
+	for node in target_nodes:
+		if node and node.is_inside_tree():
+			old_center += node.global_position
+	old_center /= target_nodes.size()
+	
+	# Snap the old center to match grid alignment (critical for correct offsets)
+	# This ensures offsets are calculated relative to grid-aligned position
+	var old_snapped_center = old_center
+	if PositionManager.snap_enabled and PositionManager.snap_step > 0.0:
+		old_snapped_center = Vector3(
+			snappedf(old_center.x, PositionManager.snap_step),
+			old_center.y,
+			snappedf(old_center.z, PositionManager.snap_step)
+		)
+	
+	# Calculate each node's offset from the old SNAPPED center
+	var node_offsets = {}
+	for node in target_nodes:
+		if node and node.is_inside_tree():
+			node_offsets[node] = node.global_position - old_snapped_center
+	
+	# Update position from mouse to get new snapped center position
+	PositionManager.update_position_from_mouse(camera, mouse_pos)
+	var new_center = PositionManager.get_current_position()
+	
+	# Apply transformations to ALL nodes by repositioning relative to new center
+	for node in target_nodes:
+		if not node or not node.is_inside_tree():
+			continue
+		
+		# Get this node's offset from center
+		var offset = node_offsets.get(node, Vector3.ZERO)
+		
+		# Set position as: new_snapped_center + offset (maintains relative position)
+		node.global_position.x = new_center.x + offset.x
+		node.global_position.z = new_center.z + offset.z
+		
+		# Apply Y movement delta
+		if y_delta != 0.0:
+			node.global_position.y += y_delta
+		else:
+			# If no Y delta, maintain the Y offset from center
+			node.global_position.y = old_center.y + offset.y
 	
 	# Update surface normal alignment if enabled, otherwise reset it
 	if placement_settings.get("align_with_normal", false):
@@ -333,18 +428,23 @@ static func _process_transform_input(camera: Camera3D):
 	else:
 		RotationManager.reset_surface_alignment()
 	
-	# Handle rotation input (this will be combined with surface alignment)
-	_process_rotation_input(rotation_input, target_node)
+	# Handle rotation input for all nodes
+	for node in target_nodes:
+		if node and node.is_inside_tree():
+			_process_rotation_input(rotation_input, node)
 	
-	# Handle scale input
-	_process_scale_input(scale_input, target_node)
+	# Handle scale input for all nodes
+	for node in target_nodes:
+		if node and node.is_inside_tree():
+			_process_scale_input(scale_input, node)
 	
 	# Handle transform confirmation
 	if position_input.left_clicked:
 		exit_transform_mode(true)
 	
-	# Update overlays with current state
-	_update_transform_overlays(target_node)
+	# Update overlays with current state (use first node as reference)
+	if target_nodes.size() > 0 and target_nodes[0]:
+		_update_transform_overlays(target_nodes[0])
 
 static func _process_rotation_input(rotation_input: Dictionary, target_node: Node3D):
 	"""Process rotation input for any target node"""
@@ -595,25 +695,29 @@ static func handle_tab_key_activation(dock_instance = null):
 		OverlayManager.show_status_message("No node selected. Select a Node3D and press TAB.", Color.YELLOW, 3.0)
 		return
 	
-	# Find first Node3D in selection
-	var target_node3d = null
+	# Find ALL Node3D nodes in selection
+	var target_node3ds = []
 	for node in selected_nodes:
 		if node is Node3D:
-			target_node3d = node
-			break
+			target_node3ds.append(node)
 	
-	if not target_node3d:
+	if target_node3ds.is_empty():
 		OverlayManager.show_status_message("Selected node is not a Node3D. Select a Node3D and press TAB.", Color.YELLOW, 3.0)
 		return
 	
-	# Determine mode based on node context
+	# Determine mode based on node context (check first node)
+	var first_node = target_node3ds[0]
 	var current_scene = EditorInterface.get_edited_scene_root()
-	if current_scene and (target_node3d.is_ancestor_of(current_scene) or current_scene == target_node3d or target_node3d.is_inside_tree()):
-		# Node is in scene - start transform mode
-		start_transform_mode(target_node3d, dock_instance)
+	if current_scene and (first_node.is_ancestor_of(current_scene) or current_scene == first_node or first_node.is_inside_tree()):
+		# Nodes are in scene - start transform mode for all selected nodes
+		start_transform_mode(target_node3ds, dock_instance)
+		if target_node3ds.size() == 1:
+			OverlayManager.show_status_message("Transform mode: " + first_node.name, Color.GREEN, 2.0)
+		else:
+			OverlayManager.show_status_message("Transform mode: " + str(target_node3ds.size()) + " nodes", Color.GREEN, 2.0)
 	else:
-		# Node is external - start placement mode
-		start_placement_from_node3d(target_node3d, dock_instance)
+		# Node is external - start placement mode (only uses first node)
+		start_placement_from_node3d(first_node, dock_instance)
 
 static func start_placement_from_node3d(node: Node3D, dock_instance = null):
 	"""Start placement mode from a Node3D by extracting its mesh"""

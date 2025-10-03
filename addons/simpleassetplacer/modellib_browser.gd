@@ -299,6 +299,12 @@ func _on_category_filter_changed(index: int):
 		else:
 			# Use the display text (for special categories and custom tags)
 			current_category_filter = category_filter.get_item_text(index)
+	
+	# Save the selected category to settings
+	const SettingsManager = preload("res://addons/simpleassetplacer/settings_manager.gd")
+	SettingsManager.set_plugin_setting("last_model_category", current_category_filter)
+	SettingsManager.save_to_file()
+	
 	update_asset_grid()
 
 func populate_category_filter():
@@ -308,15 +314,26 @@ func populate_category_filter():
 	category_filter.clear()
 	category_filter.add_item("All Categories")
 	
+	var last_category = ""
+	var last_category_index = 0
+	
+	# Try to load the last selected category from settings
+	const SettingsManager = preload("res://addons/simpleassetplacer/settings_manager.gd")
+	last_category = SettingsManager.get_setting("last_model_category", "")
+	
 	# Add special categories first
 	var favorites = category_manager.get_favorites()
 	var recent = category_manager.get_recent_assets()
 	
 	if favorites.size() > 0:
 		category_filter.add_item("⭐ Favorites")
+		if last_category == "⭐ Favorites":
+			last_category_index = category_filter.get_item_count() - 1
 	
 	if recent.size() > 0:
 		category_filter.add_item("🕐 Recent")
+		if last_category == "🕐 Recent":
+			last_category_index = category_filter.get_item_count() - 1
 	
 	if favorites.size() > 0 or recent.size() > 0:
 		category_filter.add_separator()
@@ -333,6 +350,9 @@ func populate_category_filter():
 			category_filter.add_item("  " + cat_info["display"])
 			# Store the leaf name in metadata for filtering
 			category_filter.set_item_metadata(category_filter.get_item_count() - 1, cat_info["match"])
+			# Check if this matches the last selected category
+			if cat_info["match"] == last_category:
+				last_category_index = category_filter.get_item_count() - 1
 	
 	# Get custom tags
 	var custom_tags = category_manager.get_all_custom_tags()
@@ -346,6 +366,16 @@ func populate_category_filter():
 		
 		for tag in custom_tags:
 			category_filter.add_item("  " + tag)
+			# Check if this matches the last selected category
+			if tag == last_category:
+				last_category_index = category_filter.get_item_count() - 1
+	
+	# Restore last category selection if found
+	if last_category_index > 0:
+		category_filter.select(last_category_index)
+		# Update the filter (without saving again to avoid recursion)
+		current_category_filter = last_category
+		update_asset_grid()
 
 func _on_asset_item_selected(asset_info: Dictionary):
 	# Clear previous selection

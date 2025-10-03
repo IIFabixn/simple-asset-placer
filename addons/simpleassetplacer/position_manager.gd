@@ -33,7 +33,6 @@ static var height_offset: float = 0.0
 static var base_height: float = 0.0
 static var surface_normal: Vector3 = Vector3.UP  # Normal of the surface at current position
 static var is_initial_position: bool = true  # Track if this is the first position update
-static var current_aabb: AABB = AABB()  # Current mesh AABB for edge-based snapping
 static var manual_position_offset: Vector3 = Vector3.ZERO  # Accumulated WASD position adjustments
 
 # Position calculation settings
@@ -96,7 +95,7 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 			
 			# Apply grid snapping if enabled
 			if snap_enabled:
-				target_position = _apply_grid_snap(target_position, current_aabb)
+				target_position = _apply_grid_snap(target_position)
 			
 			# Apply manual position offset (from WASD keys)
 			target_position += manual_position_offset
@@ -127,7 +126,7 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 	
 	# Apply grid snapping if enabled
 	if snap_enabled:
-		pos = _apply_grid_snap(pos, current_aabb)
+		pos = _apply_grid_snap(pos)
 	
 	# Apply manual position offset (from WASD keys)
 	pos += manual_position_offset
@@ -186,10 +185,8 @@ static func _project_to_plane(from: Vector3, to: Vector3, plane_y: float = 0.0) 
 	
 	return current_position
 
-static func _apply_grid_snap(pos: Vector3, aabb: AABB = AABB()) -> Vector3:
-	"""Apply grid snapping to a position (pivot-based with optional center snapping)
-	pos: Position to snap
-	aabb: Optional bounding box for calculating object center"""
+static func _apply_grid_snap(pos: Vector3) -> Vector3:
+	"""Apply grid snapping to a position (pivot-based with optional center snapping)"""
 	if not snap_enabled or snap_step <= 0.0:
 		return pos
 	
@@ -200,26 +197,13 @@ static func _apply_grid_snap(pos: Vector3, aabb: AABB = AABB()) -> Vector3:
 	
 	var snapped_pos = pos
 	
-	# Calculate center offset if AABB is provided and center snapping is enabled
-	var center_offset_x = 0.0
-	var center_offset_z = 0.0
-	var center_offset_y = 0.0
-	
-	if aabb.size != Vector3.ZERO:
-		if snap_center_x:
-			center_offset_x = aabb.position.x + aabb.size.x * 0.5
-		if snap_center_z:
-			center_offset_z = aabb.position.z + aabb.size.z * 0.5
-		if snap_center_y and snap_y_enabled:
-			center_offset_y = aabb.position.y + aabb.size.y * 0.5
-	
-	# Snap the center position, then offset back to pivot
-	snapped_pos.x = snappedf((pos.x + center_offset_x) - snap_offset.x, effective_step_x) + snap_offset.x - center_offset_x
-	snapped_pos.z = snappedf((pos.z + center_offset_z) - snap_offset.z, effective_step_z) + snap_offset.z - center_offset_z
+	# Snap the position directly (no AABB center offset)
+	snapped_pos.x = snappedf(pos.x - snap_offset.x, effective_step_x) + snap_offset.x
+	snapped_pos.z = snappedf(pos.z - snap_offset.z, effective_step_z) + snap_offset.z
 	
 	# Handle Y-axis if enabled
 	if snap_y_enabled:
-		snapped_pos.y = snappedf((pos.y + center_offset_y) - snap_offset.y, effective_step_y) + snap_offset.y - center_offset_y
+		snapped_pos.y = snappedf(pos.y - snap_offset.y, effective_step_y) + snap_offset.y
 	else:
 		snapped_pos.y = pos.y  # Keep original Y
 	
@@ -349,16 +333,7 @@ static func reset_for_new_placement():
 	target_position = Vector3.ZERO
 	base_height = 0.0
 	surface_normal = Vector3.UP
-	current_aabb = AABB()
 	manual_position_offset = Vector3.ZERO
-
-static func set_mesh_aabb(aabb: AABB):
-	"""Set the AABB of the current mesh for edge-based snapping"""
-	current_aabb = aabb
-
-static func get_mesh_aabb() -> AABB:
-	"""Get the current mesh AABB"""
-	return current_aabb
 
 ## Position Getters and Setters
 

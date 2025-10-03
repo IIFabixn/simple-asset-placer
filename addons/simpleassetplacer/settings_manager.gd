@@ -69,6 +69,11 @@ static func get_default_settings() -> Dictionary:
 		# Advanced
 		"use_surface_normal": true,
 		"auto_select_placed": true,
+		
+		# Last used selections (for restoring state)
+		"last_meshlib_path": "",
+		"last_model_category": "",
+		"last_meshlib_category": "",
 	}
 
 ## Initialization

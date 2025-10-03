@@ -102,10 +102,31 @@ func populate_meshlib_options(meshlib_paths: Array):
 	meshlib_option.clear()
 	meshlib_option.add_item("Select MeshLibrary...")
 	
+	var last_meshlib_path = ""
+	var last_meshlib_index = 0
+	
+	# Try to load the last selected meshlib from settings
+	const SettingsManager = preload("res://addons/simpleassetplacer/settings_manager.gd")
+	last_meshlib_path = SettingsManager.get_setting("last_meshlib_path", "")
+	
 	for path in meshlib_paths:
 		var meshlib_name = path.get_file().get_basename()
 		meshlib_option.add_item(meshlib_name)
 		meshlib_option.set_item_metadata(meshlib_option.get_item_count() - 1, path)
+		
+		# Check if this is the last selected meshlib
+		if path == last_meshlib_path:
+			last_meshlib_index = meshlib_option.get_item_count() - 1
+	
+	# Restore last selection if found
+	if last_meshlib_index > 0:
+		meshlib_option.select(last_meshlib_index)
+		# Trigger the selection to load the meshlib
+		call_deferred("_restore_last_meshlib", last_meshlib_index)
+
+func _restore_last_meshlib(index: int):
+	"""Restore the last selected meshlib (called deferred to ensure UI is ready)"""
+	_on_meshlib_selected(index)
 
 func _on_meshlib_selected(index: int):
 	if index == 0:  # "Select MeshLibrary..." option
@@ -113,6 +134,10 @@ func _on_meshlib_selected(index: int):
 		current_meshlib_path = ""
 		meshlib_items_data.clear()
 		clear_items()
+		# Clear the saved selection
+		const SettingsManager = preload("res://addons/simpleassetplacer/settings_manager.gd")
+		SettingsManager.set_plugin_setting("last_meshlib_path", "")
+		SettingsManager.save_to_file()
 		return
 	
 	var meshlib_path = meshlib_option.get_item_metadata(index)
@@ -123,6 +148,11 @@ func _on_meshlib_selected(index: int):
 		current_meshlib_path = meshlib_path
 		populate_meshlib_items(meshlib)
 		populate_category_filter()
+		
+		# Save the selected meshlib path to settings
+		const SettingsManager = preload("res://addons/simpleassetplacer/settings_manager.gd")
+		SettingsManager.set_plugin_setting("last_meshlib_path", meshlib_path)
+		SettingsManager.save_to_file()
 
 func clear_items():
 	for child in items_grid.get_children():
@@ -246,6 +276,12 @@ func _on_category_filter_changed(index: int):
 		else:
 			# Use the display text (for special categories and custom tags)
 			current_category_filter = category_filter.get_item_text(index)
+	
+	# Save the selected category to settings
+	const SettingsManager = preload("res://addons/simpleassetplacer/settings_manager.gd")
+	SettingsManager.set_plugin_setting("last_meshlib_category", current_category_filter)
+	SettingsManager.save_to_file()
+	
 	update_meshlib_grid()
 
 func populate_category_filter():
@@ -254,6 +290,13 @@ func populate_category_filter():
 	
 	category_filter.clear()
 	category_filter.add_item("All Categories")
+	
+	var last_category = ""
+	var last_category_index = 0
+	
+	# Try to load the last selected category from settings
+	const SettingsManager = preload("res://addons/simpleassetplacer/settings_manager.gd")
+	last_category = SettingsManager.get_setting("last_meshlib_category", "")
 	
 	# Add special categories first
 	var has_special = false
@@ -280,8 +323,12 @@ func populate_category_filter():
 		
 		if has_favorites:
 			category_filter.add_item("⭐ Favorites")
+			if last_category == "⭐ Favorites":
+				last_category_index = category_filter.get_item_count() - 1
 		if has_recent:
 			category_filter.add_item("🕐 Recent")
+			if last_category == "🕐 Recent":
+				last_category_index = category_filter.get_item_count() - 1
 		
 		category_filter.add_separator()
 	
@@ -302,6 +349,9 @@ func populate_category_filter():
 			category_filter.add_item("  " + full_path)
 			# Store leaf name for matching
 			category_filter.set_item_metadata(category_filter.get_item_count() - 1, cat)
+			# Check if this matches the last selected category
+			if cat == last_category:
+				last_category_index = category_filter.get_item_count() - 1
 	
 	# Get custom tags used by any item
 	var all_tags_set = {}
@@ -321,6 +371,16 @@ func populate_category_filter():
 		
 		for tag in custom_tags:
 			category_filter.add_item("  " + tag)
+			# Check if this matches the last selected category
+			if tag == last_category:
+				last_category_index = category_filter.get_item_count() - 1
+	
+	# Restore last category selection if found
+	if last_category_index > 0:
+		category_filter.select(last_category_index)
+		# Update the filter (without saving again to avoid recursion)
+		current_category_filter = last_category
+		update_meshlib_grid()
 
 func _on_manage_tags_pressed() -> void:
 	if not category_manager:

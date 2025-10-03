@@ -532,10 +532,6 @@ static func _process_transform_input(camera: Camera3D):
 	# Calculate XZ position using offset-from-center approach for proper grid snapping
 	var mouse_pos = position_input.mouse_position
 	
-	# Calculate combined AABB for all nodes (for edge-based snapping)
-	var combined_aabb = _calculate_combined_aabb(target_nodes)
-	PositionManager.set_mesh_aabb(combined_aabb)
-	
 	# Set half-step mode based on CTRL key state
 	PositionManager.use_half_step = position_input.ctrl_held
 	
@@ -1123,64 +1119,6 @@ static func cleanup():
 	transform_data.clear()
 	settings.clear()
 	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Cleanup completed")
-
-## HELPER FUNCTIONS
-
-static func _calculate_combined_aabb(nodes: Array) -> AABB:
-	"""Calculate combined AABB from multiple Node3D objects"""
-	var combined = AABB()
-	var first = true
-	
-	for node in nodes:
-		if not node or not node.is_inside_tree():
-			continue
-		
-		var node_aabb = _get_node_aabb(node)
-		if node_aabb.size != Vector3.ZERO:
-			# Transform AABB to world space relative to group center
-			var world_aabb = AABB(node.global_position + node_aabb.position, node_aabb.size)
-			
-			if first:
-				combined = world_aabb
-				first = false
-			else:
-				combined = combined.merge(world_aabb)
-	
-	# Convert back to local space (relative to center)
-	if not first and nodes.size() > 0:
-		var center = Vector3.ZERO
-		var count = 0
-		for node in nodes:
-			if node and node.is_inside_tree():
-				center += node.global_position
-				count += 1
-		if count > 0:
-			center /= count
-			# Adjust AABB position to be relative to center
-			combined.position = combined.position - center
-	
-	return combined
-
-static func _get_node_aabb(node: Node) -> AABB:
-	"""Get AABB from a single node"""
-	if node is MeshInstance3D and node.mesh:
-		return node.mesh.get_aabb()
-	elif node is GeometryInstance3D:
-		# Try to get AABB from visual instance
-		return node.get_aabb()
-	else:
-		# Recursively check children
-		var combined = AABB()
-		var first = true
-		for child in node.get_children():
-			var child_aabb = _get_node_aabb(child)
-			if child_aabb.size != Vector3.ZERO:
-				if first:
-					combined = child_aabb
-					first = false
-				else:
-					combined = combined.merge(child_aabb)
-		return combined
 
 ## RESET MANAGEMENT
 

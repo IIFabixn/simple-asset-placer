@@ -261,12 +261,13 @@ static func _process_placement_input(camera: Camera3D):
 	# Update preview position
 	PreviewManager.update_preview_position(preview_pos)
 	
-	# Apply surface normal alignment if enabled
+	# Update surface normal alignment if enabled, otherwise reset it
 	if placement_settings.get("align_with_normal", false):
 		RotationManager.align_with_surface_normal(PositionManager.get_surface_normal())
-		RotationManager.apply_rotation_to_node(PreviewManager.preview_mesh)
+	else:
+		RotationManager.reset_surface_alignment()
 	
-	# Handle rotation input
+	# Handle rotation input (this will be combined with surface alignment)
 	_process_rotation_input(rotation_input, PreviewManager.preview_mesh)
 	
 	# Handle scale input
@@ -322,12 +323,13 @@ static func _process_transform_input(camera: Camera3D):
 	if target_node.is_inside_tree():
 		target_node.global_position.y = current_y
 	
-	# Apply surface normal alignment if enabled
+	# Update surface normal alignment if enabled, otherwise reset it
 	if placement_settings.get("align_with_normal", false):
 		RotationManager.align_with_surface_normal(PositionManager.get_surface_normal())
-		RotationManager.apply_rotation_to_node(target_node)
+	else:
+		RotationManager.reset_surface_alignment()
 	
-	# Handle rotation input
+	# Handle rotation input (this will be combined with surface alignment)
 	_process_rotation_input(rotation_input, target_node)
 	
 	# Handle scale input
@@ -805,3 +807,6 @@ static func _reset_transforms_on_exit():
 	# Reset rotation if enabled
 	if settings.get("reset_rotation_on_exit", false):
 		RotationManager.reset_rotation()
+	
+	# Always reset surface alignment when exiting modes
+	RotationManager.reset_surface_alignment()

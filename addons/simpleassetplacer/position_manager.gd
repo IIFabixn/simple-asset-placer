@@ -258,10 +258,8 @@ static func update_base_height_from_raycast(y_position: float):
 	current_position.y = target_position.y
 
 static func adjust_height(delta: float):
-	"""Adjust the current height offset"""
+	"""Adjust the current height offset (state only - position will be updated on next mouse update)"""
 	height_offset += delta
-	target_position.y = base_height + height_offset
-	current_position = target_position
 
 static func increase_height():
 	"""Increase height by one step"""
@@ -284,52 +282,28 @@ static func reset_height():
 
 # Position adjustment functions (camera-relative)
 static func move_left(delta: float, camera: Camera3D = null):
-	"""Move the position left relative to camera view"""
+	"""Move the position left relative to camera view (state only - position will be updated on next mouse update)"""
 	var move_dir = _get_camera_right_direction(camera) * -1.0  # Left is negative right
 	var movement = move_dir * delta
 	manual_position_offset += movement
-	# Update positions with snapping applied
-	var new_pos = current_position + movement
-	if snap_enabled:
-		new_pos = _apply_grid_snap(new_pos)
-	current_position = new_pos
-	target_position = new_pos
 
 static func move_right(delta: float, camera: Camera3D = null):
-	"""Move the position right relative to camera view"""
+	"""Move the position right relative to camera view (state only - position will be updated on next mouse update)"""
 	var move_dir = _get_camera_right_direction(camera)
 	var movement = move_dir * delta
 	manual_position_offset += movement
-	# Update positions with snapping applied
-	var new_pos = current_position + movement
-	if snap_enabled:
-		new_pos = _apply_grid_snap(new_pos)
-	current_position = new_pos
-	target_position = new_pos
 
 static func move_forward(delta: float, camera: Camera3D = null):
-	"""Move the position forward relative to camera view"""
+	"""Move the position forward relative to camera view (state only - position will be updated on next mouse update)"""
 	var move_dir = _get_camera_forward_direction(camera)
 	var movement = move_dir * delta
 	manual_position_offset += movement
-	# Update positions with snapping applied
-	var new_pos = current_position + movement
-	if snap_enabled:
-		new_pos = _apply_grid_snap(new_pos)
-	current_position = new_pos
-	target_position = new_pos
 
 static func move_backward(delta: float, camera: Camera3D = null):
-	"""Move the position backward relative to camera view"""
+	"""Move the position backward relative to camera view (state only - position will be updated on next mouse update)"""
 	var move_dir = _get_camera_forward_direction(camera) * -1.0  # Backward is negative forward
 	var movement = move_dir * delta
 	manual_position_offset += movement
-	# Update positions with snapping applied
-	var new_pos = current_position + movement
-	if snap_enabled:
-		new_pos = _apply_grid_snap(new_pos)
-	current_position = new_pos
-	target_position = new_pos
 
 static func _get_camera_forward_direction(camera: Camera3D) -> Vector3:
 	"""Get the nearest axis-aligned direction for camera forward (snaps to +Z or -Z or +X or -X)"""

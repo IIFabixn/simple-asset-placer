@@ -442,10 +442,11 @@ static func _apply_height_adjustment(wheel_input: Dictionary):
 	var step = placement_settings.get("fine_height_increment", 0.01)
 	
 	if current_mode == "placement":
+		# Apply fine increment for mouse wheel in placement mode
 		if direction > 0:
-			PositionManager.increase_height()
+			PositionManager.adjust_height(step)
 		else:
-			PositionManager.decrease_height()
+			PositionManager.adjust_height(-step)
 	elif current_mode == "transform":
 		var target_node = transform_data.get("target_node")
 		if target_node and target_node.is_inside_tree():

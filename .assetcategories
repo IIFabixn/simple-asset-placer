@@ -1,5 +1,6 @@
 {
 	"recently_used": [
+		"nature",
 		"roof",
 		"floor",
 		"detail",
@@ -10,7 +11,8 @@
 		"cube": 1.0,
 		"detail": 6.0,
 		"floor": 12.0,
-		"roof": 9,
+		"nature": 2,
+		"roof": 9.0,
 		"wall": 41.0
 	},
 	"tags": {
@@ -85,6 +87,12 @@
 		],
 		"structure-wall-cross": [
 			"wall"
+		],
+		"tree-large": [
+			"nature"
+		],
+		"tree-shrub": [
+			"nature"
 		],
 		"wall": [
 			"wall"

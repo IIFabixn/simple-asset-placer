@@ -362,8 +362,14 @@ func populate_category_filter():
 	if favorites.size() > 0 or recent.size() > 0 or ignored.size() > 0:
 		category_filter.add_separator()
 	
-	# Get all folder categories with full paths
-	var folder_category_paths = category_manager.get_all_folder_category_paths(discovered_assets)
+	# Filter out ignored assets before building folder categories
+	var non_ignored_assets = []
+	for asset in discovered_assets:
+		if not category_manager.is_ignored(asset.path):
+			non_ignored_assets.append(asset)
+	
+	# Get all folder categories with full paths (only from non-ignored assets)
+	var folder_category_paths = category_manager.get_all_folder_category_paths(non_ignored_assets)
 	
 	if folder_category_paths.size() > 0:
 		category_filter.add_item("📁 Folder Categories")
@@ -378,8 +384,19 @@ func populate_category_filter():
 			if cat_info["match"] == last_category:
 				last_category_index = category_filter.get_item_count() - 1
 	
-	# Get custom tags
-	var custom_tags = category_manager.get_all_custom_tags()
+	# Get custom tags (only show tags that have at least one non-ignored asset)
+	var all_custom_tags = category_manager.get_all_custom_tags()
+	var custom_tags = []
+	
+	# Filter tags to only include those with non-ignored assets
+	for tag in all_custom_tags:
+		var has_visible_asset = false
+		for asset in non_ignored_assets:
+			if asset.has("custom_tags") and tag in asset.custom_tags:
+				has_visible_asset = true
+				break
+		if has_visible_asset:
+			custom_tags.append(tag)
 	
 	if custom_tags.size() > 0:
 		if folder_category_paths.size() > 0:

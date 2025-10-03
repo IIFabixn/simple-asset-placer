@@ -13,6 +13,9 @@ var current_request_id: int = 0
 
 # Request tracking
 var pending_requests: Dictionary = {}
+# Track what's already queued/processing to avoid duplicates
+# Key format: "asset:<path>" or "meshlib:<resource_id>:<item_id>"
+var queued_items: Dictionary = {}
 
 # Request data structure
 class ThumbnailRequest:
@@ -43,6 +46,15 @@ func initialize():
 
 # Submit a request for asset thumbnail generation
 func request_asset_thumbnail(asset_path: String) -> ImageTexture:
+	var queue_key = "asset:" + asset_path
+	
+	# Check if already queued or processing
+	if queued_items.has(queue_key):
+		# Wait for the existing request to complete
+		var existing_awaiter = queued_items[queue_key]
+		var result = await existing_awaiter.wait_for_result()
+		return result
+	
 	var request_id = _generate_request_id()
 	
 	var request = ThumbnailRequest.new(request_id, asset_path, null, -1, "asset")
@@ -50,6 +62,7 @@ func request_asset_thumbnail(asset_path: String) -> ImageTexture:
 	# Create a signal awaiter for this request
 	var signal_awaiter = SignalAwaiter.new()
 	pending_requests[request_id] = signal_awaiter
+	queued_items[queue_key] = signal_awaiter
 	
 	# Add to queue
 	request_queue.append(request)
@@ -63,11 +76,21 @@ func request_asset_thumbnail(asset_path: String) -> ImageTexture:
 	
 	# Clean up
 	pending_requests.erase(request_id)
+	queued_items.erase(queue_key)
 	
 	return result
 
 # Submit a request for meshlib thumbnail generation
 func request_meshlib_thumbnail(meshlib: MeshLibrary, item_id: int = -1) -> ImageTexture:
+	var queue_key = "meshlib:" + str(meshlib.get_instance_id()) + ":" + str(item_id)
+	
+	# Check if already queued or processing
+	if queued_items.has(queue_key):
+		# Wait for the existing request to complete
+		var existing_awaiter = queued_items[queue_key]
+		var result = await existing_awaiter.wait_for_result()
+		return result
+	
 	var request_id = _generate_request_id()
 	
 	var request = ThumbnailRequest.new(request_id, "", meshlib, item_id, "meshlib")
@@ -75,6 +98,7 @@ func request_meshlib_thumbnail(meshlib: MeshLibrary, item_id: int = -1) -> Image
 	# Create a signal awaiter for this request
 	var signal_awaiter = SignalAwaiter.new()
 	pending_requests[request_id] = signal_awaiter
+	queued_items[queue_key] = signal_awaiter
 	
 	# Add to queue
 	request_queue.append(request)
@@ -88,6 +112,7 @@ func request_meshlib_thumbnail(meshlib: MeshLibrary, item_id: int = -1) -> Image
 	
 	# Clean up
 	pending_requests.erase(request_id)
+	queued_items.erase(queue_key)
 	
 	return result
 

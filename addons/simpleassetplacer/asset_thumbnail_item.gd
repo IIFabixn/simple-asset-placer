@@ -234,6 +234,15 @@ func _generate_thumbnail_async():
 	else:
 		_generate_asset_thumbnail()
 
+func _request_thumbnail_async(queue_manager, asset_path: String):
+	"""Request thumbnail generation asynchronously and update UI when ready"""
+	var thumbnail = await queue_manager.request_asset_thumbnail(asset_path)
+	
+	# Update thumbnail when ready (if this item still exists)
+	if thumbnail and is_instance_valid(thumbnail_rect) and is_inside_tree():
+		thumbnail_rect.texture = thumbnail
+		thumbnail_rect.queue_redraw()
+
 func _generate_meshlib_thumbnail():
 	# Check if mesh exists in MeshLibrary
 	var mesh = meshlib.get_item_mesh(item_id)
@@ -248,11 +257,19 @@ func _generate_meshlib_thumbnail():
 	
 	# Use the ThumbnailQueueManager for centralized, sequential processing
 	var queue_manager = ThumbnailQueueManager.get_instance()
+	# Don't await - let it generate asynchronously and update when ready
+	_request_meshlib_thumbnail_async(queue_manager, mesh)
+
+func _request_meshlib_thumbnail_async(queue_manager, mesh: Mesh):
+	"""Request meshlib thumbnail generation asynchronously and update UI when ready"""
 	var thumbnail = await queue_manager.request_meshlib_thumbnail(meshlib, item_id)
 	
-	if thumbnail and is_instance_valid(thumbnail_rect):
+	# Update thumbnail when ready (if this item still exists)
+	if thumbnail and is_instance_valid(thumbnail_rect) and is_inside_tree():
 		thumbnail_rect.texture = thumbnail
-	else:
+		thumbnail_rect.queue_redraw()
+	elif is_instance_valid(thumbnail_rect) and is_inside_tree():
+		# Fallback if generation failed
 		_create_simple_mesh_icon(mesh)
 
 func _generate_asset_thumbnail():
@@ -264,13 +281,9 @@ func _generate_asset_thumbnail():
 	if extension in ["fbx", "obj", "gltf", "glb", "dae", "blend", "tscn", "scn"] and asset_path != "":
 		# Use the ThumbnailQueueManager for centralized, sequential processing
 		var queue_manager = ThumbnailQueueManager.get_instance()
-		var thumbnail = await queue_manager.request_asset_thumbnail(asset_path)
-		
-		if thumbnail and is_instance_valid(thumbnail_rect):
-			thumbnail_rect.texture = thumbnail
-			# Force a UI update
-			thumbnail_rect.queue_redraw()
-			return
+		# Don't await - let it generate asynchronously and update when ready
+		_request_thumbnail_async(queue_manager, asset_path)
+		return
 	
 	# For scene files or if 3D thumbnail failed, try appropriate editor icons
 	var icon_name = "MeshInstance3D"

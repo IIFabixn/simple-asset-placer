@@ -514,25 +514,32 @@ static func create_grid_overlay(center: Vector3, grid_size: float, grid_extent: 
 	# Draw grid lines
 	immediate_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
 	
-	var start = -grid_extent
-	var end = grid_extent
+	# Calculate the range of grid lines to draw based on center position
+	# We want grid lines at exact grid positions (accounting for offset)
+	var center_grid_x = round((center.x - offset.x) / grid_size)
+	var center_grid_z = round((center.z - offset.z) / grid_size)
 	
-	# Draw lines parallel to X axis (running along Z)
-	for i in range(start, end + 1):
-		var z = i * grid_size + offset.z
-		var x_start = start * grid_size + offset.x
-		var x_end = end * grid_size + offset.x
-		var y = center.y  # Grid at ground level
+	var start_grid_x = center_grid_x - grid_extent
+	var end_grid_x = center_grid_x + grid_extent
+	var start_grid_z = center_grid_z - grid_extent
+	var end_grid_z = center_grid_z + grid_extent
+	
+	var y = center.y  # Grid at object's height
+	
+	# Draw lines parallel to X axis (running along Z direction)
+	for grid_z in range(start_grid_z, end_grid_z + 1):
+		var z = grid_z * grid_size + offset.z
+		var x_start = start_grid_x * grid_size + offset.x
+		var x_end = end_grid_x * grid_size + offset.x
 		
 		immediate_mesh.surface_add_vertex(Vector3(x_start, y, z))
 		immediate_mesh.surface_add_vertex(Vector3(x_end, y, z))
 	
-	# Draw lines parallel to Z axis (running along X)
-	for i in range(start, end + 1):
-		var x = i * grid_size + offset.x
-		var z_start = start * grid_size + offset.z
-		var z_end = end * grid_size + offset.z
-		var y = center.y
+	# Draw lines parallel to Z axis (running along X direction)
+	for grid_x in range(start_grid_x, end_grid_x + 1):
+		var x = grid_x * grid_size + offset.x
+		var z_start = start_grid_z * grid_size + offset.z
+		var z_end = end_grid_z * grid_size + offset.z
 		
 		immediate_mesh.surface_add_vertex(Vector3(x, y, z_start))
 		immediate_mesh.surface_add_vertex(Vector3(x, y, z_end))
@@ -541,7 +548,7 @@ static func create_grid_overlay(center: Vector3, grid_size: float, grid_extent: 
 	
 	# Add to scene
 	editor_root.add_child(grid_overlay)
-	grid_overlay.global_position = Vector3.ZERO  # Lines are already positioned
+	grid_overlay.global_position = Vector3.ZERO  # Lines use absolute world coordinates
 
 static func update_grid_overlay(center: Vector3, grid_size: float, grid_extent: int = 10, offset: Vector3 = Vector3.ZERO):
 	"""Update existing grid or create new one"""

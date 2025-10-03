@@ -46,6 +46,10 @@ static var current_mode: String = ""  # "", "placement", "transform"
 static var placement_data: Dictionary = {}
 static var transform_data: Dictionary = {}
 
+# Grid overlay tracking
+static var last_grid_center: Vector3 = Vector3.ZERO
+static var grid_update_threshold: float = 5.0  # Only update grid when object moves this far
+
 # Callbacks
 static var placement_end_callback: Callable
 static var mesh_placed_callback: Callable
@@ -101,6 +105,9 @@ static func start_placement_mode(mesh: Mesh = null, meshlib: MeshLibrary = null,
 	# Reset rotation for new placement (unless user wants to keep rotation)
 	if not placement_settings.get("keep_rotation_between_placements", false):
 		RotationManager.reset_all_rotation()
+	
+	# Reset grid tracking for new placement
+	last_grid_center = Vector3.ZERO
 	
 	# Grab focus for the 3D viewport to ensure keyboard input works
 	# Set counter to grab focus for next 3 frames to ensure it sticks
@@ -163,6 +170,9 @@ static func start_transform_mode(target_nodes, dock_instance = null):
 	# Initialize position manager with center position
 	PositionManager.set_position(center_pos)
 	PositionManager.start_transform_positioning(valid_nodes[0])  # Use first node as reference
+	
+	# Reset grid tracking for new transform session
+	last_grid_center = Vector3.ZERO
 	
 	# Grab focus for the 3D viewport to ensure keyboard input works
 	# Set counter to grab focus for next 3 frames to ensure it sticks
@@ -246,17 +256,45 @@ static func _update_grid_overlay():
 	if show_grid and snap_enabled and (current_mode == "placement" or current_mode == "transform"):
 		var grid_size = placement_settings.get("snap_step", 1.0)
 		var offset = placement_settings.get("snap_offset", Vector3.ZERO)
-		var center = PositionManager.get_current_position()
 		var grid_extent_units = placement_settings.get("grid_extent", 20.0)
+		
+		# Get center position based on current mode
+		var center = Vector3.ZERO
+		if current_mode == "placement":
+			# Use preview mesh position if available, otherwise current position
+			if PreviewManager.preview_mesh and is_instance_valid(PreviewManager.preview_mesh):
+				center = PreviewManager.preview_mesh.global_position
+			else:
+				center = PositionManager.get_current_position()
+		elif current_mode == "transform":
+			# Use center of selected nodes
+			var target_nodes = transform_data.get("target_nodes", [])
+			if not target_nodes.is_empty():
+				for node in target_nodes:
+					if node and is_instance_valid(node) and node.is_inside_tree():
+						center += node.global_position
+				center /= target_nodes.size()
 		
 		# Calculate number of grid cells based on grid size and desired world extent
 		var grid_extent = int(ceil(grid_extent_units / grid_size))
 		grid_extent = clamp(grid_extent, 5, 100)  # Min 5, max 100 cells
 		
-		OverlayManager.create_grid_overlay(center, grid_size, grid_extent, offset)
+		# Only update grid if object has moved significantly from last grid center
+		# or if grid doesn't exist yet
+		var distance_from_last_center = center.distance_to(last_grid_center)
+		var needs_update = distance_from_last_center > grid_update_threshold
+		
+		# Also check if grid overlay exists
+		if not OverlayManager.grid_overlay or not is_instance_valid(OverlayManager.grid_overlay):
+			needs_update = true
+		
+		if needs_update:
+			OverlayManager.create_grid_overlay(center, grid_size, grid_extent, offset)
+			last_grid_center = center
 	else:
 		# Hide/remove grid if disabled or not in active mode
 		OverlayManager.remove_grid_overlay()
+		last_grid_center = Vector3.ZERO  # Reset tracking
 
 ## INPUT PROCESSING COORDINATION
 
@@ -268,9 +306,6 @@ static func process_frame_input(camera: Camera3D, input_settings: Dictionary = {
 	# Configure managers with current settings (important for both modes)
 	# This ensures snap settings and other options are always up-to-date
 	PositionManager.configure(input_settings)
-	
-	# Update grid overlay based on settings
-	_update_grid_overlay()
 	
 	# Get the 3D viewport for proper mouse coordinate conversion
 	var viewport_3d = EditorInterface.get_editor_viewport_3d(0)
@@ -289,6 +324,9 @@ static func process_frame_input(camera: Camera3D, input_settings: Dictionary = {
 			_process_placement_input(camera)
 		"transform":
 			_process_transform_input(camera)
+	
+	# Update grid overlay AFTER position updates (so it follows the object)
+	_update_grid_overlay()
 	
 	# Process global navigation input
 	_process_navigation_input()

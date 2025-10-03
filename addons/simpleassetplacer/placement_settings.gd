@@ -77,6 +77,9 @@ var snap_by_aabb: bool = true  # Snap by bounding box edges instead of pivot
 var snap_offset: Vector3 = Vector3.ZERO  # Grid offset from world origin
 var snap_y_enabled: bool = false  # Enable Y-axis (height) snapping
 var snap_y_step: float = 1.0  # Grid size for Y-axis snapping
+var snap_center_x: bool = false  # Snap to center of bounding box on X-axis
+var snap_center_y: bool = false  # Snap to center of bounding box on Y-axis
+var snap_center_z: bool = false  # Snap to center of bounding box on Z-axis
 var show_grid: bool = false  # Show visual grid overlay
 var grid_extent: float = 20.0  # Size of grid overlay in world units (radius from center)
 var random_rotation: bool = false
@@ -257,6 +260,37 @@ func setup_ui():
 	snap_aabb_check.tooltip_text = "Snap assets by their edges instead of pivot point (aligns edges to grid)"
 	snap_aabb_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_child(snap_aabb_check)
+	
+	# Center snapping options
+	var snap_center_label = Label.new()
+	snap_center_label.text = "Snap to Center On:"
+	snap_center_label.add_theme_font_size_override("font_size", 12)
+	snap_center_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 0.9))
+	vbox.add_child(snap_center_label)
+	
+	var snap_center_x_check = CheckBox.new()
+	snap_center_x_check.name = "SnapCenterXCheck"
+	snap_center_x_check.text = "X-axis (Center on X)"
+	snap_center_x_check.button_pressed = false
+	snap_center_x_check.tooltip_text = "Snap to center of bounding box on X-axis instead of edges"
+	snap_center_x_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(snap_center_x_check)
+	
+	var snap_center_y_check = CheckBox.new()
+	snap_center_y_check.name = "SnapCenterYCheck"
+	snap_center_y_check.text = "Y-axis (Center on Y)"
+	snap_center_y_check.button_pressed = false
+	snap_center_y_check.tooltip_text = "Snap to center of bounding box on Y-axis instead of edges"
+	snap_center_y_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(snap_center_y_check)
+	
+	var snap_center_z_check = CheckBox.new()
+	snap_center_z_check.name = "SnapCenterZCheck"
+	snap_center_z_check.text = "Z-axis (Center on Z)"
+	snap_center_z_check.button_pressed = false
+	snap_center_z_check.tooltip_text = "Snap to center of bounding box on Z-axis instead of edges"
+	snap_center_z_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(snap_center_z_check)
 	
 	# Y-axis snapping checkbox (spans both columns)
 	var snap_y_check = CheckBox.new()
@@ -1069,6 +1103,18 @@ func _on_setting_changed(value = null):
 	if snap_aabb_check:
 		snap_by_aabb = snap_aabb_check.button_pressed
 	
+	var snap_center_x_check = get_node_or_null("VBoxContainer/SnapCenterXCheck")
+	if snap_center_x_check:
+		snap_center_x = snap_center_x_check.button_pressed
+	
+	var snap_center_y_check = get_node_or_null("VBoxContainer/SnapCenterYCheck")
+	if snap_center_y_check:
+		snap_center_y = snap_center_y_check.button_pressed
+	
+	var snap_center_z_check = get_node_or_null("VBoxContainer/SnapCenterZCheck")
+	if snap_center_z_check:
+		snap_center_z = snap_center_z_check.button_pressed
+	
 	var snap_y_check = get_node_or_null("VBoxContainer/SnapYCheck")
 	if snap_y_check:
 		snap_y_enabled = snap_y_check.button_pressed
@@ -1362,6 +1408,9 @@ func get_placement_settings() -> Dictionary:
 		"snap_offset": snap_offset,
 		"snap_y_enabled": snap_y_enabled,
 		"snap_y_step": snap_y_step,
+		"snap_center_x": snap_center_x,
+		"snap_center_y": snap_center_y,
+		"snap_center_z": snap_center_z,
 		"show_grid": show_grid,
 		"grid_extent": grid_extent,
 		"random_rotation": random_rotation,
@@ -1417,6 +1466,9 @@ func save_settings():
 	editor_settings.set_setting("simple_asset_placer/snap_offset", snap_offset)
 	editor_settings.set_setting("simple_asset_placer/snap_y_enabled", snap_y_enabled)
 	editor_settings.set_setting("simple_asset_placer/snap_y_step", snap_y_step)
+	editor_settings.set_setting("simple_asset_placer/snap_center_x", snap_center_x)
+	editor_settings.set_setting("simple_asset_placer/snap_center_y", snap_center_y)
+	editor_settings.set_setting("simple_asset_placer/snap_center_z", snap_center_z)
 	editor_settings.set_setting("simple_asset_placer/random_rotation", random_rotation)
 	editor_settings.set_setting("simple_asset_placer/scale_multiplier", scale_multiplier)
 	editor_settings.set_setting("simple_asset_placer/add_collision", add_collision)
@@ -1481,6 +1533,12 @@ func load_settings():
 		snap_y_enabled = editor_settings.get_setting("simple_asset_placer/snap_y_enabled")
 	if editor_settings.has_setting("simple_asset_placer/snap_y_step"):
 		snap_y_step = editor_settings.get_setting("simple_asset_placer/snap_y_step")
+	if editor_settings.has_setting("simple_asset_placer/snap_center_x"):
+		snap_center_x = editor_settings.get_setting("simple_asset_placer/snap_center_x")
+	if editor_settings.has_setting("simple_asset_placer/snap_center_y"):
+		snap_center_y = editor_settings.get_setting("simple_asset_placer/snap_center_y")
+	if editor_settings.has_setting("simple_asset_placer/snap_center_z"):
+		snap_center_z = editor_settings.get_setting("simple_asset_placer/snap_center_z")
 	if editor_settings.has_setting("simple_asset_placer/random_rotation"):
 		random_rotation = editor_settings.get_setting("simple_asset_placer/random_rotation")
 	if editor_settings.has_setting("simple_asset_placer/scale_multiplier"):
@@ -1578,6 +1636,17 @@ func update_ui_from_settings():
 		collision_check.button_pressed = add_collision
 	if grouping_check:
 		grouping_check.button_pressed = group_instances
+	
+	# Update snap center controls
+	var snap_center_x_check = get_node_or_null("VBoxContainer/SnapCenterXCheck")
+	if snap_center_x_check:
+		snap_center_x_check.button_pressed = snap_center_x
+	var snap_center_y_check = get_node_or_null("VBoxContainer/SnapCenterYCheck")
+	if snap_center_y_check:
+		snap_center_y_check.button_pressed = snap_center_y
+	var snap_center_z_check = get_node_or_null("VBoxContainer/SnapCenterZCheck")
+	if snap_center_z_check:
+		snap_center_z_check.button_pressed = snap_center_z
 	
 	# Update reset behavior controls
 	if reset_height_on_exit_check:

@@ -292,11 +292,14 @@ static func string_to_keycode(key_string: String) -> Key:
 
 static func get_rotation_input() -> Dictionary:
 	"""Get all rotation-related input state"""
+	# Disable rotation controls when right mouse button is held (viewport navigation)
+	var right_mouse_held = is_mouse_button_pressed("right")
+	
 	return {
-		"x_pressed": is_key_just_pressed("rotate_x"),
-		"y_pressed": is_key_just_pressed("rotate_y"), 
-		"z_pressed": is_key_just_pressed("rotate_z"),
-		"reset_pressed": is_key_just_pressed("reset_rotation"),
+		"x_pressed": is_key_just_pressed("rotate_x") and not right_mouse_held,
+		"y_pressed": is_key_just_pressed("rotate_y") and not right_mouse_held, 
+		"z_pressed": is_key_just_pressed("rotate_z") and not right_mouse_held,
+		"reset_pressed": is_key_just_pressed("reset_rotation") and not right_mouse_held,
 		"shift_held": is_shift_held(),
 		"ctrl_held": is_ctrl_held(),
 		"alt_held": is_alt_held()
@@ -304,24 +307,30 @@ static func get_rotation_input() -> Dictionary:
 
 static func get_scale_input() -> Dictionary:
 	"""Get all scale-related input state"""
+	# Disable scale controls when right mouse button is held (viewport navigation)
+	var right_mouse_held = is_mouse_button_pressed("right")
+	
 	return {
-		"up_pressed": is_key_just_pressed("scale_up"),
-		"down_pressed": is_key_just_pressed("scale_down"),
-		"reset_pressed": is_key_just_pressed("reset_scale"),
+		"up_pressed": is_key_just_pressed("scale_up") and not right_mouse_held,
+		"down_pressed": is_key_just_pressed("scale_down") and not right_mouse_held,
+		"reset_pressed": is_key_just_pressed("reset_scale") and not right_mouse_held,
 		"alt_held": is_alt_held()
 	}
 
 static func get_position_input() -> Dictionary:
 	"""Get all position-related input state"""
+	# Disable position controls when right mouse button is held (viewport navigation)
+	var right_mouse_held = is_mouse_button_pressed("right")
+	
 	return {
-		"height_up_pressed": is_key_just_pressed("height_up"),
-		"height_down_pressed": is_key_just_pressed("height_down"),
-		"reset_height_pressed": is_key_just_pressed("reset_height"),
-		"position_left_pressed": is_key_just_pressed("position_left"),
-		"position_right_pressed": is_key_just_pressed("position_right"),
-		"position_forward_pressed": is_key_just_pressed("position_forward"),
-		"position_backward_pressed": is_key_just_pressed("position_backward"),
-		"reset_position_pressed": is_key_just_pressed("reset_position"),
+		"height_up_pressed": is_key_just_pressed("height_up") and not right_mouse_held,
+		"height_down_pressed": is_key_just_pressed("height_down") and not right_mouse_held,
+		"reset_height_pressed": is_key_just_pressed("reset_height") and not right_mouse_held,
+		"position_left_pressed": is_key_just_pressed("position_left") and not right_mouse_held,
+		"position_right_pressed": is_key_just_pressed("position_right") and not right_mouse_held,
+		"position_forward_pressed": is_key_just_pressed("position_forward") and not right_mouse_held,
+		"position_backward_pressed": is_key_just_pressed("position_backward") and not right_mouse_held,
+		"reset_position_pressed": is_key_just_pressed("reset_position") and not right_mouse_held,
 		"mouse_position": get_mouse_position(),
 		"left_clicked": is_mouse_button_just_pressed("left") and is_mouse_in_viewport(),
 		"shift_held": is_shift_held(),
@@ -404,6 +413,40 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 			"axis": "Z",
 			"direction": wheel_direction,
 			"large_increment": event.alt_pressed,
+			"reverse_modifier": event.shift_pressed
+		}
+	
+	# Position adjustment keys (W/A/S/D)
+	if is_key_held_for_wheel("position_forward"):
+		pending_taps.erase("position_forward")
+		return {
+			"action": "position",
+			"axis": "forward",
+			"direction": wheel_direction,
+			"reverse_modifier": event.shift_pressed
+		}
+	elif is_key_held_for_wheel("position_backward"):
+		pending_taps.erase("position_backward")
+		return {
+			"action": "position",
+			"axis": "backward",
+			"direction": wheel_direction,
+			"reverse_modifier": event.shift_pressed
+		}
+	elif is_key_held_for_wheel("position_left"):
+		pending_taps.erase("position_left")
+		return {
+			"action": "position",
+			"axis": "left",
+			"direction": wheel_direction,
+			"reverse_modifier": event.shift_pressed
+		}
+	elif is_key_held_for_wheel("position_right"):
+		pending_taps.erase("position_right")
+		return {
+			"action": "position",
+			"axis": "right",
+			"direction": wheel_direction,
 			"reverse_modifier": event.shift_pressed
 		}
 	

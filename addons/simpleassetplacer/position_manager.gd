@@ -47,6 +47,9 @@ static var snap_by_aabb: bool = true  # Snap by bounding box edges instead of pi
 static var snap_offset: Vector3 = Vector3.ZERO  # Grid offset from world origin
 static var snap_y_enabled: bool = false  # Enable Y-axis snapping
 static var snap_y_step: float = 1.0  # Grid size for Y-axis snapping
+static var snap_center_x: bool = false  # Snap to center of bounding box on X-axis
+static var snap_center_y: bool = false  # Snap to center of bounding box on Y-axis
+static var snap_center_z: bool = false  # Snap to center of bounding box on Z-axis
 static var use_half_step: bool = false  # Use half-step snapping (for CTRL modifier)
 static var align_with_normal: bool = false  # Align rotation with surface normal
 
@@ -200,59 +203,75 @@ static func _apply_grid_snap(pos: Vector3, aabb: AABB = AABB()) -> Vector3:
 	
 	# Apply AABB-based snapping if enabled and AABB is valid
 	if snap_by_aabb and aabb.size != Vector3.ZERO:
-		# Calculate min and max corners in world space
+		# Calculate min, center, and max positions in world space
 		var min_corner = pos + aabb.position
 		var max_corner = pos + aabb.position + aabb.size
+		var center = pos + aabb.position + aabb.size * 0.5
 		
-		# For each axis, find which edge (min or max) is closest to a grid line
-		# Then snap that edge to the grid
-		
-		# X-axis: For thin objects, always snap minimum edge. Otherwise find closest edge.
-		var is_thin_x = aabb.size.x < 0.2  # Thin threshold
-		
-		if is_thin_x:
-			# Always snap minimum edge for thin objects
-			var snapped_min_x = snappedf(min_corner.x - snap_offset.x, effective_step_x) + snap_offset.x
-			snapped_pos.x = snapped_min_x - aabb.position.x
+		# X-axis snapping
+		if snap_center_x:
+			# Snap center of bounding box on X-axis
+			var snapped_center_x = snappedf(center.x - snap_offset.x, effective_step_x) + snap_offset.x
+			snapped_pos.x = snapped_center_x - (aabb.position.x + aabb.size.x * 0.5)
 		else:
-			# Find closest grid line and determine which edge to snap
-			var min_x_dist_to_grid = abs(min_corner.x - snap_offset.x - snappedf(min_corner.x - snap_offset.x, effective_step_x))
-			var max_x_dist_to_grid = abs(max_corner.x - snap_offset.x - snappedf(max_corner.x - snap_offset.x, effective_step_x))
+			# Edge-based snapping: For thin objects, always snap minimum edge. Otherwise find closest edge.
+			var is_thin_x = aabb.size.x < 0.2  # Thin threshold
 			
-			if min_x_dist_to_grid <= max_x_dist_to_grid:
-				# Snap minimum edge
+			if is_thin_x:
+				# Always snap minimum edge for thin objects
 				var snapped_min_x = snappedf(min_corner.x - snap_offset.x, effective_step_x) + snap_offset.x
 				snapped_pos.x = snapped_min_x - aabb.position.x
 			else:
-				# Snap maximum edge
-				var snapped_max_x = snappedf(max_corner.x - snap_offset.x, effective_step_x) + snap_offset.x
-				snapped_pos.x = snapped_max_x - (aabb.position.x + aabb.size.x)
+				# Find closest grid line and determine which edge to snap
+				var min_x_dist_to_grid = abs(min_corner.x - snap_offset.x - snappedf(min_corner.x - snap_offset.x, effective_step_x))
+				var max_x_dist_to_grid = abs(max_corner.x - snap_offset.x - snappedf(max_corner.x - snap_offset.x, effective_step_x))
+				
+				if min_x_dist_to_grid <= max_x_dist_to_grid:
+					# Snap minimum edge
+					var snapped_min_x = snappedf(min_corner.x - snap_offset.x, effective_step_x) + snap_offset.x
+					snapped_pos.x = snapped_min_x - aabb.position.x
+				else:
+					# Snap maximum edge
+					var snapped_max_x = snappedf(max_corner.x - snap_offset.x, effective_step_x) + snap_offset.x
+					snapped_pos.x = snapped_max_x - (aabb.position.x + aabb.size.x)
 		
-		# Z-axis: For thin objects, always snap minimum edge. Otherwise find closest edge.
-		var is_thin_z = aabb.size.z < 0.2  # Thin threshold
-		
-		if is_thin_z:
-			# Always snap minimum edge for thin objects
-			var snapped_min_z = snappedf(min_corner.z - snap_offset.z, effective_step_z) + snap_offset.z
-			snapped_pos.z = snapped_min_z - aabb.position.z
+		# Z-axis snapping
+		if snap_center_z:
+			# Snap center of bounding box on Z-axis
+			var snapped_center_z = snappedf(center.z - snap_offset.z, effective_step_z) + snap_offset.z
+			snapped_pos.z = snapped_center_z - (aabb.position.z + aabb.size.z * 0.5)
 		else:
-			# Find closest grid line and determine which edge to snap
-			var min_z_dist_to_grid = abs(min_corner.z - snap_offset.z - snappedf(min_corner.z - snap_offset.z, effective_step_z))
-			var max_z_dist_to_grid = abs(max_corner.z - snap_offset.z - snappedf(max_corner.z - snap_offset.z, effective_step_z))
+			# Edge-based snapping: For thin objects, always snap minimum edge. Otherwise find closest edge.
+			var is_thin_z = aabb.size.z < 0.2  # Thin threshold
 			
-			if min_z_dist_to_grid <= max_z_dist_to_grid:
-				# Snap minimum edge
+			if is_thin_z:
+				# Always snap minimum edge for thin objects
 				var snapped_min_z = snappedf(min_corner.z - snap_offset.z, effective_step_z) + snap_offset.z
 				snapped_pos.z = snapped_min_z - aabb.position.z
 			else:
-				# Snap maximum edge
-				var snapped_max_z = snappedf(max_corner.z - snap_offset.z, effective_step_z) + snap_offset.z
-				snapped_pos.z = snapped_max_z - (aabb.position.z + aabb.size.z)
+				# Find closest grid line and determine which edge to snap
+				var min_z_dist_to_grid = abs(min_corner.z - snap_offset.z - snappedf(min_corner.z - snap_offset.z, effective_step_z))
+				var max_z_dist_to_grid = abs(max_corner.z - snap_offset.z - snappedf(max_corner.z - snap_offset.z, effective_step_z))
+				
+				if min_z_dist_to_grid <= max_z_dist_to_grid:
+					# Snap minimum edge
+					var snapped_min_z = snappedf(min_corner.z - snap_offset.z, effective_step_z) + snap_offset.z
+					snapped_pos.z = snapped_min_z - aabb.position.z
+				else:
+					# Snap maximum edge
+					var snapped_max_z = snappedf(max_corner.z - snap_offset.z, effective_step_z) + snap_offset.z
+					snapped_pos.z = snapped_max_z - (aabb.position.z + aabb.size.z)
 		
-		# Handle Y-axis if enabled (always snap minimum/bottom edge for vertical)
+		# Y-axis snapping (if enabled)
 		if snap_y_enabled:
-			var snapped_min_y = snappedf(min_corner.y - snap_offset.y, effective_step_y) + snap_offset.y
-			snapped_pos.y = snapped_min_y - aabb.position.y
+			if snap_center_y:
+				# Snap center of bounding box on Y-axis
+				var snapped_center_y = snappedf(center.y - snap_offset.y, effective_step_y) + snap_offset.y
+				snapped_pos.y = snapped_center_y - (aabb.position.y + aabb.size.y * 0.5)
+			else:
+				# Snap minimum/bottom edge for vertical
+				var snapped_min_y = snappedf(min_corner.y - snap_offset.y, effective_step_y) + snap_offset.y
+				snapped_pos.y = snapped_min_y - aabb.position.y
 		else:
 			snapped_pos.y = pos.y  # Keep original Y
 	else:
@@ -492,6 +511,9 @@ static func configure(config: Dictionary):
 	snap_offset = config.get("snap_offset", Vector3.ZERO)
 	snap_y_enabled = config.get("snap_y_enabled", false)
 	snap_y_step = config.get("snap_y_step", 1.0)
+	snap_center_x = config.get("snap_center_x", false)
+	snap_center_y = config.get("snap_center_y", false)
+	snap_center_z = config.get("snap_center_z", false)
 	align_with_normal = config.get("align_with_normal", false)
 	
 	# Debug output

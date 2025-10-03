@@ -149,19 +149,29 @@ static func start_transform_mode(target_nodes, dock_instance = null):
 	for node in valid_nodes:
 		original_transforms[node] = node.transform
 	
-	transform_data = {
-		"target_nodes": valid_nodes,  # Array of nodes
-		"original_transforms": original_transforms,  # Dictionary mapping node to original transform
-		"dock_reference": dock_instance,
-		"accumulated_xz_delta": Vector3.ZERO  # Track accumulated WASD position adjustments
-	}
-	
 	# Calculate center position of all nodes for positioning reference
 	var center_pos = Vector3.ZERO
 	for node in valid_nodes:
 		if node.is_inside_tree():
 			center_pos += node.global_position
 	center_pos /= valid_nodes.size()
+	
+	# Calculate each node's offset from the original center (store once, use every frame)
+	var node_offsets = {}
+	for node in valid_nodes:
+		if node.is_inside_tree():
+			node_offsets[node] = node.global_position - center_pos
+	
+	transform_data = {
+		"target_nodes": valid_nodes,  # Array of nodes
+		"original_transforms": original_transforms,  # Dictionary mapping node to original transform
+		"original_center": center_pos,  # Store the original center position
+		"node_offsets": node_offsets,  # Store each node's offset from original center
+		"dock_reference": dock_instance,
+		"accumulated_xz_delta": Vector3.ZERO,  # Track accumulated WASD position adjustments
+		"initial_frame": true,  # Track if this is the first frame to prevent initial displacement
+		"snap_offset": Vector3.ZERO  # Offset to maintain position relative to snapped grid
+	}
 	
 	# Initialize managers for transform mode
 	OverlayManager.initialize_overlays()
@@ -529,37 +539,40 @@ static func _process_transform_input(camera: Camera3D):
 	# Set half-step mode based on CTRL key state
 	PositionManager.use_half_step = position_input.ctrl_held
 	
-	# Calculate old center position from ORIGINAL transforms (not current positions)
-	# This ensures we always position relative to the original center, not accumulated drift
-	var original_center = Vector3.ZERO
-	var original_transforms = transform_data.get("original_transforms", {})
-	for node in target_nodes:
-		if node and node.is_inside_tree() and original_transforms.has(node):
-			var orig_transform = original_transforms[node]
-			# Get original global position by applying original local transform
-			var orig_global_pos = node.get_parent().global_transform * orig_transform.origin if node.get_parent() else orig_transform.origin
-			original_center += orig_global_pos
-	original_center /= target_nodes.size()
+	# Get stored original center and node offsets (calculated once when transform mode started)
+	var original_center = transform_data.get("original_center", Vector3.ZERO)
+	var node_offsets = transform_data.get("node_offsets", {})
+	var initial_frame = transform_data.get("initial_frame", false)
 	
-	# Snap the original center using AABB-aware snapping
-	var original_snapped_center = original_center
-	if PositionManager.snap_enabled:
-		original_snapped_center = PositionManager._apply_grid_snap(original_center, combined_aabb)
+	# Determine the new center position
+	var new_center: Vector3
 	
-	# Calculate each node's offset from the original SNAPPED center
-	var node_offsets = {}
-	for node in target_nodes:
-		if node and node.is_inside_tree() and original_transforms.has(node):
-			var orig_transform = original_transforms[node]
-			var orig_global_pos = node.get_parent().global_transform * orig_transform.origin if node.get_parent() else orig_transform.origin
-			node_offsets[node] = orig_global_pos - original_snapped_center
-	
-	# Update position from mouse to get new snapped center position
-	PositionManager.update_position_from_mouse(camera, mouse_pos)
-	var mouse_center = PositionManager.get_current_position()
-	
-	# New center = mouse position + accumulated manual adjustments (relative to original snapped center)
-	var new_center = mouse_center + accumulated_delta
+	# On the initial frame, calculate and store the snap offset to preserve original position
+	if initial_frame:
+		# Get what the mouse position would be with snapping
+		PositionManager.update_position_from_mouse(camera, mouse_pos)
+		var snapped_mouse_center = PositionManager.get_current_position()
+		
+		# Calculate the offset needed to keep objects at their original position
+		# This is the difference between where snapping would put them vs where they actually are
+		var snap_offset = original_center - snapped_mouse_center
+		transform_data["snap_offset"] = snap_offset
+		
+		# Use original center for this frame
+		new_center = original_center + accumulated_delta
+		
+		# Mark that we've processed the initial frame
+		transform_data["initial_frame"] = false
+	else:
+		# Normal operation - use mouse position with snap offset applied
+		PositionManager.update_position_from_mouse(camera, mouse_pos)
+		var mouse_center = PositionManager.get_current_position()
+		
+		# Apply the snap offset to maintain the original position relative to grid
+		var snap_offset = transform_data.get("snap_offset", Vector3.ZERO)
+		
+		# New center = mouse position + snap offset + accumulated manual adjustments
+		new_center = mouse_center + snap_offset + accumulated_delta
 	
 	# Apply transformations to ALL nodes by repositioning relative to new center
 	for node in target_nodes:
@@ -681,6 +694,8 @@ static func handle_mouse_wheel_input(event: InputEventMouseButton) -> bool:
 			_apply_scale_adjustment(wheel_input)
 		"rotation":
 			_apply_rotation_adjustment(wheel_input)
+		"position":
+			_apply_position_adjustment(wheel_input)
 	
 	return true  # Event was handled
 
@@ -764,6 +779,88 @@ static func _apply_rotation_adjustment(wheel_input: Dictionary):
 		for node in target_nodes:
 			if node and node.is_inside_tree():
 				RotationManager.apply_rotation_step(node, axis, step * direction)
+
+static func _apply_position_adjustment(wheel_input: Dictionary):
+	"""Apply position adjustment based on wheel input"""
+	var direction = wheel_input.get("direction", 0)
+	var axis = wheel_input.get("axis", "forward")
+	var reverse = wheel_input.get("reverse_modifier", false)
+	
+	# Mouse wheel uses fine adjustment by default
+	var step = placement_settings.get("fine_position_increment", 0.01)
+	
+	if reverse:
+		direction = -direction
+	
+	# Calculate the actual movement delta based on axis
+	var movement_delta = step * direction
+	
+	if current_mode == "placement":
+		# Use PositionManager functions to properly update manual_position_offset
+		var camera = EditorInterface.get_editor_viewport_3d(0).get_camera_3d()
+		match axis:
+			"forward":
+				PositionManager.move_forward(movement_delta, camera)
+			"backward":
+				PositionManager.move_backward(movement_delta, camera)
+			"left":
+				PositionManager.move_left(movement_delta, camera)
+			"right":
+				PositionManager.move_right(movement_delta, camera)
+		
+		# Update preview position with the new offset
+		var preview_pos = PositionManager.get_current_position()
+		PreviewManager.update_preview_position(preview_pos)
+	
+	elif current_mode == "transform":
+		# Apply position adjustment to ALL nodes in transform mode
+		var target_nodes = transform_data.get("target_nodes", [])
+		if not target_nodes.is_empty():
+			# Get current camera for relative movement
+			var camera = EditorInterface.get_editor_viewport_3d(0).get_camera_3d()
+			if camera:
+				# Get accumulated delta
+				var accumulated_delta = transform_data.get("accumulated_xz_delta", Vector3.ZERO)
+				
+				# Calculate camera-relative directions (snapped to axes like keyboard input)
+				var camera_forward = Vector3(0, 0, -1)
+				var camera_right = Vector3(1, 0, 0)
+				
+				# Get camera forward and project to XZ plane
+				var cam_forward = -camera.global_transform.basis.z
+				cam_forward.y = 0
+				cam_forward = cam_forward.normalized()
+				
+				# Snap forward to nearest axis (Z or X)
+				if abs(cam_forward.z) > abs(cam_forward.x):
+					camera_forward = Vector3(0, 0, sign(cam_forward.z))
+				else:
+					camera_forward = Vector3(sign(cam_forward.x), 0, 0)
+				
+				# Get camera right and project to XZ plane
+				var cam_right = camera.global_transform.basis.x
+				cam_right.y = 0
+				cam_right = cam_right.normalized()
+				
+				# Snap right to nearest axis (X or Z)
+				if abs(cam_right.x) > abs(cam_right.z):
+					camera_right = Vector3(sign(cam_right.x), 0, 0)
+				else:
+					camera_right = Vector3(0, 0, sign(cam_right.z))
+				
+				# Add to accumulated delta based on axis
+				match axis:
+					"forward":
+						accumulated_delta += camera_forward * movement_delta
+					"backward":
+						accumulated_delta -= camera_forward * movement_delta
+					"left":
+						accumulated_delta -= camera_right * movement_delta
+					"right":
+						accumulated_delta += camera_right * movement_delta
+				
+				# Store back the accumulated delta
+				transform_data["accumulated_xz_delta"] = accumulated_delta
 
 ## TAB KEY COORDINATION
 

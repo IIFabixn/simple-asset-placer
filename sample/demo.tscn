@@ -97,7 +97,13 @@ top_level = true
 metadata/_edit_lock_ = true
 
 [node name="wall-fortified-door" type="Node3D" parent="." instance=ExtResource("5_xo1bm")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -64.5, 30.000008, 28.4)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -63.5, 30.000008, 31.5)
+
+[node name="wall-fortified-door2" parent="." instance=ExtResource("5_xo1bm")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -63.5, 30.000008, 31.5)
+
+[node name="wall-fortified-door3" parent="." instance=ExtResource("5_xo1bm")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -62.5, 30.000008, 30.5)
 
 [node name="wall-door" type="Node3D" parent="." instance=ExtResource("5_k5nd4")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -75, 30.000008, 26)

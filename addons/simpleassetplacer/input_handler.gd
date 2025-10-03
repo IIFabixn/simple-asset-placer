@@ -183,13 +183,18 @@ static func is_key_pressed(key_name: String) -> bool:
 
 static func is_key_just_pressed(key_name: String) -> bool:
 	"""Check if a key was just pressed this frame (edge detection)
-	For action keys (rotation, scale, height), this checks if it was a 'tap' (quick press/release)
+	For action keys (rotation, scale, height, position), this checks if it was a 'tap' (quick press/release)
 	For other keys (tab, cancel, etc.), uses normal edge detection"""
 	var current = current_keys.get(key_name, false)
 	var previous = previous_keys.get(key_name, false)
 	
 	# List of keys that should use tap detection (for mouse wheel combos)
-	var tap_detection_keys = ["height_up", "height_down", "rotate_x", "rotate_y", "rotate_z", "scale_up", "scale_down"]
+	var tap_detection_keys = [
+		"height_up", "height_down", 
+		"rotate_x", "rotate_y", "rotate_z", 
+		"scale_up", "scale_down",
+		"position_left", "position_right", "position_forward", "position_backward"
+	]
 	
 	# For tap detection keys, only return true on release if it was a quick tap
 	if key_name in tap_detection_keys:

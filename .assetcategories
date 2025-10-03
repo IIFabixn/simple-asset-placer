@@ -1,5 +1,6 @@
 {
 	"recently_used": [
+		"roof",
 		"floor",
 		"detail",
 		"wall",
@@ -7,9 +8,10 @@
 	],
 	"tag_usage": {
 		"cube": 1.0,
-		"detail": 6,
-		"floor": 12,
-		"wall": 41
+		"detail": 6.0,
+		"floor": 12.0,
+		"roof": 9,
+		"wall": 41.0
 	},
 	"tags": {
 		"cone_blend": [
@@ -50,6 +52,33 @@
 		],
 		"floor-steps-corner-outer": [
 			"floor"
+		],
+		"roof": [
+			"roof"
+		],
+		"roof-corner": [
+			"roof"
+		],
+		"roof-edge": [
+			"roof"
+		],
+		"roof-high-side": [
+			"roof"
+		],
+		"roof-high-side-corner": [
+			"roof"
+		],
+		"roof-high-side-corner-inner": [
+			"roof"
+		],
+		"roof-side": [
+			"roof"
+		],
+		"roof-side-corner": [
+			"roof"
+		],
+		"roof-side-corner-inner": [
+			"roof"
 		],
 		"structure-wall": [
 			"wall"

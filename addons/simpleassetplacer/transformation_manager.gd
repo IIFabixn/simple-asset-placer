@@ -181,6 +181,7 @@ static func start_transform_mode(target_nodes, dock_instance = null):
 		"node_offsets": node_offsets,  # Store each node's offset from original center
 		"dock_reference": dock_instance,
 		"accumulated_xz_delta": Vector3.ZERO,  # Track accumulated WASD position adjustments
+		"accumulated_y_delta": 0.0,  # Track accumulated height adjustments
 		"initial_frame": true,  # Track if this is the first frame to prevent initial displacement
 		"snap_offset": Vector3.ZERO  # Offset to maintain position relative to snapped grid
 	}
@@ -342,9 +343,9 @@ static func process_frame_input(camera: Camera3D, input_settings: Dictionary = {
 	
 	# Process mode-specific input
 	match current_mode:
-		"placement":
+		Mode.PLACEMENT:
 			_process_placement_input(camera)
-		"transform":
+		Mode.TRANSFORM:
 			_process_transform_input(camera)
 	
 	# Update grid overlay AFTER position updates (so it follows the object)
@@ -454,38 +455,25 @@ static func _process_transform_input(camera: Camera3D):
 	if valid_node_count > 0:
 		center_y /= valid_node_count
 	
-	var current_y = center_y
-	var y_delta = 0.0  # Track height change to apply to all nodes
+	# Get accumulated height delta from transform_data
+	var accumulated_y_delta = transform_data.get("accumulated_y_delta", 0.0)
 	
 	# Handle height adjustments first with reverse modifier support
 	var height_step = settings.get("height_adjustment_step", 0.1)
 	var reverse_height = position_input.shift_held  # SHIFT = reverse direction
 	
 	if position_input.height_up_pressed:
-		y_delta = height_step if not reverse_height else -height_step
-		current_y += y_delta
+		var height_change = height_step if not reverse_height else -height_step
+		accumulated_y_delta += height_change
 	elif position_input.height_down_pressed:
-		y_delta = -(height_step if not reverse_height else -height_step)
-		current_y += y_delta
+		var height_change = -(height_step if not reverse_height else -height_step)
+		accumulated_y_delta += height_change
 	elif position_input.reset_height_pressed:
-		# Reset to ground level (Y=0) or get current raycast height
-		var mouse_pos = position_input.mouse_position
-		var ray_from = camera.project_ray_origin(mouse_pos)
-		var ray_to = ray_from + camera.project_ray_normal(mouse_pos) * 1000.0
-		
-		# Use first valid node for raycast
-		var first_node = target_nodes[0]
-		if first_node and first_node.is_inside_tree():
-			var space_state = first_node.get_world_3d().direct_space_state
-			var query = PhysicsRayQueryParameters3D.create(ray_from, ray_to)
-			query.collision_mask = 1
-			var result = space_state.intersect_ray(query)
-			if result:
-				y_delta = result.position.y - center_y
-				current_y = result.position.y
-			else:
-				y_delta = -center_y
-				current_y = 0.0
+		# Reset accumulated height delta to 0
+		accumulated_y_delta = 0.0
+	
+	# Store the accumulated height delta back to transform_data
+	transform_data["accumulated_y_delta"] = accumulated_y_delta
 	
 	# Handle position adjustments (WASD-style movement) - this adds to XZ position
 	var position_delta = settings.get("position_increment", 0.1)
@@ -598,8 +586,8 @@ static func _process_transform_input(camera: Camera3D):
 		node.global_position.x = new_center.x + offset.x
 		node.global_position.z = new_center.z + offset.z
 		
-		# Y position: original center Y + offset + any height adjustment delta
-		node.global_position.y = original_center.y + offset.y + y_delta
+		# Y position: original center Y + offset + accumulated height adjustments
+		node.global_position.y = original_center.y + offset.y + accumulated_y_delta
 	
 	# Update surface normal alignment if enabled, otherwise reset it
 	if settings.get("align_with_normal", false):

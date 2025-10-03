@@ -201,8 +201,11 @@ static func process_frame_input(camera: Camera3D, input_settings: Dictionary = {
 	# Store current settings for TAB key and other operations
 	placement_settings = input_settings
 	
-	# Update input system
-	InputHandler.update_input_state(input_settings)
+	# Get the 3D viewport for proper mouse coordinate conversion
+	var viewport_3d = EditorInterface.get_editor_viewport_3d(0)
+	
+	# Update input system with viewport context
+	InputHandler.update_input_state(input_settings, viewport_3d)
 	
 	# Keep grabbing focus for the first few frames after mode starts
 	if focus_grab_counter > 0:

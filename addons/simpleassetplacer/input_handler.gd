@@ -42,11 +42,18 @@ static var key_press_times: Dictionary = {}  # Track when each key was pressed
 static var key_tap_grace_period: float = 0.15  # 150ms to distinguish tap from hold
 static var pending_taps: Dictionary = {}  # Keys that might be taps, waiting for release
 
+# Viewport cache for proper mouse coordinate conversion
+static var cached_viewport: SubViewport = null
+
 ## Core Input Polling
 
-static func update_input_state(input_settings: Dictionary = {}):
+static func update_input_state(input_settings: Dictionary = {}, viewport: SubViewport = null):
 	"""Update all input state for the current frame. Call this once per frame."""
 	settings = input_settings
+	
+	# Store viewport for mouse position calculations
+	if viewport:
+		cached_viewport = viewport
 	
 
 	
@@ -133,7 +140,13 @@ static func _track_key_press_time(key_name: String, current_time: float):
 
 static func _update_mouse_states():
 	"""Update mouse state"""
-	current_mouse["position"] = DisplayServer.mouse_get_position()
+	# Get viewport-relative mouse position for proper 3D viewport raycasting
+	if cached_viewport:
+		current_mouse["position"] = cached_viewport.get_mouse_position()
+	else:
+		# Fallback to global position if viewport not available (shouldn't happen in normal use)
+		current_mouse["position"] = DisplayServer.mouse_get_position()
+	
 	current_mouse["left_pressed"] = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
 	current_mouse["right_pressed"] = Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
 	current_mouse["middle_pressed"] = Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE)

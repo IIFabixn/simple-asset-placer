@@ -3,6 +3,9 @@ extends Control
 
 class_name AssetPlacerDock
 
+const PluginLogger = preload("res://addons/simpleassetplacer/plugin_logger.gd")
+const PluginConstants = preload("res://addons/simpleassetplacer/plugin_constants.gd")
+const AssetScanner = preload("res://addons/simpleassetplacer/asset_scanner.gd")
 const ThumbnailGenerator = preload("res://addons/simpleassetplacer/thumbnail_generator.gd")
 const MeshLibraryBrowser = preload("res://addons/simpleassetplacer/meshlib_browser.gd")
 const ModelLibraryBrowser = preload("res://addons/simpleassetplacer/modellib_browser.gd")
@@ -30,13 +33,8 @@ var thumbnail_size: int = 64
 
 # Asset Management
 var discovered_assets: Array = []
-var mesh_thumbnails: Dictionary = {}
 var supported_extensions = ["obj", "fbx", "dae", "gltf", "glb", "blend", "tscn", "scn", "tres", "res", "meshlib"]
 var category_manager: CategoryManager = null
-
-# Thumbnail generation queue to prevent conflicts
-var thumbnail_queue: Array = []
-var is_generating_thumbnails: bool = false
 
 func _ready():
 	name = "Asset Placer"
@@ -234,132 +232,26 @@ func update_responsive_sizes():
 		
 		# Update existing thumbnail items or refresh grid
 		if grid_container:
-			var needs_refresh = false
 			for child in grid_container.get_children():
 				if child is AssetThumbnailItem:
 					child.update_thumbnail_size(thumbnail_size)
-				else:
-					needs_refresh = true
-			
-			# If there are non-AssetThumbnailItem children, refresh the grid
-			if needs_refresh:
-				update_asset_grid()
 
 func discover_assets():
-	discovered_assets.clear()
-	_scan_directory("res://")
+	"""Discover all 3D assets in the project using AssetScanner"""
+	discovered_assets = AssetScanner.scan_for_assets("res://", true)
 	update_meshlib_browser()
 	# Discover assets for the model library browser
 	if modellib_browser:
 		modellib_browser.discover_assets()
 
-func _scan_directory(path: String):
-	var dir = DirAccess.open(path)
-	if dir:
-		dir.list_dir_begin()
-		var file_name = dir.get_next()
-		
-		while file_name != "":
-			var full_path = path + "/" + file_name
-			
-			if dir.current_is_dir() and not file_name.begins_with("."):
-				# Skip .godot and other hidden directories
-				if file_name != ".godot":
-					_scan_directory(full_path)
-			else:
-				var extension = file_name.get_extension().to_lower()
-				if extension in supported_extensions:
-					# Check if it's a MeshLibrary resource
-					var is_meshlib = false
-					var has_mesh = false
-					
-					if extension in ["tres", "res", "meshlib"]:
-						# Try to load resource safely
-						var resource = null
-						if ResourceLoader.exists(full_path):
-							resource = load(full_path)
-						
-						if resource != null and resource is MeshLibrary:
-							is_meshlib = true
-							has_mesh = true  # MeshLibraries are always valid
-						elif resource != null:
-							# Check if other .tres/.res files contain meshes
-							has_mesh = _resource_contains_mesh(resource)
-					elif extension in ["tscn", "scn"]:
-						# For Godot scene files, check if they contain meshes
-						has_mesh = _scene_file_contains_mesh(full_path)
-					else:
-						# For 3D model files (.fbx, .obj, .gltf, .blend, etc.), check if they contain meshes
-						has_mesh = _model_file_contains_mesh(full_path)
-					
-					# Only add assets that have meshes or are MeshLibraries
-					if has_mesh:
-						var asset_type = "MeshLibrary"
-						if not is_meshlib:
-							if extension in ["tscn", "scn"]:
-								asset_type = "Scene"
-							else:
-								asset_type = "3D Model"
-						
-						var asset_info = {
-							"path": full_path,
-							"name": file_name.get_basename(),
-							"extension": extension,
-							"is_meshlib": is_meshlib,
-							"type": asset_type
-						}
-						discovered_assets.append(asset_info)
-			
-			file_name = dir.get_next()
-
-func update_asset_grid():
-	# This function is no longer needed since the models tab now uses ModelLibraryBrowser
-	# The grid_container is no longer used for the models tab
-	pass
-
-func get_filtered_assets() -> Array:
-	# This function is no longer needed since filtering is handled by ModelLibraryBrowser
-	# Return empty array to maintain compatibility
-	return []
-
 func update_meshlib_browser():
-	# Get all MeshLibrary paths
-	var meshlib_paths = []
-	for asset in discovered_assets:
-		if asset.is_meshlib:
-			meshlib_paths.append(asset.path)
-	
+	"""Update MeshLibrary browser with discovered MeshLibrary assets"""
+	var meshlib_paths = AssetScanner.get_meshlib_paths(discovered_assets)
 	meshlib_browser.populate_meshlib_options(meshlib_paths)
 
 func _on_meshlib_item_selected(meshlib: MeshLibrary, item_id: int):
 	var settings = placement_settings.get_placement_settings()
 	meshlib_item_selected.emit(meshlib, item_id, settings)
-
-func create_asset_thumbnail(asset_info: Dictionary):
-	# Create the thumbnail item using our dedicated control
-	var thumbnail_item = AssetThumbnailItem.create_for_asset(asset_info, thumbnail_size)
-	
-	# Connect signals
-	thumbnail_item.asset_item_selected.connect(_on_asset_selected)
-	
-	# Add to grid
-	grid_container.add_child(thumbnail_item)
-
-func generate_thumbnail_for_asset(asset_info: Dictionary, thumbnail_rect: TextureRect):
-	# Generate actual 3D thumbnail
-	if asset_info.is_meshlib:
-		# Use placeholder for MeshLibrary for now
-		thumbnail_rect.texture = EditorInterface.get_editor_theme().get_icon("MeshLibrary", "EditorIcons")
-	else:
-		# Generate 3D mesh thumbnail asynchronously
-		_generate_mesh_thumbnail_async(asset_info, thumbnail_rect)
-
-func _generate_mesh_thumbnail_async(asset_info: Dictionary, thumbnail_rect: TextureRect):
-	# Set placeholder first
-	thumbnail_rect.texture = EditorInterface.get_editor_theme().get_icon("MeshInstance3D", "EditorIcons")
-	
-	# Queue thumbnail generation to avoid simultaneous generation conflicts
-	_queue_thumbnail_generation(asset_info, thumbnail_rect)
 
 func _on_asset_selected(asset_info: Dictionary):
 	# Load the resource and emit signal
@@ -372,18 +264,7 @@ func _on_asset_selected(asset_info: Dictionary):
 		var settings = placement_settings.get_placement_settings()
 		asset_selected.emit(asset_info.path, resource, settings)
 	else:
-		print("AssetPlacerDock: Failed to load resource: ", asset_info.path)
-
-func _on_thumbnail_gui_input(event: InputEvent, asset_info: Dictionary):
-	# For now, just handle click - drag and drop can be added later
-	pass
-
-func create_drag_preview(asset_info: Dictionary) -> Control:
-	var preview = Label.new()
-	preview.text = asset_info.name
-	preview.add_theme_color_override("font_color", Color.WHITE)
-	preview.add_theme_color_override("font_shadow_color", Color.BLACK)
-	return preview
+		PluginLogger.error(PluginConstants.COMPONENT_DOCK, "Failed to load resource: " + asset_info.path)
 
 func _on_refresh_pressed():
 	discover_assets()
@@ -396,123 +277,10 @@ func _on_search_changed(new_text: String):
 	if modellib_browser:
 		modellib_browser.set_search_text(new_text)
 
-
-
 func _on_cache_cleared():
-	# Clear any pending thumbnail queue
-	thumbnail_queue.clear()
-	is_generating_thumbnails = false
-	# Refresh both browsers to regenerate thumbnails
+	"""Handle cache clear event - refresh browsers to regenerate thumbnails"""
 	if modellib_browser:
 		modellib_browser.update_asset_grid()
-
-func _queue_thumbnail_generation(asset_info: Dictionary, thumbnail_rect: TextureRect):
-	# Add to queue
-	thumbnail_queue.append({"asset_info": asset_info, "thumbnail_rect": thumbnail_rect})
-	
-	# Start processing if not already running
-	if not is_generating_thumbnails:
-		_process_thumbnail_queue()
-
-func _process_thumbnail_queue():
-	if thumbnail_queue.is_empty():
-		is_generating_thumbnails = false
-		return
-	
-	is_generating_thumbnails = true
-	var item = thumbnail_queue.pop_front()
-	var asset_info = item.asset_info
-	var thumbnail_rect = item.thumbnail_rect
-	
-	# Check if thumbnail_rect is still valid (UI might have been refreshed)
-	if not is_instance_valid(thumbnail_rect):
-		# Skip and continue with next
-		_process_thumbnail_queue()
-		return
-	
-	# Generate thumbnail
-	var thumbnail = await ThumbnailGenerator.generate_mesh_thumbnail(asset_info.path)
-	
-	# Apply thumbnail if successful and UI element still valid
-	if thumbnail and is_instance_valid(thumbnail_rect):
-		thumbnail_rect.texture = thumbnail
-	
-	# Continue with next item in queue
-	_process_thumbnail_queue()
-
-func _resource_contains_mesh(resource: Resource) -> bool:
-	# Check if a .tres/.res resource contains mesh data
-	if resource is Mesh:
-		return true
-	elif resource is PackedScene:
-		# Check if the scene contains mesh instances
-		var scene_instance = resource.instantiate()
-		var has_mesh = _scene_has_mesh_recursive(scene_instance)
-		scene_instance.queue_free()
-		return has_mesh
-	elif resource is Material or resource.get_class().contains("Material"):
-		# Materials don't contain meshes
-		return false
-	elif resource.get_class().contains("Terrain") or resource.get_class().contains("terrain"):
-		# Terrain resources don't contain meshes
-		return false
-	
-	# Unknown resource type, assume it might contain a mesh
-	return false
-
-func _model_file_contains_mesh(file_path: String) -> bool:
-	# Check if a 3D model file (.fbx, .obj, .gltf, .blend, etc.) contains meshes
-	if not ResourceLoader.exists(file_path):
-		return false
-	
-	var resource = load(file_path)
-	if not resource:
-		return false
-	
-	if resource is Mesh:
-		return true
-	elif resource is PackedScene:
-		# Check if the scene contains mesh instances
-		var scene_instance = resource.instantiate()
-		var has_mesh = _scene_has_mesh_recursive(scene_instance)
-		scene_instance.queue_free()
-		return has_mesh
-	
-	return false
-
-func _scene_has_mesh_recursive(node: Node) -> bool:
-	# Check if this node or any child contains a mesh
-	if node is MeshInstance3D:
-		var mesh_instance = node as MeshInstance3D
-		if mesh_instance.mesh:
-			return true
-	
-	# Also check for ImporterMeshInstance3D (used during import process)
-	if node.get_class() == "ImporterMeshInstance3D":
-		if node.has_method("get_mesh") and node.get_mesh():
-			return true
-	
-	# Recursively check children
-	for child in node.get_children():
-		if _scene_has_mesh_recursive(child):
-			return true
-	
-	return false
-
-func _scene_file_contains_mesh(file_path: String) -> bool:
-	# Check if a Godot scene file (.tscn, .scn) contains meshes
-	if not ResourceLoader.exists(file_path):
-		return false
-	
-	var scene_resource = load(file_path)
-	if not scene_resource or not scene_resource is PackedScene:
-		return false
-	
-	# Instantiate the scene and check for meshes
-	var scene_instance = scene_resource.instantiate()
-	var has_mesh = _scene_has_mesh_recursive(scene_instance)
-	scene_instance.queue_free()
-	return has_mesh
 
 func _ensure_settings_loaded():
 	"""Ensure settings are properly loaded and applied to UI after initialization"""

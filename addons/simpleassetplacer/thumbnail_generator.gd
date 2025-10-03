@@ -3,7 +3,13 @@ extends RefCounted
 
 class_name ThumbnailGenerator
 
-static var thumbnail_cache: Dictionary = {}
+const PluginConstants = preload("res://addons/simpleassetplacer/plugin_constants.gd")
+const PluginLogger = preload("res://addons/simpleassetplacer/plugin_logger.gd")
+
+# LRU Cache implementation
+static var thumbnail_cache: Dictionary = {}  # key -> texture
+static var cache_access_order: Array = []  # LRU order (most recent at end)
+
 static var viewport: SubViewport
 static var camera: Camera3D
 static var mesh_instance: MeshInstance3D
@@ -40,7 +46,7 @@ static func initialize():
 	# This viewport will have its own world and rendering context
 	viewport = SubViewport.new()
 	if not viewport:
-		print("ThumbnailGenerator: ERROR - Failed to create SubViewport!")
+		PluginLogger.error(PluginConstants.COMPONENT_THUMBNAIL, "Failed to create SubViewport!")
 		return
 	
 	viewport.size = Vector2i(256, 256)  # Increased size for better rendering
@@ -59,7 +65,7 @@ static func initialize():
 	# Create a hidden control container that's isolated from the main editor
 	var hidden_container = Control.new()
 	if not hidden_container:
-		print("ThumbnailGenerator: ERROR - Failed to create hidden container!")
+		PluginLogger.error(PluginConstants.COMPONENT_THUMBNAIL, "Failed to create hidden container!")
 		viewport.queue_free()
 		viewport = null
 		return
@@ -70,7 +76,7 @@ static func initialize():
 	# Add to editor but in a way that's completely isolated
 	var main_screen = EditorInterface.get_editor_main_screen()
 	if not main_screen:
-		print("ThumbnailGenerator: ERROR - Could not get editor main screen!")
+		PluginLogger.error(PluginConstants.COMPONENT_THUMBNAIL, "Could not get editor main screen!")
 		hidden_container.queue_free()
 		viewport.queue_free()
 		viewport = null
@@ -82,7 +88,7 @@ static func initialize():
 	# Create camera
 	camera = Camera3D.new()
 	if not camera:
-		print("ThumbnailGenerator: ERROR - Failed to create Camera3D!")
+		PluginLogger.error(PluginConstants.COMPONENT_THUMBNAIL, "Failed to create Camera3D!")
 		return
 	
 	camera.projection = Camera3D.PROJECTION_PERSPECTIVE
@@ -96,7 +102,7 @@ static func initialize():
 	# Create mesh instance
 	mesh_instance = MeshInstance3D.new()
 	if not mesh_instance:
-		print("ThumbnailGenerator: ERROR - Failed to create MeshInstance3D!")
+		PluginLogger.error(PluginConstants.COMPONENT_THUMBNAIL, "Failed to create MeshInstance3D!")
 		return
 	
 	viewport.add_child(mesh_instance)
@@ -104,7 +110,7 @@ static func initialize():
 	# Create main directional light
 	light = DirectionalLight3D.new()
 	if not light:
-		print("ThumbnailGenerator: ERROR - Failed to create DirectionalLight3D!")
+		PluginLogger.error(PluginConstants.COMPONENT_THUMBNAIL, "Failed to create DirectionalLight3D!")
 		return
 	light.position = Vector3(2, 3, 2)
 	light.light_energy = 1.2  # Moderate main lighting
@@ -137,7 +143,7 @@ static func initialize():
 	
 	# Validate initialization
 	if not (viewport and camera and mesh_instance and light):
-		print("ThumbnailGenerator: WARNING - Component initialization failed!")
+		PluginLogger.warning(PluginConstants.COMPONENT_THUMBNAIL, "Component initialization failed!")
 
 static func cleanup():
 	"""Clean up all static resources when no longer needed"""
@@ -177,11 +183,65 @@ static func cleanup():
 	
 	# Clear cache
 	thumbnail_cache.clear()
+	cache_access_order.clear()
 	
 	generation_mutex.unlock()
 
 static func clear_cache():
+	"""Clear all cached thumbnails"""
 	thumbnail_cache.clear()
+	cache_access_order.clear()
+	PluginLogger.info(PluginConstants.COMPONENT_THUMBNAIL, "Thumbnail cache cleared")
+
+## LRU Cache Management
+
+static func _cache_get(key: String) -> ImageTexture:
+	"""Get item from cache and mark as recently used"""
+	if key in thumbnail_cache:
+		# Move to end (most recent)
+		cache_access_order.erase(key)
+		cache_access_order.append(key)
+		return thumbnail_cache[key]
+	return null
+
+static func _cache_put(key: String, texture: ImageTexture) -> void:
+	"""Add item to cache with LRU eviction if needed"""
+	# If already in cache, remove old entry from access order
+	if key in thumbnail_cache:
+		cache_access_order.erase(key)
+	
+	# Check if we need to evict old entries
+	if thumbnail_cache.size() >= PluginConstants.MAX_THUMBNAIL_CACHE_SIZE:
+		_evict_lru_entries()
+	
+	# Add new entry
+	thumbnail_cache[key] = texture
+	cache_access_order.append(key)
+
+static func _evict_lru_entries() -> void:
+	"""Evict least recently used entries when cache is full"""
+	var entries_to_remove = thumbnail_cache.size() - PluginConstants.MAX_THUMBNAIL_CACHE_SIZE + 10
+	
+	if entries_to_remove <= 0:
+		return
+	
+	PluginLogger.debug(PluginConstants.COMPONENT_THUMBNAIL, "Evicting " + str(entries_to_remove) + " LRU cache entries")
+	
+	# Remove oldest entries (from front of access order list)
+	for i in range(entries_to_remove):
+		if cache_access_order.is_empty():
+			break
+		
+		var key_to_remove = cache_access_order.pop_front()
+		thumbnail_cache.erase(key_to_remove)
+
+static func get_cache_stats() -> Dictionary:
+	"""Get cache statistics for debugging"""
+	return {
+		"size": thumbnail_cache.size(),
+		"max_size": PluginConstants.MAX_THUMBNAIL_CACHE_SIZE,
+		"usage_percent": (thumbnail_cache.size() * 100.0) / PluginConstants.MAX_THUMBNAIL_CACHE_SIZE
+	}
 
 static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 	# Auto-initialize if not already done
@@ -191,11 +251,11 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 	# Simple concurrency control - just use the mutex to protect the rendering process
 	generation_mutex.lock()
 	
-	# Check cache first - return cached thumbnail if available
-	if asset_path in thumbnail_cache:
+	# Check cache first using LRU - return cached thumbnail if available
+	var cached_texture = _cache_get(asset_path)
+	if cached_texture:
 		_cleanup_generation()
-		return thumbnail_cache[asset_path]
-	initialize()
+		return cached_texture
 
 	# Clear any previous mesh and materials to prevent contamination
 	if mesh_instance:
@@ -260,7 +320,7 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 	
 	# Set the mesh to our instance
 	if not mesh_instance or not is_instance_valid(mesh_instance):
-		print("ThumbnailGenerator: ERROR - mesh_instance is null or invalid!")
+		PluginLogger.error(PluginConstants.COMPONENT_THUMBNAIL, "mesh_instance is null or invalid!")
 		_cleanup_generation()
 		return null
 	
@@ -338,7 +398,7 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 	
 	# Check if viewport is still valid after awaits (could be cleaned up externally)
 	if not viewport or not is_instance_valid(viewport):
-		print("ThumbnailGenerator: Viewport became invalid during generation for ", asset_path.get_file())
+		PluginLogger.warning(PluginConstants.COMPONENT_THUMBNAIL, "Viewport became invalid during generation for " + str(asset_path.get_file()))
 		_cleanup_generation()
 		return null
 	
@@ -348,7 +408,7 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 	# Get the viewport texture
 	var viewport_texture = viewport.get_texture()
 	if not viewport_texture:
-		print("ThumbnailGenerator: Failed to get viewport texture for ", asset_path.get_file())
+		PluginLogger.warning(PluginConstants.COMPONENT_THUMBNAIL, "Failed to get viewport texture for " + str(asset_path.get_file()))
 		return null
 
 	# Create ImageTexture from viewport
@@ -360,8 +420,8 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 	var texture = ImageTexture.new()
 	texture.set_image(image)
 	
-	# Cache the result with unique identifier
-	thumbnail_cache[asset_path] = texture
+	# Cache the result using LRU cache
+	_cache_put(asset_path, texture)
 	
 	# Always clear the mesh after capturing to prevent leftover state
 	if mesh_instance:

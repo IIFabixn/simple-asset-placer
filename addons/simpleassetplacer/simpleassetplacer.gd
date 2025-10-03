@@ -4,6 +4,12 @@ extends EditorPlugin
 # Main Plugin
 # Only handles editor integration and delegates everything to TransformationManager
 
+# Import utilities
+const PluginLogger = preload("res://addons/simpleassetplacer/plugin_logger.gd")
+const PluginConstants = preload("res://addons/simpleassetplacer/plugin_constants.gd")
+const SettingsManager = preload("res://addons/simpleassetplacer/settings_manager.gd")
+const ErrorHandler = preload("res://addons/simpleassetplacer/error_handler.gd")
+
 # Import specialized managers
 const InputHandler = preload("res://addons/simpleassetplacer/input_handler.gd")
 const PositionManager = preload("res://addons/simpleassetplacer/position_manager.gd")
@@ -20,18 +26,17 @@ const ThumbnailQueueManager = preload("res://addons/simpleassetplacer/thumbnail_
 
 # Plugin state
 var dock: AssetPlacerDock
-var _settings: Dictionary = {}
 
 ## Plugin Lifecycle
 
 func _enable_plugin() -> void:
-	print("AssetPlacer: Plugin enabled")
+	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Plugin enabled")
 
 func _disable_plugin() -> void:
-	print("AssetPlacer: Plugin disabled")
+	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Plugin disabled")
 
 func _enter_tree() -> void:
-	print("AssetPlacer: Initializing...")
+	PluginLogger.log_initialization(PluginConstants.COMPONENT_MAIN)
 	
 	# Initialize systems in order
 	_initialize_systems()
@@ -41,21 +46,27 @@ func _enter_tree() -> void:
 	# Enable input forwarding for reliable input handling
 	set_input_event_forwarding_always_enabled()
 	
-	print("AssetPlacer: Initialization complete!")
+	PluginLogger.log_initialization_complete(PluginConstants.COMPONENT_MAIN)
 
 func _exit_tree() -> void:
-	print("AssetPlacer: Cleaning up...")
+	PluginLogger.log_cleanup(PluginConstants.COMPONENT_MAIN)
 	
 	# Clean up in reverse order
 	_cleanup_systems()
 	_cleanup_dock()
 	
-	print("AssetPlacer: Cleanup complete!")
+	PluginLogger.log_cleanup_complete(PluginConstants.COMPONENT_MAIN)
 
 ## System Initialization
 
 func _initialize_systems():
 	"""Initialize all manager systems"""
+	# Initialize settings manager first
+	SettingsManager.initialize()
+	
+	# Initialize error handler with editor interface instance
+	ErrorHandler.initialize(get_editor_interface())
+	
 	# Initialize core systems
 	InputHandler.update_input_state({})  # Initialize with empty settings initially
 	PositionManager.configure({})
@@ -64,7 +75,7 @@ func _initialize_systems():
 	# Initialize thumbnail system
 	ThumbnailGenerator.initialize()
 	
-	print("AssetPlacer: All systems initialized")
+	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "All systems initialized")
 
 func _cleanup_systems():
 	"""Clean up all manager systems"""
@@ -92,7 +103,7 @@ func _setup_dock():
 	# Add to Godot dock
 	add_control_to_dock(DOCK_SLOT_RIGHT_UL, dock)
 	
-	print("AssetPlacer: Dock setup complete")
+	PluginLogger.info(PluginConstants.COMPONENT_DOCK, "Dock setup complete")
 
 func _cleanup_dock():
 	"""Clean up the dock"""
@@ -104,26 +115,11 @@ func _cleanup_dock():
 ## Settings Management
 
 func _load_settings():
-	"""Load plugin settings"""
-	# Load default settings (could be enhanced to load from file)
-	_settings = {
-		"cancel_key": "ESCAPE",
-		"height_up_key": "Q", 
-		"height_down_key": "E",
-		"rotate_x_key": "X",
-		"rotate_y_key": "Y", 
-		"rotate_z_key": "Z",
-		"reset_rotation_key": "T",
-		"scale_up_key": "PAGE_UP",
-		"scale_down_key": "PAGE_DOWN",
-		"scale_reset_key": "HOME",
-		"collision_enabled": true,
-		"snap_to_ground": true,
-		"height_step_size": 0.1,
-		"preview_opacity": 0.6
-	}
+	"""Load plugin settings from file or use defaults"""
+	# Try to load from file, fallback to defaults
+	SettingsManager.load_from_file()
 	
-	print("AssetPlacer: Settings loaded")
+	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Settings loaded")
 
 ## Core Processing Loop
 
@@ -137,15 +133,13 @@ func _process(delta: float) -> void:
 	if not camera:
 		return
 	
-	# Delegate frame processing to coordinator
-	# Get current settings from dock if available, otherwise use defaults
-	var current_settings = _settings.duplicate()
+	# Update dock settings in SettingsManager if available
 	if dock and dock.has_method("get_placement_settings"):
 		var dock_settings = dock.get_placement_settings()
-		# Use merge with overwrite to ensure dock settings take priority
-		current_settings.merge(dock_settings, true)  # true = overwrite existing keys
+		SettingsManager.set_dock_settings(dock_settings)
 	
-	TransformationManager.process_frame_input(camera, current_settings)
+	# Delegate frame processing to coordinator with combined settings
+	TransformationManager.process_frame_input(camera, SettingsManager.get_combined_settings())
 
 func _is_plugin_ready() -> bool:
 	"""Check if plugin is ready for processing"""
@@ -189,15 +183,13 @@ func _input(event: InputEvent) -> void:
 			full_key_string += "SHIFT+"
 		full_key_string += key_string
 		
-		# Get current settings for transform mode key
-		var current_settings = {}
+		# Update dock settings in SettingsManager
 		if dock and dock.has_method("get_placement_settings"):
 			var dock_settings = dock.get_placement_settings()
-			current_settings.merge(_settings, true)
-			current_settings.merge(dock_settings, true)
+			SettingsManager.set_dock_settings(dock_settings)
 		
 		# Check if this is the transform mode key
-		var transform_key = current_settings.get("transform_mode_key", "TAB")
+		var transform_key = SettingsManager.get_setting("transform_mode_key", "TAB")
 		if key_string == transform_key or full_key_string == transform_key:
 			# Only handle if we have a selected Node3D
 			var selection = EditorInterface.get_selection()
@@ -231,15 +223,13 @@ func _shortcut_input(event: InputEvent) -> void:
 			full_key_string += "SHIFT+"
 		full_key_string += key_string
 		
-		# Get current dock settings for key mappings
-		var current_settings = {}
+		# Update dock settings in SettingsManager
 		if dock and dock.has_method("get_placement_settings"):
 			var dock_settings = dock.get_placement_settings()
-			current_settings.merge(_settings, true)
-			current_settings.merge(dock_settings, true)
+			SettingsManager.set_dock_settings(dock_settings)
 		
 		# Special handling for transform mode key - intercept even when no mode is active
-		var transform_key = current_settings.get("transform_mode_key", "TAB")
+		var transform_key = SettingsManager.get_setting("transform_mode_key", "TAB")
 		if key_string == transform_key or full_key_string == transform_key:
 			# Consume the event immediately to prevent focus change
 			get_viewport().set_input_as_handled()
@@ -249,7 +239,7 @@ func _shortcut_input(event: InputEvent) -> void:
 		# For other plugin keys, only handle when modes are active
 		if TransformationManager.is_any_mode_active():
 			# Check if this key matches any of our plugin keybindings
-			if _is_plugin_key(full_key_string, current_settings) or _is_plugin_key(key_string, current_settings):
+			if SettingsManager.is_plugin_key(full_key_string) or SettingsManager.is_plugin_key(key_string):
 				# This is our key - consume it to prevent Godot from processing it
 				get_viewport().set_input_as_handled()
 
@@ -280,15 +270,13 @@ func _forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 			full_key_string += "SHIFT+"
 		full_key_string += key_string
 		
-		# Get current dock settings for key mappings
-		var current_settings = {}
+		# Update dock settings in SettingsManager
 		if dock and dock.has_method("get_placement_settings"):
 			var dock_settings = dock.get_placement_settings()
-			current_settings.merge(_settings, true)
-			current_settings.merge(dock_settings, true)
+			SettingsManager.set_dock_settings(dock_settings)
 		
 		# Special handling for transform mode key - intercept even when no mode is active
-		var transform_key = current_settings.get("transform_mode_key", "TAB")
+		var transform_key = SettingsManager.get_setting("transform_mode_key", "TAB")
 		if key_string == transform_key or full_key_string == transform_key:
 			# Consume the event to prevent focus change 
 			get_viewport().set_input_as_handled()
@@ -298,15 +286,8 @@ func _forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 		if not TransformationManager.is_any_mode_active():
 			return EditorPlugin.AFTER_GUI_INPUT_PASS
 		
-		# Get current dock settings for key mappings
-		var settings_for_keys = {}
-		if dock and dock.has_method("get_placement_settings"):
-			var dock_settings = dock.get_placement_settings()
-			settings_for_keys.merge(_settings, true)
-			settings_for_keys.merge(dock_settings, true)
-		
 		# Check if this key matches any of our plugin keybindings
-		if _is_plugin_key(full_key_string, settings_for_keys) or _is_plugin_key(key_string, settings_for_keys):
+		if SettingsManager.is_plugin_key(full_key_string) or SettingsManager.is_plugin_key(key_string):
 			# This is our key - consume it to prevent Godot from processing it
 			# Mark the event as handled and STOP further processing
 			get_viewport().set_input_as_handled()
@@ -336,60 +317,28 @@ func _forward_canvas_gui_input(event: InputEvent) -> bool:
 			full_key_string += "SHIFT+"
 		full_key_string += key_string
 		
-		# Get current dock settings for key mappings
-		var current_settings = {}
+		# Update dock settings in SettingsManager
 		if dock and dock.has_method("get_placement_settings"):
 			var dock_settings = dock.get_placement_settings()
-			current_settings.merge(_settings, true)
-			current_settings.merge(dock_settings, true)
+			SettingsManager.set_dock_settings(dock_settings)
 		
 		# Check if this key matches any of our plugin keybindings
-		if _is_plugin_key(full_key_string, current_settings) or _is_plugin_key(key_string, current_settings):
+		if SettingsManager.is_plugin_key(full_key_string) or SettingsManager.is_plugin_key(key_string):
 			# This is our key - consume it to prevent Godot from processing it
 			return true
 	
 	# Let Godot handle other inputs
 	return false
 
-func _is_plugin_key(key_string: String, settings: Dictionary) -> bool:
-	"""Check if a key string matches any plugin keybinding"""
-	var plugin_keys = [
-		"cancel_key",
-		"transform_mode_key", 
-		"height_up_key",
-		"height_down_key",
-		"reset_height_key",
-		"position_left_key",
-		"position_right_key",
-		"position_forward_key",
-		"position_backward_key",
-		"reset_position_key",
-		"rotate_x_key",
-		"rotate_y_key", 
-		"rotate_z_key",
-		"reset_rotation_key",
-		"scale_up_key",
-		"scale_down_key",
-		"scale_reset_key",
-		"reverse_modifier_key",
-		"large_increment_modifier_key"
-	]
-	
-	for plugin_key in plugin_keys:
-		if settings.get(plugin_key, "") == key_string:
-			return true
-	
-	return false
-
 ## Asset Selection Handlers (From Dock)
 
 func _on_asset_selected(asset_path: String, mesh_resource: Resource, settings: Dictionary):
 	"""Handle asset selection from dock"""
-	print("AssetPlacer: Asset selected: ", asset_path)
+	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Asset selected: " + asset_path)
 	
-	# Merge dock settings with plugin settings
-	var combined_settings = _settings.duplicate()
-	combined_settings.merge(settings)
+	# Update dock settings and get combined settings
+	SettingsManager.update_dock_settings(settings)
+	var combined_settings = SettingsManager.get_combined_settings()
 	
 	# Start placement mode through the coordinator
 	if mesh_resource and mesh_resource is Mesh:
@@ -402,11 +351,11 @@ func _on_asset_selected(asset_path: String, mesh_resource: Resource, settings: D
 
 func _on_meshlib_item_selected(meshlib: MeshLibrary, item_id: int, settings: Dictionary):
 	"""Handle MeshLibrary item selection from dock"""
-	print("AssetPlacer: MeshLib item selected: ", item_id)
+	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "MeshLib item selected: " + str(item_id))
 	
-	# Merge dock settings with plugin settings
-	var combined_settings = _settings.duplicate()
-	combined_settings.merge(settings)
+	# Update dock settings and get combined settings
+	SettingsManager.update_dock_settings(settings)
+	var combined_settings = SettingsManager.get_combined_settings()
 	
 	# Start placement mode through the coordinator
 	TransformationManager.start_placement_mode(null, meshlib, item_id, "", combined_settings, dock)
@@ -418,12 +367,12 @@ func _on_meshlib_item_selected(meshlib: MeshLibrary, item_id: int, settings: Dic
 
 func update_plugin_settings(new_settings: Dictionary):
 	"""Update plugin settings"""
-	_settings.merge(new_settings)
-	print("AssetPlacer: Settings updated")
+	SettingsManager.set_plugin_settings(new_settings)
+	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Settings updated")
 
 func get_plugin_settings() -> Dictionary:
 	"""Get current plugin settings"""
-	return _settings.duplicate()
+	return SettingsManager.get_combined_settings()
 
 ## Debug and Information
 
@@ -434,12 +383,12 @@ func get_system_status() -> Dictionary:
 		"dock_exists": dock != null,
 		"current_mode": TransformationManager.get_current_mode(),
 		"has_camera": _get_current_camera() != null,
-		"settings_loaded": not _settings.is_empty()
+		"settings_loaded": SettingsManager.get_settings_summary()["plugin_settings_count"] > 0
 	}
 
 func debug_print_status():
 	"""Print system status for debugging"""
 	var status = get_system_status()
-	print("AssetPlacer System Status:")
+	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "System Status:")
 	for key in status:
-		print("  ", key, ": ", status[key])
+		PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "  " + key + ": " + str(status[key]))

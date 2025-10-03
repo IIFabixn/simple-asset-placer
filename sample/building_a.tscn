@@ -9,7 +9,7 @@
 [ext_resource type="PackedScene" uid="uid://c868uybopcv4p" path="res://sample/assets/kenny_retro-medival-kit/roof.glb" id="7_8xed5"]
 [ext_resource type="PackedScene" uid="uid://c5kcy5uc63m7e" path="res://sample/assets/kenny_retro-medival-kit/pulley-crate.glb" id="8_eqgrl"]
 
-[node name="Building_A" type="Node3D"]
+[node name="Building_a" type="Node3D"]
 
 [node name="wall-window" parent="." instance=ExtResource("1_15ce8")]
 transform = Transform3D(1.9470718e-07, 0, -1, 0, 1, 0, 1, 0, 1.9470718e-07, -0.5, 5.722046e-06, -1.5)

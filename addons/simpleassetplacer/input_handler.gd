@@ -319,6 +319,7 @@ static func get_scale_input() -> Dictionary:
 		"up_pressed": is_key_just_pressed("scale_up") and not right_mouse_held,
 		"down_pressed": is_key_just_pressed("scale_down") and not right_mouse_held,
 		"reset_pressed": is_key_just_pressed("reset_scale") and not right_mouse_held,
+		"shift_held": is_shift_held(),
 		"alt_held": is_alt_held()
 	}
 

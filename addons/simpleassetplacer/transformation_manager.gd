@@ -110,9 +110,11 @@ static func start_placement_mode(mesh: Mesh = null, meshlib: MeshLibrary = null,
 	# Configure position manager for placement
 	PositionManager.configure(placement_settings)
 	
-	# Reset position manager for new placement (but not the position offset - that's controlled by reset_position_on_exit)
+	# Reset position manager for new placement
 	# The first mouse update will set the initial position from raycast
-	PositionManager.reset_for_new_placement()
+	# Reset height offset only if the setting is enabled
+	var reset_height = placement_settings.get("reset_height_on_exit", false)
+	PositionManager.reset_for_new_placement(reset_height)
 	
 	# Reset rotation for new placement (unless user wants to keep rotation)
 	if not settings.get("keep_rotation_between_placements", false):
@@ -713,16 +715,23 @@ static func _process_scale_input(scale_input: Dictionary, target_node: Node3D = 
 		return
 		
 	var scale_step = settings.get("scale_increment", 0.1)  # Default
+	var reverse_scale = scale_input.shift_held  # SHIFT = reverse direction
 	
 	# Apply modifier for increment size
 	if scale_input.alt_held:  # ALT = large increment
 		scale_step = settings.get("large_scale_increment", 0.5)
 	
 	if scale_input.up_pressed:
-		ScaleManager.increase_scale(scale_step)
+		if reverse_scale:
+			ScaleManager.decrease_scale(scale_step)
+		else:
+			ScaleManager.increase_scale(scale_step)
 		ScaleManager.apply_uniform_scale_to_node(target_node)
 	elif scale_input.down_pressed:
-		ScaleManager.decrease_scale(scale_step)
+		if reverse_scale:
+			ScaleManager.increase_scale(scale_step)
+		else:
+			ScaleManager.decrease_scale(scale_step)
 		ScaleManager.apply_uniform_scale_to_node(target_node)
 	elif scale_input.reset_pressed:
 		ScaleManager.reset_scale()

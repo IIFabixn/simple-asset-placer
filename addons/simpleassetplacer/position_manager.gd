@@ -34,6 +34,7 @@ static var base_height: float = 0.0
 static var surface_normal: Vector3 = Vector3.UP  # Normal of the surface at current position
 static var is_initial_position: bool = true  # Track if this is the first position update
 static var manual_position_offset: Vector3 = Vector3.ZERO  # Accumulated WASD position adjustments
+static var last_raycast_xz: Vector2 = Vector2.ZERO  # Track last raycast XZ position (without offsets) for change detection
 
 # Position calculation settings
 static var collision_enabled: bool = true
@@ -56,7 +57,8 @@ static var align_with_normal: bool = false  # Align rotation with surface normal
 static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, collision_layer: int = 1, lock_y_axis: bool = false) -> Vector3:
 	"""Update target position based on mouse position and camera raycast
 	lock_y_axis: If true, only XZ is updated after initial setup, Y is calculated from base_height + height_offset
-	However, when snap_to_ground or align_with_normal is enabled, Y always follows the surface"""
+	align_with_normal: Y always follows the surface (updates base_height every frame)
+	snap_to_ground + lock_y_axis: base_height only updates when XZ position changes (not from height offset changes)"""
 	if not camera:
 		return current_position
 	
@@ -69,11 +71,27 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 		var new_pos = _raycast_to_world(from, to, collision_layer)
 		if new_pos != Vector3.INF:
 			# Determine Y position based on lock_y_axis flag, alignment mode, snap_to_ground, and whether this is initial positioning
-			# When aligning with normal or snap_to_ground, Y should always follow the surface
-			if align_with_normal or snap_to_ground or not lock_y_axis or is_initial_position:
+			# When aligning with normal, Y should always follow the surface
+			# When snap_to_ground with lock_y_axis, only update base_height if XZ changed significantly (not from height offset changes)
+			var should_update_base_height = false
+			if align_with_normal or not lock_y_axis or is_initial_position:
+				should_update_base_height = true
+			elif snap_to_ground and lock_y_axis:
+				# Only update base height if XZ position changed (not just height offset)
+				# Compare against last raycast XZ position to avoid interference from manual_position_offset
+				var new_xz = Vector2(new_pos.x, new_pos.z)
+				var xz_distance = new_xz.distance_to(last_raycast_xz)
+				should_update_base_height = xz_distance > 0.01  # Small threshold to avoid floating point issues
+			
+			if should_update_base_height:
 				# Update base_height from raycast and apply offset
-				# This happens when: aligning with surface, snapping to ground, Y not locked, or first update
-				base_height = new_pos.y
+				# If this is initial position and we're preserving height_offset, compensate for it
+				# This prevents double-application when raycast hits previously placed objects at elevated heights
+				if is_initial_position and height_offset != 0.0:
+					base_height = new_pos.y - height_offset
+				else:
+					base_height = new_pos.y
+				last_raycast_xz = Vector2(new_pos.x, new_pos.z)  # Store XZ for next frame comparison
 				
 				# When aligning with normal, apply height offset along the surface normal direction
 				if align_with_normal and height_offset != 0.0:
@@ -107,10 +125,26 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 	# Fallback: project to horizontal plane
 	var pos = _project_to_plane(from, to)
 	
-	# When aligning with normal, snapping to ground, or not initial, handle Y appropriately
-	if align_with_normal or snap_to_ground or not lock_y_axis or is_initial_position:
+	# When aligning with normal or not initial, handle Y appropriately
+	# When snap_to_ground with lock_y_axis, only update if XZ changed
+	var should_update_base_height_fallback = false
+	if align_with_normal or not lock_y_axis or is_initial_position:
+		should_update_base_height_fallback = true
+	elif snap_to_ground and lock_y_axis:
+		# Only update base height if XZ position changed
+		# Compare against last raycast XZ position to avoid interference from manual_position_offset
+		var new_xz = Vector2(pos.x, pos.z)
+		var xz_distance = new_xz.distance_to(last_raycast_xz)
+		should_update_base_height_fallback = xz_distance > 0.01
+	
+	if should_update_base_height_fallback:
 		# Set base_height from plane and mark as initialized
-		base_height = pos.y
+		# If this is initial position and we're preserving height_offset, compensate for it
+		if is_initial_position and height_offset != 0.0:
+			base_height = pos.y - height_offset
+		else:
+			base_height = pos.y
+		last_raycast_xz = Vector2(pos.x, pos.z)  # Store XZ for next frame comparison
 		
 		# When aligning with normal, apply height offset along surface normal
 		if align_with_normal and height_offset != 0.0:
@@ -398,17 +432,21 @@ static func set_base_height(y: float):
 	target_position.y = base_height + height_offset
 	current_position = target_position
 
-static func reset_for_new_placement():
+static func reset_for_new_placement(reset_height_offset: bool = true):
 	"""Reset position manager state for a new placement session
 	
 	Note: manual_position_offset is NOT reset here - it's only reset when exiting modes
-	if the reset_position_on_exit setting is enabled."""
+	if the reset_position_on_exit setting is enabled.
+	
+	reset_height_offset: If true, reset height_offset to 0. If false, preserve current height."""
 	is_initial_position = true
-	height_offset = 0.0
+	if reset_height_offset:
+		height_offset = 0.0
 	current_position = Vector3.ZERO
 	target_position = Vector3.ZERO
 	base_height = 0.0
 	surface_normal = Vector3.UP
+	last_raycast_xz = Vector2.ZERO
 	# manual_position_offset is deliberately NOT reset here
 
 ## Position Getters and Setters

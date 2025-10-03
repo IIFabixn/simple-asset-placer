@@ -595,10 +595,22 @@ static func _process_transform_input(camera: Camera3D):
 	else:
 		RotationManager.reset_surface_alignment()
 	
-	# Handle rotation input for all nodes
-	for node in target_nodes:
-		if node and node.is_inside_tree():
-			_process_rotation_input(rotation_input, node)
+	# Handle rotation input - process ONCE for all nodes to avoid accumulation
+	# Since RotationManager uses static state, we must not call it multiple times per frame
+	var rotation_applied = false
+	if not target_nodes.is_empty():
+		var first_node = target_nodes[0]
+		if first_node and first_node.is_inside_tree():
+			_process_rotation_input(rotation_input, first_node)
+			rotation_applied = true
+	
+	# Apply the same rotation to remaining nodes (copying from first node)
+	if rotation_applied and target_nodes.size() > 1:
+		for i in range(1, target_nodes.size()):
+			var node = target_nodes[i]
+			if node and node.is_inside_tree():
+				# Copy rotation from first node to maintain consistency
+				node.rotation = target_nodes[0].rotation
 	
 	# Handle scale input for all nodes
 	for node in target_nodes:
@@ -619,15 +631,18 @@ static func _process_rotation_input(rotation_input: Dictionary, target_node: Nod
 		return
 	
 	# Handle rotation keys - use proper increment sizes and modifiers
-	var rotation_step = placement_settings.get("rotation_increment", 15.0)  # Default
+	# Priority: ALT (large) > CTRL (fine) > Base
+	# These should be mutually exclusive - only one size modifier at a time
+	var rotation_step: float
 	
-	# Apply modifier for increment size
-	if rotation_input.alt_held:  # ALT = large increment
+	if rotation_input.alt_held and not rotation_input.ctrl_held:  # ALT only = large increment
 		rotation_step = placement_settings.get("large_rotation_increment", 90.0)
-	elif rotation_input.ctrl_held:  # CTRL = fine increment
+	elif rotation_input.ctrl_held and not rotation_input.alt_held:  # CTRL only = fine increment
 		rotation_step = placement_settings.get("fine_rotation_increment", 5.0)
+	else:  # No modifier or both (default to base)
+		rotation_step = placement_settings.get("rotation_increment", 15.0)
 	
-	# Apply reverse direction modifier
+	# Apply reverse direction modifier (SHIFT)
 	if rotation_input.shift_held:  # SHIFT = reverse direction
 		rotation_step = -rotation_step
 	
@@ -761,10 +776,13 @@ static func _apply_rotation_adjustment(wheel_input: Dictionary):
 	var large_increment = wheel_input.get("large_increment", false)
 	var reverse = wheel_input.get("reverse_modifier", false)
 	
-	# Mouse wheel uses fine adjustment by default, unless ALT is held for large increment
-	var step = placement_settings.get("fine_rotation_increment", 5.0)
+	# Mouse wheel: ALT = large increment, otherwise fine adjustment
+	# Use explicit if/else to prevent accidental addition of increments
+	var step: float
 	if large_increment:
 		step = placement_settings.get("large_rotation_increment", 90.0)
+	else:
+		step = placement_settings.get("fine_rotation_increment", 5.0)
 	
 	if reverse:
 		direction = -direction

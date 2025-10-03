@@ -103,11 +103,12 @@ static func show_rotation_overlay(rotation: Vector3, message: String = ""):
 	
 	var label = rotation_overlay.get_node("RotationLabel")
 	if label:
-		var text = "Rotation: X: %.1f° Y: %.1f° Z: %.1f°" % [
-			rad_to_deg(rotation.x),
-			rad_to_deg(rotation.y), 
-			rad_to_deg(rotation.z)
-		]
+		# Convert to degrees and normalize to 0-360 range for display
+		var x_deg = fmod(rad_to_deg(rotation.x) + 360.0, 360.0)
+		var y_deg = fmod(rad_to_deg(rotation.y) + 360.0, 360.0)
+		var z_deg = fmod(rad_to_deg(rotation.z) + 360.0, 360.0)
+		
+		var text = "Rotation: X: %.1f° Y: %.1f° Z: %.1f°" % [x_deg, y_deg, z_deg]
 		if message != "":
 			text += "\n" + message
 		label.text = text

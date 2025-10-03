@@ -73,13 +73,12 @@ var snap_to_ground: bool = false
 var align_with_normal: bool = false  # Align object rotation with surface normal
 var snap_enabled: bool = false  # User can enable when desired
 var snap_step: float = 1.0
-var snap_by_aabb: bool = true  # Snap by bounding box edges instead of pivot
 var snap_offset: Vector3 = Vector3.ZERO  # Grid offset from world origin
 var snap_y_enabled: bool = false  # Enable Y-axis (height) snapping
 var snap_y_step: float = 1.0  # Grid size for Y-axis snapping
-var snap_center_x: bool = false  # Snap to center of bounding box on X-axis
-var snap_center_y: bool = false  # Snap to center of bounding box on Y-axis
-var snap_center_z: bool = false  # Snap to center of bounding box on Z-axis
+var snap_center_x: bool = false  # Snap using center position on X-axis
+var snap_center_y: bool = false  # Snap using center position on Y-axis
+var snap_center_z: bool = false  # Snap using center position on Z-axis
 var show_grid: bool = false  # Show visual grid overlay
 var grid_extent: float = 20.0  # Size of grid overlay in world units (radius from center)
 var random_rotation: bool = false
@@ -252,43 +251,34 @@ func setup_ui():
 	grid_extent_spin.tooltip_text = "Size of the grid overlay in world units (radius from center)"
 	settings_grid.add_child(grid_extent_spin)
 	
-	# Snap by AABB checkbox (spans both columns)
-	var snap_aabb_check = CheckBox.new()
-	snap_aabb_check.name = "SnapAABBCheck"
-	snap_aabb_check.text = "Snap by Bounding Box Edges"
-	snap_aabb_check.button_pressed = true  # Default enabled
-	snap_aabb_check.tooltip_text = "Snap assets by their edges instead of pivot point (aligns edges to grid)"
-	snap_aabb_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vbox.add_child(snap_aabb_check)
-	
 	# Center snapping options
 	var snap_center_label = Label.new()
-	snap_center_label.text = "Snap to Center On:"
+	snap_center_label.text = "Snap Using Center Position:"
 	snap_center_label.add_theme_font_size_override("font_size", 12)
 	snap_center_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 0.9))
 	vbox.add_child(snap_center_label)
 	
 	var snap_center_x_check = CheckBox.new()
 	snap_center_x_check.name = "SnapCenterXCheck"
-	snap_center_x_check.text = "X-axis (Center on X)"
+	snap_center_x_check.text = "X-axis (Center X)"
 	snap_center_x_check.button_pressed = false
-	snap_center_x_check.tooltip_text = "Snap to center of bounding box on X-axis instead of edges"
+	snap_center_x_check.tooltip_text = "Snap using the center position of the object on X-axis"
 	snap_center_x_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_child(snap_center_x_check)
 	
 	var snap_center_y_check = CheckBox.new()
 	snap_center_y_check.name = "SnapCenterYCheck"
-	snap_center_y_check.text = "Y-axis (Center on Y)"
+	snap_center_y_check.text = "Y-axis (Center Y)"
 	snap_center_y_check.button_pressed = false
-	snap_center_y_check.tooltip_text = "Snap to center of bounding box on Y-axis instead of edges"
+	snap_center_y_check.tooltip_text = "Snap using the center position of the object on Y-axis"
 	snap_center_y_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_child(snap_center_y_check)
 	
 	var snap_center_z_check = CheckBox.new()
 	snap_center_z_check.name = "SnapCenterZCheck"
-	snap_center_z_check.text = "Z-axis (Center on Z)"
+	snap_center_z_check.text = "Z-axis (Center Z)"
 	snap_center_z_check.button_pressed = false
-	snap_center_z_check.tooltip_text = "Snap to center of bounding box on Z-axis instead of edges"
+	snap_center_z_check.tooltip_text = "Snap using the center position of the object on Z-axis"
 	snap_center_z_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_child(snap_center_z_check)
 	
@@ -1098,11 +1088,7 @@ func _on_setting_changed(value = null):
 	add_collision = collision_check.button_pressed
 	group_instances = grouping_check.button_pressed
 	
-	# New snap settings
-	var snap_aabb_check = get_node_or_null("VBoxContainer/SnapAABBCheck")
-	if snap_aabb_check:
-		snap_by_aabb = snap_aabb_check.button_pressed
-	
+	# Center snap settings
 	var snap_center_x_check = get_node_or_null("VBoxContainer/SnapCenterXCheck")
 	if snap_center_x_check:
 		snap_center_x = snap_center_x_check.button_pressed
@@ -1115,6 +1101,7 @@ func _on_setting_changed(value = null):
 	if snap_center_z_check:
 		snap_center_z = snap_center_z_check.button_pressed
 	
+	# Y-axis snap settings
 	var snap_y_check = get_node_or_null("VBoxContainer/SnapYCheck")
 	if snap_y_check:
 		snap_y_enabled = snap_y_check.button_pressed
@@ -1404,7 +1391,6 @@ func get_placement_settings() -> Dictionary:
 		"align_with_normal": align_with_normal,
 		"snap_enabled": snap_enabled,
 		"snap_step": snap_step,
-		"snap_by_aabb": snap_by_aabb,
 		"snap_offset": snap_offset,
 		"snap_y_enabled": snap_y_enabled,
 		"snap_y_step": snap_y_step,
@@ -1462,13 +1448,14 @@ func save_settings():
 	editor_settings.set_setting("simple_asset_placer/align_with_normal", align_with_normal)
 	editor_settings.set_setting("simple_asset_placer/snap_enabled", snap_enabled)
 	editor_settings.set_setting("simple_asset_placer/snap_step", snap_step)
-	editor_settings.set_setting("simple_asset_placer/snap_by_aabb", snap_by_aabb)
 	editor_settings.set_setting("simple_asset_placer/snap_offset", snap_offset)
 	editor_settings.set_setting("simple_asset_placer/snap_y_enabled", snap_y_enabled)
 	editor_settings.set_setting("simple_asset_placer/snap_y_step", snap_y_step)
 	editor_settings.set_setting("simple_asset_placer/snap_center_x", snap_center_x)
 	editor_settings.set_setting("simple_asset_placer/snap_center_y", snap_center_y)
 	editor_settings.set_setting("simple_asset_placer/snap_center_z", snap_center_z)
+	editor_settings.set_setting("simple_asset_placer/show_grid", show_grid)
+	editor_settings.set_setting("simple_asset_placer/grid_extent", grid_extent)
 	editor_settings.set_setting("simple_asset_placer/random_rotation", random_rotation)
 	editor_settings.set_setting("simple_asset_placer/scale_multiplier", scale_multiplier)
 	editor_settings.set_setting("simple_asset_placer/add_collision", add_collision)
@@ -1504,6 +1491,16 @@ func save_settings():
 	editor_settings.set_setting("simple_asset_placer/fine_height_increment", fine_height_increment)
 	editor_settings.set_setting("simple_asset_placer/large_height_increment", large_height_increment)
 	
+	# Save position adjustment settings
+	editor_settings.set_setting("simple_asset_placer/position_left_key", position_left_key)
+	editor_settings.set_setting("simple_asset_placer/position_right_key", position_right_key)
+	editor_settings.set_setting("simple_asset_placer/position_forward_key", position_forward_key)
+	editor_settings.set_setting("simple_asset_placer/position_backward_key", position_backward_key)
+	editor_settings.set_setting("simple_asset_placer/reset_position_key", reset_position_key)
+	editor_settings.set_setting("simple_asset_placer/position_increment", position_increment)
+	editor_settings.set_setting("simple_asset_placer/fine_position_increment", fine_position_increment)
+	editor_settings.set_setting("simple_asset_placer/large_position_increment", large_position_increment)
+	
 	# Save modifier key settings
 	editor_settings.set_setting("simple_asset_placer/reverse_modifier_key", reverse_modifier_key)
 	editor_settings.set_setting("simple_asset_placer/large_increment_modifier_key", large_increment_modifier_key)
@@ -1525,8 +1522,6 @@ func load_settings():
 		snap_enabled = editor_settings.get_setting("simple_asset_placer/snap_enabled")
 	if editor_settings.has_setting("simple_asset_placer/snap_step"):
 		snap_step = editor_settings.get_setting("simple_asset_placer/snap_step")
-	if editor_settings.has_setting("simple_asset_placer/snap_by_aabb"):
-		snap_by_aabb = editor_settings.get_setting("simple_asset_placer/snap_by_aabb")
 	if editor_settings.has_setting("simple_asset_placer/snap_offset"):
 		snap_offset = editor_settings.get_setting("simple_asset_placer/snap_offset")
 	if editor_settings.has_setting("simple_asset_placer/snap_y_enabled"):
@@ -1539,6 +1534,10 @@ func load_settings():
 		snap_center_y = editor_settings.get_setting("simple_asset_placer/snap_center_y")
 	if editor_settings.has_setting("simple_asset_placer/snap_center_z"):
 		snap_center_z = editor_settings.get_setting("simple_asset_placer/snap_center_z")
+	if editor_settings.has_setting("simple_asset_placer/show_grid"):
+		show_grid = editor_settings.get_setting("simple_asset_placer/show_grid")
+	if editor_settings.has_setting("simple_asset_placer/grid_extent"):
+		grid_extent = editor_settings.get_setting("simple_asset_placer/grid_extent")
 	if editor_settings.has_setting("simple_asset_placer/random_rotation"):
 		random_rotation = editor_settings.get_setting("simple_asset_placer/random_rotation")
 	if editor_settings.has_setting("simple_asset_placer/scale_multiplier"):
@@ -1600,6 +1599,24 @@ func load_settings():
 	if editor_settings.has_setting("simple_asset_placer/large_height_increment"):
 		large_height_increment = editor_settings.get_setting("simple_asset_placer/large_height_increment")
 	
+	# Load position adjustment settings
+	if editor_settings.has_setting("simple_asset_placer/position_left_key"):
+		position_left_key = editor_settings.get_setting("simple_asset_placer/position_left_key")
+	if editor_settings.has_setting("simple_asset_placer/position_right_key"):
+		position_right_key = editor_settings.get_setting("simple_asset_placer/position_right_key")
+	if editor_settings.has_setting("simple_asset_placer/position_forward_key"):
+		position_forward_key = editor_settings.get_setting("simple_asset_placer/position_forward_key")
+	if editor_settings.has_setting("simple_asset_placer/position_backward_key"):
+		position_backward_key = editor_settings.get_setting("simple_asset_placer/position_backward_key")
+	if editor_settings.has_setting("simple_asset_placer/reset_position_key"):
+		reset_position_key = editor_settings.get_setting("simple_asset_placer/reset_position_key")
+	if editor_settings.has_setting("simple_asset_placer/position_increment"):
+		position_increment = editor_settings.get_setting("simple_asset_placer/position_increment")
+	if editor_settings.has_setting("simple_asset_placer/fine_position_increment"):
+		fine_position_increment = editor_settings.get_setting("simple_asset_placer/fine_position_increment")
+	if editor_settings.has_setting("simple_asset_placer/large_position_increment"):
+		large_position_increment = editor_settings.get_setting("simple_asset_placer/large_position_increment")
+	
 	# Load modifier key settings
 	if editor_settings.has_setting("simple_asset_placer/reverse_modifier_key"):
 		reverse_modifier_key = editor_settings.get_setting("simple_asset_placer/reverse_modifier_key")
@@ -1636,8 +1653,11 @@ func update_ui_from_settings():
 		collision_check.button_pressed = add_collision
 	if grouping_check:
 		grouping_check.button_pressed = group_instances
+	if show_grid_check:
+		show_grid_check.button_pressed = show_grid
 	
 	# Update snap center controls
+	# Update center snap controls
 	var snap_center_x_check = get_node_or_null("VBoxContainer/SnapCenterXCheck")
 	if snap_center_x_check:
 		snap_center_x_check.button_pressed = snap_center_x

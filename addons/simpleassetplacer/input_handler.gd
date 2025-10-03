@@ -238,6 +238,17 @@ static func get_mouse_position() -> Vector2:
 	"""Get current mouse position"""
 	return current_mouse.get("position", Vector2.ZERO)
 
+static func is_mouse_in_viewport() -> bool:
+	"""Check if mouse is within the 3D viewport bounds"""
+	if not cached_viewport:
+		return false
+	
+	var mouse_pos = get_mouse_position()
+	var viewport_rect = cached_viewport.get_visible_rect()
+	
+	# Check if mouse position is within viewport bounds
+	return viewport_rect.has_point(mouse_pos)
+
 static func is_action_pressed(action_name: String) -> bool:
 	"""Check Godot action state"""
 	return current_actions.get(action_name, false)
@@ -289,7 +300,7 @@ static func get_position_input() -> Dictionary:
 		"height_down_pressed": is_key_just_pressed("height_down"),
 		"reset_height_pressed": is_key_just_pressed("reset_height"),
 		"mouse_position": get_mouse_position(),
-		"left_clicked": is_mouse_button_just_pressed("left"),
+		"left_clicked": is_mouse_button_just_pressed("left") and is_mouse_in_viewport(),
 		"shift_held": is_shift_held()
 	}
 

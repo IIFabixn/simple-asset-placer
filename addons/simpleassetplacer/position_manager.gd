@@ -432,6 +432,13 @@ static func get_height_offset() -> float:
 	"""Get the current height offset from base"""
 	return height_offset
 
+static func get_base_position() -> Vector3:
+	"""Get the base position (current position without height offset applied)
+	This is useful for positioning the grid overlay at ground level"""
+	var base_pos = current_position
+	base_pos.y = base_height
+	return base_pos
+
 static func get_surface_normal() -> Vector3:
 	"""Get the surface normal at the current position"""
 	return surface_normal

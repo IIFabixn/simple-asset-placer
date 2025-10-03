@@ -287,11 +287,9 @@ static func _update_grid_overlay():
 		# Get center position based on current mode
 		var center = Vector3.ZERO
 		if current_mode == Mode.PLACEMENT:
-			# Use preview mesh position if available, otherwise current position
-			if PreviewManager.preview_mesh and is_instance_valid(PreviewManager.preview_mesh):
-				center = PreviewManager.preview_mesh.global_position
-			else:
-				center = PositionManager.get_current_position()
+			# Use base position (without height offset) for grid placement
+			# This ensures the grid stays at ground level, not elevated with the object
+			center = PositionManager.get_base_position()
 		elif current_mode == Mode.TRANSFORM:
 			# Use center of selected nodes
 			var target_nodes = transform_data.get("target_nodes", [])

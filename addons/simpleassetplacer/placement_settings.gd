@@ -781,9 +781,7 @@ func setup_ui():
 	fine_scale_increment_spin.value_changed.connect(_on_scale_increment_changed)
 	large_scale_increment_spin.value_changed.connect(_on_scale_increment_changed)
 	
-	# Connect height adjustment control signals
-	height_up_key_button.pressed.connect(_on_key_binding_button_pressed.bind(height_up_key_button, "height_up_key"))
-	height_down_key_button.pressed.connect(_on_key_binding_button_pressed.bind(height_down_key_button, "height_down_key"))
+	# Connect height adjustment spin box signals
 	height_step_spin.value_changed.connect(_on_height_step_changed)
 	fine_height_increment_spin.value_changed.connect(_on_height_step_changed)
 	large_height_increment_spin.value_changed.connect(_on_height_step_changed)

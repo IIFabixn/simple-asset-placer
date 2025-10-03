@@ -354,6 +354,12 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 	await Engine.get_main_loop().process_frame
 	await Engine.get_main_loop().process_frame
 	
+	# Check if viewport is still valid after awaits (could be cleaned up externally)
+	if not viewport or not is_instance_valid(viewport):
+		print("ThumbnailGenerator: Viewport became invalid during generation for ", asset_path.get_file())
+		_cleanup_generation()
+		return null
+	
 	# Force one final render
 	viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 
@@ -633,6 +639,11 @@ static func generate_meshlib_thumbnail(meshlib: MeshLibrary, item_id: int = -1) 
 	await viewport.get_tree().process_frame
 	await viewport.get_tree().process_frame
 	await viewport.get_tree().process_frame
+	
+	# Check if viewport is still valid after awaits
+	if not viewport or not is_instance_valid(viewport):
+		print("ThumbnailGenerator: Viewport became invalid during meshlib generation")
+		return null
 	
 	# Get the viewport texture
 	var viewport_texture = viewport.get_texture()

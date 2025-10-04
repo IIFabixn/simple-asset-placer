@@ -1,5 +1,61 @@
 # Changelog
 
+## [1.1.1] - 2025-10-04
+
+### 🔧 Architecture & Bug Fixes
+
+#### Offset-Based Architecture Refactor
+- **RotationManager**: Complete refactor to use offset-based system instead of absolute rotations
+  - Renamed `current_rotation` → `manual_rotation_offset` (breaking change for internal API)
+  - Renamed `set_rotation()` → `set_rotation_offset()`
+  - Renamed `get_rotation()` → `get_rotation_offset()`
+  - Renamed `get_rotation_degrees()` → `get_rotation_offset_degrees()`
+  - Now preserves original node rotations when entering transform mode
+  - Updated `apply_rotation_to_node()` to accept `original_rotation` parameter
+  - Rotation formula: `final_rotation = original_rotation + surface_alignment + manual_offset`
+  - All rotation operations (rotate_x, rotate_y, rotate_z) now modify offset instead of absolute rotation
+  
+- **ScaleManager**: Complete refactor to use multiplier-based system instead of absolute scales
+  - Renamed `current_scale` → `scale_multiplier` (breaking change for internal API)
+  - Renamed `non_uniform_scale` → `non_uniform_multiplier`
+  - Renamed `set_scale()` → `set_scale_multiplier()`
+  - Renamed `get_scale()` → `get_scale_multiplier()`
+  - Now preserves original node scales when entering transform mode
+  - Updated `apply_scale_to_node()` and `apply_uniform_scale_to_node()` to accept `original_scale` parameter
+  - Scale formula: `final_scale = original_scale * scale_multiplier`
+
+#### Transform Mode Improvements
+- **Fixed critical bug**: Node rotations no longer reset to zero when entering transform mode with multiple nodes
+- **Group rotation**: Implemented rotation around collective center while preserving individual node rotations
+  - Each node orbits the group center while maintaining its own rotation offset
+  - Uses rotation basis calculation: `rotation_basis * original_offset` for proper orbital motion
+- **Position updates**: Eliminated `initial_frame` workaround for cleaner logic
+  - `snap_offset` now calculated once at mode start for consistent positioning
+  - Simplified flow: `new_center = mouse_center + snap_offset + accumulated_delta`
+- **Original transforms**: All original transforms (position, rotation, scale) now stored in `original_transforms` dictionary at mode start
+- Unified transform application flow with consistent offset-based approach
+
+#### Visual Improvements
+- **Thumbnail camera angle**: Adjusted from `Vector3(1, 0.7, 1)` to `Vector3(1, 1, -1)` (frontal-diagonal view)
+- Increased camera padding from 1.5x to 2x for better framing
+- Thumbnails now show frontal view of assets for better preview quality and identification
+
+#### Stability & Compatibility
+- **Removed Terrain3D plugin**: Completely removed Terrain3D addon to prevent conflicts
+  - Deleted 169 files including binaries, brushes, icons, tools, and utilities
+  - Cleaned up sample scenes and terrain data
+  - Updated `project.godot` to disable terrain_3d plugin
+- Added Terrain3D usage tip in README for users who want to use it separately
+
+### 🏗️ Technical Improvements
+- **Unified architecture**: All transformation managers now use consistent offset-based calculations
+- **Better encapsulation**: Original node values preserved and never directly modified
+- **Cleaner code**: Removed workarounds and simplified logic flows
+- **Improved maintainability**: Consistent naming conventions across all managers
+- **Better separation of concerns**: Clear distinction between original values, offsets, and final transforms
+
+---
+
 ## [1.1.0] - 2025-10-04
 
 ### 🎉 Major Features

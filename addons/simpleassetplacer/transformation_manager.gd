@@ -382,7 +382,7 @@ static func _process_placement_input(camera: Camera3D):
 	PositionManager.use_half_step = position_input.ctrl_held
 	
 	# Handle height adjustments with reverse modifier and increment size support
-	var reverse_height = position_input.shift_held  # SHIFT = reverse direction
+	var reverse_height = position_input.reverse_modifier_held  # Configurable reverse modifier
 	
 	# Determine height step based on modifiers (matching transform mode logic)
 	var height_step = PositionManager.height_step_size  # Base step
@@ -395,8 +395,8 @@ static func _process_placement_input(camera: Camera3D):
 	if position_input.ctrl_held:
 		# CTRL = fine adjustment (10% of base step)
 		height_step *= 0.1
-	elif position_input.alt_held:
-		# ALT = large adjustment (10x base step)
+	elif position_input.large_increment_modifier_held:
+		# Configurable large increment modifier = large adjustment (10x base step)
 		height_step *= 10.0
 	
 	if position_input.height_up_pressed:
@@ -412,7 +412,7 @@ static func _process_placement_input(camera: Camera3D):
 	var position_delta = settings.get("position_increment", 0.1)
 	if position_input.ctrl_held:
 		position_delta = settings.get("fine_position_increment", 0.01)
-	elif position_input.alt_held:
+	elif position_input.large_increment_modifier_held:
 		position_delta = settings.get("large_position_increment", 1.0)
 	
 	# Get camera-relative directions snapped to nearest axis (same as transform mode)
@@ -521,7 +521,7 @@ static func _process_transform_input(camera: Camera3D):
 	var accumulated_y_delta = transform_data.get("accumulated_y_delta", 0.0)
 	
 	# Handle height adjustments with reverse modifier and increment size support
-	var reverse_height = position_input.shift_held  # SHIFT = reverse direction
+	var reverse_height = position_input.reverse_modifier_held  # Configurable reverse modifier
 	
 	# Determine height step based on modifiers (matching placement mode logic)
 	var height_step = PositionManager.height_step_size  # Base step
@@ -534,8 +534,8 @@ static func _process_transform_input(camera: Camera3D):
 	if position_input.ctrl_held:
 		# CTRL = fine adjustment (10% of base step)
 		height_step *= 0.1
-	elif position_input.alt_held:
-		# ALT = large adjustment (10x base step)
+	elif position_input.large_increment_modifier_held:
+		# Configurable large increment modifier = large adjustment (10x base step)
 		height_step *= 10.0
 	
 	if position_input.height_up_pressed:
@@ -555,7 +555,7 @@ static func _process_transform_input(camera: Camera3D):
 	var position_delta = settings.get("position_increment", 0.1)
 	if position_input.ctrl_held:
 		position_delta = settings.get("fine_position_increment", 0.01)
-	elif position_input.alt_held:
+	elif position_input.large_increment_modifier_held:
 		position_delta = settings.get("large_position_increment", 1.0)
 	
 	# Get accumulated delta from transform_data
@@ -706,19 +706,19 @@ static func _process_rotation_input(rotation_input: Dictionary, target_node: Nod
 		return
 	
 	# Handle rotation keys - use proper increment sizes and modifiers
-	# Priority: ALT (large) > CTRL (fine) > Base
+	# Priority: Large increment modifier > CTRL (fine) > Base
 	# These should be mutually exclusive - only one size modifier at a time
 	var rotation_step: float
 	
-	if rotation_input.alt_held and not rotation_input.ctrl_held:  # ALT only = large increment
+	if rotation_input.large_increment_modifier_held and not rotation_input.ctrl_held:  # Large increment modifier only
 		rotation_step = settings.get("large_rotation_increment", 90.0)
-	elif rotation_input.ctrl_held and not rotation_input.alt_held:  # CTRL only = fine increment
+	elif rotation_input.ctrl_held and not rotation_input.large_increment_modifier_held:  # CTRL only = fine increment
 		rotation_step = settings.get("fine_rotation_increment", 5.0)
 	else:  # No modifier or both (default to base)
 		rotation_step = settings.get("rotation_increment", 15.0)
 	
-	# Apply reverse direction modifier (SHIFT)
-	if rotation_input.shift_held:  # SHIFT = reverse direction
+	# Apply reverse direction modifier (configurable)
+	if rotation_input.reverse_modifier_held:
 		rotation_step = -rotation_step
 	
 	if rotation_input.x_pressed:
@@ -742,10 +742,10 @@ static func _process_scale_input(scale_input: Dictionary, target_node: Node3D = 
 		return
 		
 	var scale_step = settings.get("scale_increment", 0.1)  # Default
-	var reverse_scale = scale_input.shift_held  # SHIFT = reverse direction
+	var reverse_scale = scale_input.reverse_modifier_held  # Configurable reverse modifier
 	
 	# Apply modifier for increment size
-	if scale_input.alt_held:  # ALT = large increment
+	if scale_input.large_increment_modifier_held:  # Configurable large increment modifier
 		scale_step = settings.get("large_scale_increment", 0.5)
 	
 	if scale_input.up_pressed:

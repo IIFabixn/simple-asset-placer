@@ -69,6 +69,11 @@ var large_increment_modifier_key_button: Button
 var cancel_key_button: Button
 var transform_mode_key_button: Button
 
+# Key binding capture state
+var pressed_keys: Array = []  # Track all keys pressed during binding capture
+var pressed_modifiers: Dictionary = {"ctrl": false, "alt": false, "shift": false, "meta": false}
+var pressed_non_modifier_keys: Array = []  # Track non-modifier keys separately
+
 # Asset Cycling Key Controls
 var cycle_next_asset_key_button: Button
 var cycle_previous_asset_key_button: Button
@@ -1193,6 +1198,11 @@ func _on_key_binding_button_pressed(button: Button, key_property: String):
 	button.text = "Press any key..."
 	button.modulate = Color.YELLOW
 	
+	# Reset key capture tracking
+	pressed_keys.clear()
+	pressed_non_modifier_keys.clear()
+	pressed_modifiers = {"ctrl": false, "alt": false, "shift": false, "meta": false}
+	
 	# Store the property name to update when key is pressed
 	button.set_meta("key_property", key_property)
 
@@ -1200,87 +1210,162 @@ func _input(event: InputEvent):
 	if listening_button == null:
 		return
 	
-	if event is InputEventKey and event.pressed:
-		# Allow ESC to cancel key binding
-		if event.keycode == KEY_ESCAPE:
+	if event is InputEventKey:
+		# Allow ESC to cancel key binding (on press)
+		if event.pressed and event.keycode == KEY_ESCAPE:
 			_cancel_key_binding()
 			get_viewport().set_input_as_handled()
 			return
 		
-		# Ignore standalone modifier key presses - wait for the actual key
-		# This allows capturing combinations like CTRL+ALT+8
-		if event.keycode in [KEY_SHIFT, KEY_CTRL, KEY_ALT, KEY_META]:
-			# Don't process modifier keys alone - wait for the base key
+		# Get the property we're binding to
+		var key_property = listening_button.get_meta("key_property")
+		
+		# Check if this is a modifier key
+		var is_modifier_key = event.keycode in [KEY_SHIFT, KEY_CTRL, KEY_ALT, KEY_META]
+		
+		# For modifier-specific bindings (like reverse or large increment), allow pure modifiers
+		var allow_pure_modifiers = key_property in ["reverse_modifier_key", "large_increment_modifier_key"]
+		
+		# Record keys on press
+		if event.pressed:
+			# Track modifiers
+			if event.keycode == KEY_CTRL:
+				pressed_modifiers["ctrl"] = true
+			elif event.keycode == KEY_ALT:
+				pressed_modifiers["alt"] = true
+			elif event.keycode == KEY_SHIFT:
+				pressed_modifiers["shift"] = true
+			elif event.keycode == KEY_META:
+				pressed_modifiers["meta"] = true
+			else:
+				# Track non-modifier keys separately
+				if event.keycode not in pressed_non_modifier_keys:
+					pressed_non_modifier_keys.append(event.keycode)
+			
+			# Track all keys pressed (including modifiers and regular keys)
+			if event.keycode not in pressed_keys:
+				pressed_keys.append(event.keycode)
+			
 			get_viewport().set_input_as_handled()
 			return
 		
-		# Get the key name and build full key string with modifiers
-		var base_key_string = OS.get_keycode_string(event.keycode)
-		var key_string = ""
-		
-		# Build modifier combination string
-		if event.ctrl_pressed:
-			key_string += "CTRL+"
-		if event.alt_pressed:
-			key_string += "ALT+"
-		if event.shift_pressed:
-			key_string += "SHIFT+"
-		key_string += base_key_string
-		
-		# Update the appropriate key property
-		var key_property = listening_button.get_meta("key_property")
-		match key_property:
-			"rotate_y_key":
-				rotate_y_key = key_string
-			"rotate_x_key":
-				rotate_x_key = key_string
-			"rotate_z_key":
-				rotate_z_key = key_string
-			"reset_rotation_key":
-				reset_rotation_key = key_string
-			"scale_up_key":
-				scale_up_key = key_string
-			"scale_down_key":
-				scale_down_key = key_string
-			"scale_reset_key":
-				scale_reset_key = key_string
-			"height_up_key":
-				height_up_key = key_string
-			"height_down_key":
-				height_down_key = key_string
-			"position_left_key":
-				position_left_key = key_string
-			"position_right_key":
-				position_right_key = key_string
-			"position_forward_key":
-				position_forward_key = key_string
-			"position_backward_key":
-				position_backward_key = key_string
-			"reset_position_key":
-				reset_position_key = key_string
-			"reverse_modifier_key":
-				reverse_modifier_key = key_string
-			"large_increment_modifier_key":
-				large_increment_modifier_key = key_string
-			"cancel_key":
-				cancel_key = key_string
-			"transform_mode_key":
-				transform_mode_key = key_string
-			"cycle_next_asset_key":
-				cycle_next_asset_key = key_string
-			"cycle_previous_asset_key":
-				cycle_previous_asset_key = key_string
-		
-		# Update button display
-		listening_button.text = key_string
-		listening_button.modulate = Color.WHITE
-		listening_button = null
-		
-		# Save settings
-		settings_changed.emit()
-		
-		# Consume the event so it doesn't propagate
-		get_viewport().set_input_as_handled()
+		# Handle key release - check if ALL keys have been released
+		if not event.pressed:
+			# Remove this key from pressed keys
+			if event.keycode in pressed_keys:
+				pressed_keys.erase(event.keycode)
+			
+			# Check if all keys have been released
+			var all_released = pressed_keys.is_empty()
+			
+			if all_released:
+				# Now we have the complete combination!
+				# Determine what was pressed
+				var has_modifiers = pressed_modifiers["ctrl"] or pressed_modifiers["alt"] or pressed_modifiers["shift"] or pressed_modifiers["meta"]
+				var has_non_modifiers = not pressed_non_modifier_keys.is_empty()
+				
+				# Count how many modifiers were pressed
+				var modifier_count = 0
+				if pressed_modifiers["ctrl"]: modifier_count += 1
+				if pressed_modifiers["alt"]: modifier_count += 1
+				if pressed_modifiers["shift"]: modifier_count += 1
+				if pressed_modifiers["meta"]: modifier_count += 1
+				
+				# Determine the type of binding
+				var is_single_modifier = (modifier_count == 1) and not has_non_modifiers
+				var is_modifier_combo = (modifier_count > 1) and not has_non_modifiers
+				
+				# Build the key string
+				var key_string = ""
+				
+				# For modifier-specific bindings, allow pure modifiers (single or combination)
+				if (is_single_modifier or is_modifier_combo) and allow_pure_modifiers:
+					# Pure modifier(s) binding (e.g., "ALT" or "CTRL+ALT")
+					if pressed_modifiers["ctrl"]:
+						key_string += "CTRL+"
+					if pressed_modifiers["alt"]:
+						key_string += "ALT+"
+					if pressed_modifiers["shift"]:
+						key_string += "SHIFT+"
+					if pressed_modifiers["meta"]:
+						key_string += "META+"
+					# Remove trailing "+"
+					if key_string.ends_with("+"):
+						key_string = key_string.substr(0, key_string.length() - 1)
+				elif has_non_modifiers:
+					# Combination with modifiers and a base key (e.g., "CTRL+ALT+8")
+					# Use the first non-modifier key that was pressed
+					var base_key = pressed_non_modifier_keys[0]
+					var base_key_string = OS.get_keycode_string(base_key)
+					
+					if has_modifiers:
+						if pressed_modifiers["ctrl"]:
+							key_string += "CTRL+"
+						if pressed_modifiers["alt"]:
+							key_string += "ALT+"
+						if pressed_modifiers["shift"]:
+							key_string += "SHIFT+"
+						if pressed_modifiers["meta"]:
+							key_string += "META+"
+					key_string += base_key_string
+				else:
+					# Simple key without modifiers (shouldn't happen in practice since we record everything)
+					# But as fallback, use the last released key
+					key_string = OS.get_keycode_string(event.keycode)
+				
+				# Update the appropriate key property based on the meta we stored earlier
+				match key_property:
+					"rotate_y_key":
+						rotate_y_key = key_string
+					"rotate_x_key":
+						rotate_x_key = key_string
+					"rotate_z_key":
+						rotate_z_key = key_string
+					"reset_rotation_key":
+						reset_rotation_key = key_string
+					"scale_up_key":
+						scale_up_key = key_string
+					"scale_down_key":
+						scale_down_key = key_string
+					"scale_reset_key":
+						scale_reset_key = key_string
+					"height_up_key":
+						height_up_key = key_string
+					"height_down_key":
+						height_down_key = key_string
+					"position_left_key":
+						position_left_key = key_string
+					"position_right_key":
+						position_right_key = key_string
+					"position_forward_key":
+						position_forward_key = key_string
+					"position_backward_key":
+						position_backward_key = key_string
+					"reset_position_key":
+						reset_position_key = key_string
+					"reverse_modifier_key":
+						reverse_modifier_key = key_string
+					"large_increment_modifier_key":
+						large_increment_modifier_key = key_string
+					"cancel_key":
+						cancel_key = key_string
+					"transform_mode_key":
+						transform_mode_key = key_string
+					"cycle_next_asset_key":
+						cycle_next_asset_key = key_string
+					"cycle_previous_asset_key":
+						cycle_previous_asset_key = key_string
+				
+				# Update button display
+				listening_button.text = key_string
+				listening_button.modulate = Color.WHITE
+				listening_button = null
+				
+				# Save settings
+				settings_changed.emit()
+				
+				# Consume the event so it doesn't propagate
+				get_viewport().set_input_as_handled()
 
 func _cancel_key_binding():
 	if listening_button == null:

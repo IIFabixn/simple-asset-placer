@@ -292,3 +292,29 @@ func get_placement_settings() -> Dictionary:
 	if placement_settings and placement_settings.has_method("get_placement_settings"):
 		return placement_settings.get_placement_settings()
 	return {}
+
+## Asset Cycling Coordination
+
+func cycle_next_asset() -> bool:
+	"""Cycle to the next asset in the currently active browser tab. Returns true if successful."""
+	var active_tab = tab_container.get_current_tab_control()
+	
+	# Check which tab is active and delegate to the appropriate browser
+	if active_tab == models_tab and modellib_browser:
+		return modellib_browser.cycle_to_next_asset()
+	elif active_tab == meshlib_tab and meshlib_browser:
+		return meshlib_browser.cycle_to_next_item()
+	
+	return false
+
+func cycle_previous_asset() -> bool:
+	"""Cycle to the previous asset in the currently active browser tab. Returns true if successful."""
+	var active_tab = tab_container.get_current_tab_control()
+	
+	# Check which tab is active and delegate to the appropriate browser
+	if active_tab == models_tab and modellib_browser:
+		return modellib_browser.cycle_to_previous_asset()
+	elif active_tab == meshlib_tab and meshlib_browser:
+		return meshlib_browser.cycle_to_previous_item()
+	
+	return false

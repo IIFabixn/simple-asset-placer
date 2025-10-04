@@ -47,6 +47,10 @@ static func get_default_settings() -> Dictionary:
 		"reverse_modifier_key": "SHIFT",
 		"large_increment_modifier_key": "CTRL",
 		
+		# Asset cycling keys
+		"cycle_next_asset_key": "BRACKETRIGHT",  # ] key
+		"cycle_previous_asset_key": "BRACKETLEFT",  # [ key
+		
 		# Placement behavior
 		"collision_enabled": true,
 		"snap_to_ground": true,

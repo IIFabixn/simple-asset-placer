@@ -486,6 +486,9 @@ static func _process_placement_input(camera: Camera3D):
 	# Handle scale input
 	_process_scale_input(scale_input, PreviewManager.preview_mesh)
 	
+	# Handle asset cycling
+	_process_asset_cycling_input()
+	
 	# Handle placement action
 	if position_input.left_clicked:
 		place_at_preview_position()
@@ -760,6 +763,23 @@ static func _process_scale_input(scale_input: Dictionary, target_node: Node3D = 
 	elif scale_input.reset_pressed:
 		ScaleManager.reset_scale()
 		ScaleManager.apply_uniform_scale_to_node(target_node, original_scale)
+
+static func _process_asset_cycling_input():
+	"""Process asset cycling input during placement mode"""
+	# Only works in placement mode
+	if current_mode != Mode.PLACEMENT:
+		return
+	
+	# Get the dock reference to call cycling methods
+	var dock = placement_data.get("dock_reference", null)
+	if not dock:
+		return
+	
+	# Check for cycling input
+	if InputHandler.should_cycle_next_asset():
+		dock.cycle_next_asset()
+	elif InputHandler.should_cycle_previous_asset():
+		dock.cycle_previous_asset()
 
 static func _process_navigation_input():
 	"""Process navigation and mode control input"""

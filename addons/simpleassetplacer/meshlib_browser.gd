@@ -408,3 +408,83 @@ func _on_tags_modified_in_dialog() -> void:
 	# Refresh the meshlib display when tags are modified
 	if current_meshlib:
 		populate_meshlib_items(current_meshlib)
+
+## Asset Cycling
+
+func cycle_to_next_item() -> bool:
+	"""Cycle to the next meshlib item in the currently visible grid. Returns true if successful."""
+	return _cycle_meshlib_item(1)
+
+func cycle_to_previous_item() -> bool:
+	"""Cycle to the previous meshlib item in the currently visible grid. Returns true if successful."""
+	return _cycle_meshlib_item(-1)
+
+func _cycle_meshlib_item(direction: int) -> bool:
+	"""Internal method to cycle through meshlib items in the given direction (1 = next, -1 = previous)"""
+	if not current_meshlib:
+		return false
+	
+	# Get all visible item buttons
+	var visible_items: Array[AssetThumbnailItem] = []
+	for child in items_grid.get_children():
+		if child is AssetThumbnailItem and child.visible:
+			visible_items.append(child)
+	
+	if visible_items.is_empty():
+		return false
+	
+	# Find current selection index
+	var current_index = -1
+	if selected_button and is_instance_valid(selected_button):
+		current_index = visible_items.find(selected_button)
+	
+	# Calculate next index with wrap-around
+	var next_index: int
+	if current_index == -1:
+		# No selection, start at beginning or end depending on direction
+		next_index = 0 if direction > 0 else visible_items.size() - 1
+	else:
+		next_index = (current_index + direction) % visible_items.size()
+		# Handle negative modulo for wrap-around
+		if next_index < 0:
+			next_index += visible_items.size()
+	
+	# Select the new item
+	var next_button = visible_items[next_index]
+	var next_item_id = next_button.get_item_id()
+	
+	# Trigger selection (this will emit the signal and update UI)
+	_on_meshlib_item_selected(current_meshlib, next_item_id)
+	
+	# Scroll to make the selected item visible
+	_scroll_to_item(next_button)
+	
+	return true
+
+func _scroll_to_item(item: AssetThumbnailItem):
+	"""Scroll the container to make the given item visible"""
+	if not scroll_container or not item:
+		return
+	
+	# Calculate item's position in the scroll container
+	var item_rect = item.get_rect()
+	var scroll_rect = scroll_container.get_rect()
+	
+	# Get current scroll position
+	var current_scroll = scroll_container.scroll_vertical
+	
+	# Calculate the item's position relative to the scroll container
+	var item_top = item.position.y
+	var item_bottom = item.position.y + item_rect.size.y
+	
+	# Calculate visible area
+	var visible_top = current_scroll
+	var visible_bottom = current_scroll + scroll_rect.size.y
+	
+	# Scroll if item is not fully visible
+	if item_top < visible_top:
+		# Item is above visible area - scroll up
+		scroll_container.scroll_vertical = item_top
+	elif item_bottom > visible_bottom:
+		# Item is below visible area - scroll down
+		scroll_container.scroll_vertical = item_bottom - scroll_rect.size.y

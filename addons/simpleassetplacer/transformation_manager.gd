@@ -178,6 +178,17 @@ static func start_transform_mode(target_nodes, dock_instance = null):
 		if node.is_inside_tree():
 			node_offsets[node] = node.global_position - center_pos
 	
+	# Calculate snap offset ONCE at mode start to prevent jumping when snapping is enabled
+	# This preserves the original position relative to the grid
+	var snap_offset = Vector3.ZERO
+	if PositionManager.snap_enabled:
+		# Simulate what snapping would do to the center position
+		var snapped_center = center_pos
+		if PositionManager.snap_enabled:
+			snapped_center = PositionManager._apply_grid_snap(center_pos)
+		# Calculate offset needed to maintain original position
+		snap_offset = center_pos - snapped_center
+	
 	transform_data = {
 		"target_nodes": valid_nodes,  # Array of nodes
 		"original_transforms": original_transforms,  # Dictionary mapping node to original transform
@@ -186,8 +197,7 @@ static func start_transform_mode(target_nodes, dock_instance = null):
 		"dock_reference": dock_instance,
 		"accumulated_xz_delta": Vector3.ZERO,  # Track accumulated WASD position adjustments
 		"accumulated_y_delta": 0.0,  # Track accumulated height adjustments
-		"initial_frame": true,  # Track if this is the first frame to prevent initial displacement
-		"snap_offset": Vector3.ZERO  # Offset to maintain position relative to snapped grid
+		"snap_offset": snap_offset  # Offset to maintain position relative to snapped grid (calculated once at start)
 	}
 	
 	# Initialize managers for transform mode
@@ -601,57 +611,15 @@ static func _process_transform_input(camera: Camera3D):
 	# Get stored original center and node offsets (calculated once when transform mode started)
 	var original_center = transform_data.get("original_center", Vector3.ZERO)
 	var node_offsets = transform_data.get("node_offsets", {})
-	var initial_frame = transform_data.get("initial_frame", false)
+	var snap_offset = transform_data.get("snap_offset", Vector3.ZERO)
 	
-	# Determine the new center position
-	var new_center: Vector3
+	# Update position from mouse (with snapping if enabled)
+	PositionManager.update_position_from_mouse(camera, mouse_pos)
+	var mouse_center = PositionManager.get_current_position()
 	
-	# On the initial frame, calculate and store the snap offset to preserve original position
-	if initial_frame:
-		# Get what the mouse position would be with snapping
-		PositionManager.update_position_from_mouse(camera, mouse_pos)
-		var snapped_mouse_center = PositionManager.get_current_position()
-		
-		# Calculate the offset needed to keep objects at their original position
-		# This is the difference between where snapping would put them vs where they actually are
-		var snap_offset = original_center - snapped_mouse_center
-		transform_data["snap_offset"] = snap_offset
-		
-		# Use original center for this frame
-		new_center = original_center + accumulated_delta
-		
-		# Mark that we've processed the initial frame
-		transform_data["initial_frame"] = false
-	else:
-		# Normal operation - use mouse position with snap offset applied
-		PositionManager.update_position_from_mouse(camera, mouse_pos)
-		var mouse_center = PositionManager.get_current_position()
-		
-		# Apply the snap offset to maintain the original position relative to grid
-		var snap_offset = transform_data.get("snap_offset", Vector3.ZERO)
-		
-		# New center = mouse position + snap offset + accumulated manual adjustments
-		new_center = mouse_center + snap_offset + accumulated_delta
-	
-	# Apply transformations to ALL nodes by repositioning relative to new center
-	for node in target_nodes:
-		if not node or not node.is_inside_tree():
-			continue
-		
-		# Get this node's offset from original center
-		var offset = node_offsets.get(node, Vector3.ZERO)
-		
-		# Set position as: new_center + offset (maintains relative position from original)
-		node.global_position.x = new_center.x + offset.x
-		node.global_position.z = new_center.z + offset.z
-		
-		# Y position: when snap_to_ground is enabled, follow the surface; otherwise use original Y
-		if settings.get("snap_to_ground", false):
-			# Follow the surface height from raycast (new_center.y includes raycast Y)
-			node.global_position.y = new_center.y + offset.y + accumulated_y_delta
-		else:
-			# Keep original Y position + height adjustments
-			node.global_position.y = original_center.y + offset.y + accumulated_y_delta
+	# Calculate new center position:
+	# mouse_center (snapped) + snap_offset (preserves original grid alignment) + accumulated_delta (WASD movement)
+	var new_center = mouse_center + snap_offset + accumulated_delta
 	
 	# Update surface normal alignment if enabled, otherwise reset it
 	if settings.get("align_with_normal", false):
@@ -662,26 +630,57 @@ static func _process_transform_input(camera: Camera3D):
 	# Handle rotation input - process ONCE for all nodes to avoid accumulation
 	# Since RotationManager uses static state, we must not call it multiple times per frame
 	var rotation_applied = false
+	var original_transforms = transform_data.get("original_transforms", {})
+	
 	if not target_nodes.is_empty():
 		var first_node = target_nodes[0]
 		if first_node and first_node.is_inside_tree():
-			_process_rotation_input(rotation_input, first_node)
-			# Apply the combined rotation (surface alignment + manual rotation) to the first node
-			RotationManager.apply_rotation_to_node(first_node)
+			var first_original_rotation = original_transforms.get(first_node, Transform3D()).basis.get_euler()
+			_process_rotation_input(rotation_input, first_node, false, first_original_rotation)
 			rotation_applied = true
 	
-	# Apply the same rotation to remaining nodes (copying from first node)
-	if rotation_applied and target_nodes.size() > 1:
-		for i in range(1, target_nodes.size()):
-			var node = target_nodes[i]
-			if node and node.is_inside_tree():
-				# Copy rotation from first node to maintain consistency
-				node.rotation = target_nodes[0].rotation
+	# Get the current rotation offset for group rotation around center
+	var rotation_offset_euler = RotationManager.get_rotation_offset()
+	var rotation_basis = Basis.from_euler(rotation_offset_euler)
 	
-	# Handle scale input for all nodes
+	# Apply transformations to ALL nodes using offset-based system
+	# Flow: base_position (mouse + snap) → apply rotation orbit → apply offsets (rotation, scale)
+	for node in target_nodes:
+		if not node or not node.is_inside_tree():
+			continue
+		
+		# Get this node's original offset from center (calculated once at mode start)
+		var original_offset = node_offsets.get(node, Vector3.ZERO)
+		
+		# STEP 1: Group Rotation - Rotate the node's position around the collective center
+		# This makes nodes orbit around the center when rotating as a group
+		var rotated_offset = rotation_basis * original_offset
+		
+		# STEP 2: Position - Base position (new_center) + rotation orbit offset
+		# new_center = mouse_position (snapped) + snap_offset + accumulated_delta (WASD)
+		node.global_position.x = new_center.x + rotated_offset.x
+		node.global_position.z = new_center.z + rotated_offset.z
+		
+		# Y position: follows ground or maintains original height
+		if settings.get("snap_to_ground", false):
+			# Follow surface height from raycast + height offset
+			node.global_position.y = new_center.y + rotated_offset.y + accumulated_y_delta
+		else:
+			# Maintain original Y + height offset
+			node.global_position.y = original_center.y + rotated_offset.y + accumulated_y_delta
+		
+		# STEP 3: Individual Rotation - Apply rotation offset to node's original rotation
+		# Rotation offset is applied on top of the node's original rotation
+		if rotation_applied:
+			var node_original_rotation = original_transforms.get(node, Transform3D()).basis.get_euler()
+			RotationManager.apply_rotation_to_node(node, node_original_rotation)
+	
+	# STEP 4: Scale - Apply scale multiplier to node's original scale
+	# final_scale = original_scale * scale_multiplier
 	for node in target_nodes:
 		if node and node.is_inside_tree():
-			_process_scale_input(scale_input, node)
+			var node_original_scale = original_transforms.get(node, Transform3D()).basis.get_scale()
+			_process_scale_input(scale_input, node, node_original_scale)
 	
 	# Handle transform confirmation
 	if position_input.left_clicked:
@@ -691,10 +690,15 @@ static func _process_transform_input(camera: Camera3D):
 	if target_nodes.size() > 0 and target_nodes[0]:
 		_update_transform_overlays(target_nodes[0])
 
-static func _process_rotation_input(rotation_input: Dictionary, target_node: Node3D, rotate_position_offset: bool = false):
+static func _process_rotation_input(rotation_input: Dictionary, target_node: Node3D, rotate_position_offset: bool = false, original_rotation: Vector3 = Vector3.ZERO):
 	"""Process rotation input for any target node
 	
-	rotate_position_offset: If true, also rotates manual position offset (for placement mode)"""
+	Args:
+		rotation_input: Input dictionary from InputHandler
+		target_node: The node to apply rotation to
+		rotate_position_offset: If true, also rotates manual position offset (for placement mode)
+		original_rotation: The node's original rotation (from transform mode) or Vector3.ZERO for placement mode
+	"""
 	if not target_node:
 		return
 	
@@ -715,16 +719,22 @@ static func _process_rotation_input(rotation_input: Dictionary, target_node: Nod
 		rotation_step = -rotation_step
 	
 	if rotation_input.x_pressed:
-		RotationManager.apply_rotation_step(target_node, "X", rotation_step, rotate_position_offset)
+		RotationManager.apply_rotation_step(target_node, "X", rotation_step, original_rotation, rotate_position_offset)
 	elif rotation_input.y_pressed:
-		RotationManager.apply_rotation_step(target_node, "Y", rotation_step, rotate_position_offset)
+		RotationManager.apply_rotation_step(target_node, "Y", rotation_step, original_rotation, rotate_position_offset)
 	elif rotation_input.z_pressed:
-		RotationManager.apply_rotation_step(target_node, "Z", rotation_step, rotate_position_offset)
+		RotationManager.apply_rotation_step(target_node, "Z", rotation_step, original_rotation, rotate_position_offset)
 	elif rotation_input.reset_pressed:
 		RotationManager.reset_node_rotation(target_node)
 
-static func _process_scale_input(scale_input: Dictionary, target_node: Node3D = null):
-	"""Process scale input and apply to target node"""
+static func _process_scale_input(scale_input: Dictionary, target_node: Node3D = null, original_scale: Vector3 = Vector3.ONE):
+	"""Process scale input and apply to target node
+	
+	Args:
+		scale_input: Input dictionary from InputHandler
+		target_node: The node to apply scale to
+		original_scale: The node's original scale (from transform mode) or Vector3.ONE for placement mode
+	"""
 	if not target_node:
 		return
 		
@@ -740,16 +750,16 @@ static func _process_scale_input(scale_input: Dictionary, target_node: Node3D = 
 			ScaleManager.decrease_scale(scale_step)
 		else:
 			ScaleManager.increase_scale(scale_step)
-		ScaleManager.apply_uniform_scale_to_node(target_node)
+		ScaleManager.apply_uniform_scale_to_node(target_node, original_scale)
 	elif scale_input.down_pressed:
 		if reverse_scale:
 			ScaleManager.increase_scale(scale_step)
 		else:
 			ScaleManager.decrease_scale(scale_step)
-		ScaleManager.apply_uniform_scale_to_node(target_node)
+		ScaleManager.apply_uniform_scale_to_node(target_node, original_scale)
 	elif scale_input.reset_pressed:
 		ScaleManager.reset_scale()
-		ScaleManager.apply_uniform_scale_to_node(target_node)
+		ScaleManager.apply_uniform_scale_to_node(target_node, original_scale)
 
 static func _process_navigation_input():
 	"""Process navigation and mode control input"""
@@ -832,19 +842,21 @@ static func _apply_scale_adjustment(wheel_input: Dictionary):
 				ScaleManager.increase_scale(step)
 			else:
 				ScaleManager.decrease_scale(step)
-			ScaleManager.apply_uniform_scale_to_node(target_node)
+			ScaleManager.apply_uniform_scale_to_node(target_node, Vector3.ONE)  # Placement mode starts at scale 1.0
 	elif current_mode == Mode.TRANSFORM:
-		# Apply scale adjustment to ALL nodes in transform mode
+		# Apply scale multiplier adjustment to ALL nodes in transform mode (using their original scales)
 		var target_nodes = transform_data.get("target_nodes", [])
+		var original_transforms = transform_data.get("original_transforms", {})
 		if not target_nodes.is_empty():
 			if direction > 0:
 				ScaleManager.increase_scale(step)
 			else:
 				ScaleManager.decrease_scale(step)
-			# Apply to all nodes
+			# Apply to all nodes with their original scales
 			for node in target_nodes:
 				if node and node.is_inside_tree():
-					ScaleManager.apply_uniform_scale_to_node(node)
+					var node_original_scale = original_transforms.get(node, Transform3D()).basis.get_scale()
+					ScaleManager.apply_uniform_scale_to_node(node, node_original_scale)
 
 static func _apply_rotation_adjustment(wheel_input: Dictionary):
 	"""Apply rotation adjustment based on wheel input"""
@@ -867,13 +879,15 @@ static func _apply_rotation_adjustment(wheel_input: Dictionary):
 	if current_mode == Mode.PLACEMENT:
 		var target_node = PreviewManager.preview_mesh
 		if target_node:
-			RotationManager.apply_rotation_step(target_node, axis, step * direction)
+			RotationManager.apply_rotation_step(target_node, axis, step * direction, Vector3.ZERO, false)
 	elif current_mode == Mode.TRANSFORM:
-		# Apply rotation to ALL nodes in transform mode
+		# Apply rotation offset to ALL nodes in transform mode (using their original rotations)
 		var target_nodes = transform_data.get("target_nodes", [])
+		var original_transforms = transform_data.get("original_transforms", {})
 		for node in target_nodes:
 			if node and node.is_inside_tree():
-				RotationManager.apply_rotation_step(node, axis, step * direction)
+				var node_original_rotation = original_transforms.get(node, Transform3D()).basis.get_euler()
+				RotationManager.apply_rotation_step(node, axis, step * direction, node_original_rotation, false)
 
 static func _apply_position_adjustment(wheel_input: Dictionary):
 	"""Apply position adjustment based on wheel input"""

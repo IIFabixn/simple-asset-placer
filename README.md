@@ -336,6 +336,7 @@ addons/simpleassetplacer/
 - 🎯 **Surface Alignment**: Enable surface snapping for natural object placement.
 - 📏 **Grid Snapping**: Use grid alignment for architectural precision.
 - 🔍 **Camera Positioning**: Position camera for optimal placement angles.
+- 🛠️ **Terrain3D Collision**: When using Terrain3D, enable its Collision option in the editor (set it to "Dynamic / Editor") so placement rays hit the surface.
 - ⌨️ **Hotkey Efficiency**: Customize keys for your most common operations.
 
 ### **Performance Optimization**

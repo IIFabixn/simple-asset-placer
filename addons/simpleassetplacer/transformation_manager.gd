@@ -633,26 +633,6 @@ static func _process_transform_input(camera: Camera3D):
 		# New center = mouse position + snap offset + accumulated manual adjustments
 		new_center = mouse_center + snap_offset + accumulated_delta
 	
-	# Apply transformations to ALL nodes by repositioning relative to new center
-	for node in target_nodes:
-		if not node or not node.is_inside_tree():
-			continue
-		
-		# Get this node's offset from original center
-		var offset = node_offsets.get(node, Vector3.ZERO)
-		
-		# Set position as: new_center + offset (maintains relative position from original)
-		node.global_position.x = new_center.x + offset.x
-		node.global_position.z = new_center.z + offset.z
-		
-		# Y position: when snap_to_ground is enabled, follow the surface; otherwise use original Y
-		if settings.get("snap_to_ground", false):
-			# Follow the surface height from raycast (new_center.y includes raycast Y)
-			node.global_position.y = new_center.y + offset.y + accumulated_y_delta
-		else:
-			# Keep original Y position + height adjustments
-			node.global_position.y = original_center.y + offset.y + accumulated_y_delta
-	
 	# Update surface normal alignment if enabled, otherwise reset it
 	if settings.get("align_with_normal", false):
 		RotationManager.align_with_surface_normal(PositionManager.get_surface_normal())
@@ -669,18 +649,40 @@ static func _process_transform_input(camera: Camera3D):
 		if first_node and first_node.is_inside_tree():
 			var first_original_rotation = original_transforms.get(first_node, Transform3D()).basis.get_euler()
 			_process_rotation_input(rotation_input, first_node, false, first_original_rotation)
-			# Apply the combined rotation (original + surface alignment + manual offset) to the first node
-			RotationManager.apply_rotation_to_node(first_node, first_original_rotation)
 			rotation_applied = true
 	
-	# Apply the same rotation offset to remaining nodes (using their original rotations)
-	if rotation_applied and target_nodes.size() > 1:
-		for i in range(1, target_nodes.size()):
-			var node = target_nodes[i]
-			if node and node.is_inside_tree():
-				# Apply rotation offset to this node's original rotation
-				var node_original_rotation = original_transforms.get(node, Transform3D()).basis.get_euler()
-				RotationManager.apply_rotation_to_node(node, node_original_rotation)
+	# Get the current rotation offset for group rotation around center
+	var rotation_offset_euler = RotationManager.get_rotation_offset()
+	var rotation_basis = Basis.from_euler(rotation_offset_euler)
+	
+	# Apply transformations to ALL nodes (position + rotation)
+	for node in target_nodes:
+		if not node or not node.is_inside_tree():
+			continue
+		
+		# Get this node's original offset from center
+		var original_offset = node_offsets.get(node, Vector3.ZERO)
+		
+		# 1. Apply group rotation: rotate the node's offset around the center
+		var rotated_offset = rotation_basis * original_offset
+		
+		# 2. Apply position: new_center (from mouse/snap) + rotated offset
+		# Use new_center for XZ (follows mouse movement), but handle Y separately
+		node.global_position.x = new_center.x + rotated_offset.x
+		node.global_position.z = new_center.z + rotated_offset.z
+		
+		# Y position: when snap_to_ground is enabled, follow the surface; otherwise use original Y
+		if settings.get("snap_to_ground", false):
+			# Follow the surface height from raycast (new_center.y includes raycast Y)
+			node.global_position.y = new_center.y + rotated_offset.y + accumulated_y_delta
+		else:
+			# Keep original Y position + height adjustments
+			node.global_position.y = original_center.y + rotated_offset.y + accumulated_y_delta
+		
+		# 3. Apply individual rotation to the node (if rotation was applied)
+		if rotation_applied:
+			var node_original_rotation = original_transforms.get(node, Transform3D()).basis.get_euler()
+			RotationManager.apply_rotation_to_node(node, node_original_rotation)
 	
 	# Handle scale input for all nodes
 	for node in target_nodes:

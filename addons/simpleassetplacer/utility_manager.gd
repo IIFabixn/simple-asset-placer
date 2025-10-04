@@ -124,6 +124,11 @@ static func place_asset_in_scene(asset_path: String, position: Vector3 = Vector3
 		# Apply rotation from RotationManager
 		RotationManager.apply_rotation_to_node(scene_instance)
 		
+		# Apply random Y rotation if enabled
+		if settings.get("random_rotation", false):
+			var random_y_rotation = randf_range(0.0, TAU)  # Full 360 degrees in radians
+			scene_instance.rotate_y(random_y_rotation)
+		
 		# Apply scale (assume uniform scale from ScaleManager)
 		var scale_multiplier = ScaleManager.get_scale()
 		scene_instance.scale *= scale_multiplier
@@ -163,6 +168,12 @@ static func place_meshlib_item_in_scene(meshlib: MeshLibrary, item_id: int, posi
 		# Apply rotation from RotationManager
 		RotationManager.apply_rotation_to_node(mesh_instance)
 		
+		# Apply random Y rotation if enabled
+		if settings.get("random_rotation", false):
+			var random_y_rotation = randf_range(0.0, TAU)  # Full 360 degrees in radians
+			mesh_instance.rotate_y(random_y_rotation)
+			print("UtilityManager: Applied random Y rotation: ", rad_to_deg(random_y_rotation), " degrees")
+		
 		# Apply scale (assume uniform scale from ScaleManager)
 		var scale_multiplier = ScaleManager.get_scale()
 		mesh_instance.scale *= scale_multiplier
@@ -198,6 +209,12 @@ static func place_mesh_in_scene(mesh: Mesh, position: Vector3, settings: Diction
 		
 		# Apply rotation from RotationManager
 		RotationManager.apply_rotation_to_node(mesh_instance)
+		
+		# Apply random Y rotation if enabled
+		if settings.get("random_rotation", false):
+			var random_y_rotation = randf_range(0.0, TAU)  # Full 360 degrees in radians
+			mesh_instance.rotate_y(random_y_rotation)
+			print("UtilityManager: Applied random Y rotation: ", rad_to_deg(random_y_rotation), " degrees")
 		
 		# Apply scale (assume uniform scale from ScaleManager)
 		var scale_multiplier = ScaleManager.get_scale()

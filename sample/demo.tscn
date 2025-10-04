@@ -100,4 +100,7 @@ metadata/_edit_lock_ = true
 transform = Transform3D(0.258819, 0, -0.96592563, 0, 1, 0, 0.96592563, 0, 0.258819, -55, 30, 1)
 
 [node name="building_b" type="Node3D" parent="." instance=ExtResource("6_xo1bm")]
-transform = Transform3D(-0.9899492, 0, 0.9899497, 0, 1.4, 0, -0.9899497, 0, -0.9899492, -54.5, 30.000006, 6.5)
+transform = Transform3D(0.9899494, 7.212011e-09, 0.98994946, 0, 1.4, -1.0199324e-08, -0.9899494, 7.212011e-09, 0.98994946, -58.5, 30.000008, 28.5)
+
+[node name="building_b_2" type="Node3D" parent="." instance=ExtResource("6_xo1bm")]
+transform = Transform3D(0.89879787, 0.39523786, -0.1896034, -0.39523786, 0.5435736, -0.7404828, -0.18960345, 0.7404828, 0.64477575, -47.5, 21.909557, 43.5)

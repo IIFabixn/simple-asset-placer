@@ -469,6 +469,10 @@ static func _process_placement_input(camera: Camera3D):
 	# Don't rotate position offset - this makes rotation behave like transform mode (in-place)
 	_process_rotation_input(rotation_input, PreviewManager.preview_mesh, false)
 	
+	# Apply the combined rotation (surface alignment + manual rotation) to the preview mesh
+	if PreviewManager.preview_mesh:
+		RotationManager.apply_rotation_to_node(PreviewManager.preview_mesh)
+	
 	# Handle scale input
 	_process_scale_input(scale_input, PreviewManager.preview_mesh)
 	
@@ -641,8 +645,13 @@ static func _process_transform_input(camera: Camera3D):
 		node.global_position.x = new_center.x + offset.x
 		node.global_position.z = new_center.z + offset.z
 		
-		# Y position: original center Y + offset + accumulated height adjustments
-		node.global_position.y = original_center.y + offset.y + accumulated_y_delta
+		# Y position: when snap_to_ground is enabled, follow the surface; otherwise use original Y
+		if settings.get("snap_to_ground", false):
+			# Follow the surface height from raycast (new_center.y includes raycast Y)
+			node.global_position.y = new_center.y + offset.y + accumulated_y_delta
+		else:
+			# Keep original Y position + height adjustments
+			node.global_position.y = original_center.y + offset.y + accumulated_y_delta
 	
 	# Update surface normal alignment if enabled, otherwise reset it
 	if settings.get("align_with_normal", false):
@@ -657,6 +666,8 @@ static func _process_transform_input(camera: Camera3D):
 		var first_node = target_nodes[0]
 		if first_node and first_node.is_inside_tree():
 			_process_rotation_input(rotation_input, first_node)
+			# Apply the combined rotation (surface alignment + manual rotation) to the first node
+			RotationManager.apply_rotation_to_node(first_node)
 			rotation_applied = true
 	
 	# Apply the same rotation to remaining nodes (copying from first node)

@@ -495,8 +495,9 @@ static func update_smooth_position(delta: float):
 
 static func configure(config: Dictionary):
 	"""Configure position manager settings"""
-	collision_enabled = config.get("collision_enabled", true)
-	snap_to_ground = config.get("snap_to_ground", true) 
+	snap_to_ground = config.get("snap_to_ground", true)
+	# "Snap to ground" enables collision detection for raycasting to surfaces
+	collision_enabled = snap_to_ground
 	height_step_size = config.get("height_step_size", 0.1)
 	collision_mask = config.get("collision_mask", 1)
 	interpolation_enabled = config.get("interpolation_enabled", false)

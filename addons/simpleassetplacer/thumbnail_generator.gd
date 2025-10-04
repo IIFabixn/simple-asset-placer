@@ -557,10 +557,11 @@ static func _position_camera_for_aabb(aabb: AABB):
 	
 	# Calculate camera distance to fit the entire object
 	var fov_rad = deg_to_rad(camera.fov)
-	var distance = (max_size / 2.0) / tan(fov_rad / 2.0) * 1.5  # 1.5 for padding
+	var distance = (max_size / 2.0) / tan(fov_rad / 2.0) * 2  # 2 for padding
 	
-	# Position camera at an angle
-	var camera_offset = Vector3(1, 0.7, 1).normalized() * distance
+	# Position camera at an angle (adjusted to view from front-diagonal)
+	# Using negative Z to view from the front, positive Y for height, slight X for angle
+	var camera_offset = Vector3(1, 1, -1).normalized() * distance
 	camera.position = center + camera_offset
 	camera.look_at(center, Vector3.UP)
 

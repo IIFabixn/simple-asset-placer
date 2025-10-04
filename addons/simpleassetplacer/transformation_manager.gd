@@ -662,21 +662,25 @@ static func _process_transform_input(camera: Camera3D):
 	# Handle rotation input - process ONCE for all nodes to avoid accumulation
 	# Since RotationManager uses static state, we must not call it multiple times per frame
 	var rotation_applied = false
+	var original_transforms = transform_data.get("original_transforms", {})
+	
 	if not target_nodes.is_empty():
 		var first_node = target_nodes[0]
 		if first_node and first_node.is_inside_tree():
-			_process_rotation_input(rotation_input, first_node)
-			# Apply the combined rotation (surface alignment + manual rotation) to the first node
-			RotationManager.apply_rotation_to_node(first_node)
+			var first_original_rotation = original_transforms.get(first_node, Transform3D()).basis.get_euler()
+			_process_rotation_input(rotation_input, first_node, false, first_original_rotation)
+			# Apply the combined rotation (original + surface alignment + manual offset) to the first node
+			RotationManager.apply_rotation_to_node(first_node, first_original_rotation)
 			rotation_applied = true
 	
-	# Apply the same rotation to remaining nodes (copying from first node)
+	# Apply the same rotation offset to remaining nodes (using their original rotations)
 	if rotation_applied and target_nodes.size() > 1:
 		for i in range(1, target_nodes.size()):
 			var node = target_nodes[i]
 			if node and node.is_inside_tree():
-				# Copy rotation from first node to maintain consistency
-				node.rotation = target_nodes[0].rotation
+				# Apply rotation offset to this node's original rotation
+				var node_original_rotation = original_transforms.get(node, Transform3D()).basis.get_euler()
+				RotationManager.apply_rotation_to_node(node, node_original_rotation)
 	
 	# Handle scale input for all nodes
 	for node in target_nodes:
@@ -691,10 +695,15 @@ static func _process_transform_input(camera: Camera3D):
 	if target_nodes.size() > 0 and target_nodes[0]:
 		_update_transform_overlays(target_nodes[0])
 
-static func _process_rotation_input(rotation_input: Dictionary, target_node: Node3D, rotate_position_offset: bool = false):
+static func _process_rotation_input(rotation_input: Dictionary, target_node: Node3D, rotate_position_offset: bool = false, original_rotation: Vector3 = Vector3.ZERO):
 	"""Process rotation input for any target node
 	
-	rotate_position_offset: If true, also rotates manual position offset (for placement mode)"""
+	Args:
+		rotation_input: Input dictionary from InputHandler
+		target_node: The node to apply rotation to
+		rotate_position_offset: If true, also rotates manual position offset (for placement mode)
+		original_rotation: The node's original rotation (from transform mode) or Vector3.ZERO for placement mode
+	"""
 	if not target_node:
 		return
 	
@@ -715,11 +724,11 @@ static func _process_rotation_input(rotation_input: Dictionary, target_node: Nod
 		rotation_step = -rotation_step
 	
 	if rotation_input.x_pressed:
-		RotationManager.apply_rotation_step(target_node, "X", rotation_step, rotate_position_offset)
+		RotationManager.apply_rotation_step(target_node, "X", rotation_step, original_rotation, rotate_position_offset)
 	elif rotation_input.y_pressed:
-		RotationManager.apply_rotation_step(target_node, "Y", rotation_step, rotate_position_offset)
+		RotationManager.apply_rotation_step(target_node, "Y", rotation_step, original_rotation, rotate_position_offset)
 	elif rotation_input.z_pressed:
-		RotationManager.apply_rotation_step(target_node, "Z", rotation_step, rotate_position_offset)
+		RotationManager.apply_rotation_step(target_node, "Z", rotation_step, original_rotation, rotate_position_offset)
 	elif rotation_input.reset_pressed:
 		RotationManager.reset_node_rotation(target_node)
 
@@ -867,13 +876,15 @@ static func _apply_rotation_adjustment(wheel_input: Dictionary):
 	if current_mode == Mode.PLACEMENT:
 		var target_node = PreviewManager.preview_mesh
 		if target_node:
-			RotationManager.apply_rotation_step(target_node, axis, step * direction)
+			RotationManager.apply_rotation_step(target_node, axis, step * direction, Vector3.ZERO, false)
 	elif current_mode == Mode.TRANSFORM:
-		# Apply rotation to ALL nodes in transform mode
+		# Apply rotation offset to ALL nodes in transform mode (using their original rotations)
 		var target_nodes = transform_data.get("target_nodes", [])
+		var original_transforms = transform_data.get("original_transforms", {})
 		for node in target_nodes:
 			if node and node.is_inside_tree():
-				RotationManager.apply_rotation_step(node, axis, step * direction)
+				var node_original_rotation = original_transforms.get(node, Transform3D()).basis.get_euler()
+				RotationManager.apply_rotation_step(node, axis, step * direction, node_original_rotation, false)
 
 static func _apply_position_adjustment(wheel_input: Dictionary):
 	"""Apply position adjustment based on wheel input"""

@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### 🐛 Fixed
+- **Grid Overlay Coordinate System**: Fixed grid overlay moving in opposite direction when transforming nodes
+  - Root cause: Grid was inheriting flipped coordinate system from scene root nodes with 180° Y-axis rotation
+  - Solution: Set `top_level = true` on grid overlay to make it independent of parent transform
+  - Grid now works correctly regardless of scene root rotation or transform
+  - Both XZ plane movement and Y-axis height adjustments now follow object correctly
+- **Random Y-Rotation Now Works**: Fixed broken random rotation feature - settings were being passed but never applied during placement
+  - Added random rotation application in `utility_manager.gd` for all three placement functions (place_asset_in_scene, place_meshlib_item_in_scene, place_mesh_in_scene)
+  - Random rotation now applies AFTER manual rotation offsets, giving full 0-360 degree randomization on Y-axis
+
 ## [1.2.1] - 2025-10-04
 
 ### 🐛 Fixed

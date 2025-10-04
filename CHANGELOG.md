@@ -1,5 +1,82 @@
 # Changelog
 
+## [1.2.0] - 2025-10-04
+
+### ✨ New Features
+
+#### Asset Cycling System
+- **Cycle Through Assets During Placement**: Press `]` or `[` to browse assets without leaving the viewport
+  - **Next Asset**: Press `]` (BRACKETRIGHT) to cycle forward through visible assets
+  - **Previous Asset**: Press `[` (BRACKETLEFT) to cycle backward through visible assets
+  - **Tap to Cycle Once**: Quick press cycles to next/previous asset
+  - **Hold to Rapid Cycle**: Hold key to quickly browse through multiple assets (150ms repeat rate)
+  - **Context-Aware**: Cycles through currently filtered view (category, favorites, search results, tags)
+  - **Auto-Scroll**: Browser automatically scrolls to keep selected asset visible
+  - **Visual Feedback**: Thumbnail highlights and preview updates instantly
+  - **Works with Both Tabs**: Supports 3D Models and MeshLibrary browsers
+  - **Wrap-Around**: Seamlessly loops from last asset back to first
+
+#### Cycling Configuration
+- Added "Cycle Next Asset" keybind in Settings → Control Keys
+- Added "Cycle Previous Asset" keybind in Settings → Control Keys
+- Fully customizable key assignments
+- Settings persist across Godot sessions
+
+### 🌍 Enhanced - Universal Keyboard Layout Support
+
+#### International Keyboard Compatibility
+- **ALL keybinds now support modifier combinations** (CTRL+ALT+8, SHIFT+X, etc.)
+  - Rotation keys (X, Y, Z, Reset)
+  - Scale keys (Page Up, Page Down, Home)
+  - Height adjustment keys (Q, E, R)
+  - Position keys (W, A, S, D, G)
+  - Control keys (TAB, ESC)
+  - Asset cycling keys (], [)
+
+#### Modifier Combination Support
+- **Full chord detection**: Press CTRL+ALT+8 to configure keybinds requiring modifiers
+- **Conflict prevention**: Simple key bindings won't trigger when modifiers are held
+- **Exact matching**: Each keybind checks for precise modifier state
+- **Number key fallback**: Automatic conversion for keyboards requiring modifiers for numbers
+- **Works with all modifiers**: CTRL, ALT, SHIFT, META (Windows/Command key)
+
+#### Keybind Capture Improvements
+- Settings UI now properly captures modifier combinations
+- Ignores standalone modifier key presses (waits for actual key)
+- Displays full key combination in settings (e.g., "CTRL+ALT+9")
+- Visual feedback during key capture
+- ESC to cancel key binding
+
+### 🐛 Fixed
+- **Keybind capture bug**: Settings now correctly captures full modifier combinations instead of first key pressed
+- **Modifier isolation**: Modifiers no longer interfere with simple key bindings
+- **International layouts**: Keyboards requiring modifiers for brackets/special chars now work properly
+
+### 📚 Documentation
+- Added `ASSET_CYCLING_IMPLEMENTATION.md` - Complete technical documentation
+- Added `KEYBOARD_LAYOUT_SUPPORT.md` - Guide for international keyboard users
+- Updated README with asset cycling feature description
+- Added usage examples for different keyboard layouts
+
+### 🏗️ Technical Improvements
+- New `InputHandler._check_key_with_modifiers()` - Universal modifier detection
+- Enhanced input state tracking for tap vs hold detection
+- `ModelLibraryBrowser.cycle_to_next_asset()` - Cycles through 3D models
+- `ModelLibraryBrowser.cycle_to_previous_asset()` - Reverse cycling for models
+- `MeshLibraryBrowser.cycle_to_next_item()` - Cycles through meshlib items
+- `MeshLibraryBrowser.cycle_to_previous_item()` - Reverse cycling for meshlib
+- `AssetPlacerDock.cycle_next_asset()` - Tab-aware cycling coordinator
+- `AssetPlacerDock.cycle_previous_asset()` - Reverse coordinator
+- `TransformationManager._process_asset_cycling_input()` - Placement mode integration
+- Auto-scroll implementation for browser visibility management
+
+### 🎯 Workflow Enhancements
+- Stay in creative flow - no need to return to dock during placement
+- Quick asset iteration for level design
+- Visual comparison by rapidly cycling between options
+- One-handed operation (place with mouse, cycle with keyboard)
+- Works seamlessly with existing filtering and search features
+
 ## [1.1.1] - 2025-10-04
 
 ### 🔧 Architecture & Bug Fixes

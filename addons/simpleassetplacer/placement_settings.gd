@@ -69,6 +69,10 @@ var large_increment_modifier_key_button: Button
 var cancel_key_button: Button
 var transform_mode_key_button: Button
 
+# Asset Cycling Key Controls
+var cycle_next_asset_key_button: Button
+var cycle_previous_asset_key_button: Button
+
 # Settings
 var snap_to_ground: bool = false
 var align_with_normal: bool = false  # Align object rotation with surface normal
@@ -135,6 +139,10 @@ var large_increment_modifier_key: String = "ALT"  # Large increments
 # Control Settings
 var cancel_key: String = "ESCAPE"    # Cancel placement mode
 var transform_mode_key: String = "TAB"  # Activate transform mode on selected object
+
+# Asset Cycling Settings
+var cycle_next_asset_key: String = "BRACKETRIGHT"    # ] key - cycle to next asset
+var cycle_previous_asset_key: String = "BRACKETLEFT" # [ key - cycle to previous asset
 
 func _ready():
 	setup_ui()
@@ -996,6 +1004,32 @@ func setup_ui():
 	transform_mode_key_button.tooltip_text = "Click to set key for activating transform mode on selected object. Press ESC to cancel."
 	control_grid.add_child(transform_mode_key_button)
 	
+	# Cycle Next Asset Key
+	var cycle_next_label = Label.new()
+	cycle_next_label.text = "Cycle Next Asset:"
+	cycle_next_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	control_grid.add_child(cycle_next_label)
+	
+	cycle_next_asset_key_button = Button.new()
+	cycle_next_asset_key_button.text = cycle_next_asset_key
+	cycle_next_asset_key_button.custom_minimum_size.x = 80
+	cycle_next_asset_key_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cycle_next_asset_key_button.tooltip_text = "Click to set key for cycling to next asset during placement. Press ESC to cancel."
+	control_grid.add_child(cycle_next_asset_key_button)
+	
+	# Cycle Previous Asset Key
+	var cycle_prev_label = Label.new()
+	cycle_prev_label.text = "Cycle Previous Asset:"
+	cycle_prev_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	control_grid.add_child(cycle_prev_label)
+	
+	cycle_previous_asset_key_button = Button.new()
+	cycle_previous_asset_key_button.text = cycle_previous_asset_key
+	cycle_previous_asset_key_button.custom_minimum_size.x = 80
+	cycle_previous_asset_key_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cycle_previous_asset_key_button.tooltip_text = "Click to set key for cycling to previous asset during placement. Press ESC to cancel."
+	control_grid.add_child(cycle_previous_asset_key_button)
+	
 	# Add separator for utility settings
 	var utility_separator = HSeparator.new()
 	utility_separator.add_theme_constant_override("separation", 8)
@@ -1086,6 +1120,10 @@ func setup_ui():
 	cancel_key_button.pressed.connect(_on_key_binding_button_pressed.bind(cancel_key_button, "cancel_key"))
 	transform_mode_key_button.pressed.connect(_on_key_binding_button_pressed.bind(transform_mode_key_button, "transform_mode_key"))
 	
+	# Connect asset cycling key signals
+	cycle_next_asset_key_button.pressed.connect(_on_key_binding_button_pressed.bind(cycle_next_asset_key_button, "cycle_next_asset_key"))
+	cycle_previous_asset_key_button.pressed.connect(_on_key_binding_button_pressed.bind(cycle_previous_asset_key_button, "cycle_previous_asset_key"))
+	
 	# Connect utility button signals
 	reset_settings_button.pressed.connect(_on_reset_settings_pressed)
 	clear_cache_button.pressed.connect(_on_clear_cache_pressed)
@@ -1169,22 +1207,25 @@ func _input(event: InputEvent):
 			get_viewport().set_input_as_handled()
 			return
 		
+		# Ignore standalone modifier key presses - wait for the actual key
+		# This allows capturing combinations like CTRL+ALT+8
+		if event.keycode in [KEY_SHIFT, KEY_CTRL, KEY_ALT, KEY_META]:
+			# Don't process modifier keys alone - wait for the base key
+			get_viewport().set_input_as_handled()
+			return
+		
 		# Get the key name and build full key string with modifiers
 		var base_key_string = OS.get_keycode_string(event.keycode)
 		var key_string = ""
 		
-		# Handle standalone modifier keys (CTRL, ALT, SHIFT alone)
-		if event.keycode in [KEY_SHIFT, KEY_CTRL, KEY_ALT, KEY_META]:
-			key_string = base_key_string  # Just "CTRL" or "SHIFT" etc.
-		else:
-			# Handle modifier combinations (CTRL+X, ALT+Y, etc.)
-			if event.ctrl_pressed:
-				key_string += "CTRL+"
-			if event.alt_pressed:
-				key_string += "ALT+"
-			if event.shift_pressed:
-				key_string += "SHIFT+"
-			key_string += base_key_string
+		# Build modifier combination string
+		if event.ctrl_pressed:
+			key_string += "CTRL+"
+		if event.alt_pressed:
+			key_string += "ALT+"
+		if event.shift_pressed:
+			key_string += "SHIFT+"
+		key_string += base_key_string
 		
 		# Update the appropriate key property
 		var key_property = listening_button.get_meta("key_property")
@@ -1225,6 +1266,10 @@ func _input(event: InputEvent):
 				cancel_key = key_string
 			"transform_mode_key":
 				transform_mode_key = key_string
+			"cycle_next_asset_key":
+				cycle_next_asset_key = key_string
+			"cycle_previous_asset_key":
+				cycle_previous_asset_key = key_string
 		
 		# Update button display
 		listening_button.text = key_string
@@ -1381,6 +1426,10 @@ func _perform_reset_settings():
 	cancel_key = "ESCAPE"
 	transform_mode_key = "TAB"
 	
+	# Reset asset cycling keys
+	cycle_next_asset_key = "BRACKETRIGHT"
+	cycle_previous_asset_key = "BRACKETLEFT"
+	
 	# Update UI to reflect the reset values
 	update_ui_from_settings()
 	
@@ -1446,6 +1495,8 @@ func get_placement_settings() -> Dictionary:
 		"large_increment_modifier_key": large_increment_modifier_key,
 		"cancel_key": cancel_key,
 		"transform_mode_key": transform_mode_key,
+		"cycle_next_asset_key": cycle_next_asset_key,
+		"cycle_previous_asset_key": cycle_previous_asset_key,
 		
 		# Reset behavior settings
 		"reset_height_on_exit": reset_height_on_exit,
@@ -1522,6 +1573,10 @@ func save_settings():
 	# Save control settings
 	editor_settings.set_setting("simple_asset_placer/cancel_key", cancel_key)
 	editor_settings.set_setting("simple_asset_placer/transform_mode_key", transform_mode_key)
+	
+	# Save asset cycling settings
+	editor_settings.set_setting("simple_asset_placer/cycle_next_asset_key", cycle_next_asset_key)
+	editor_settings.set_setting("simple_asset_placer/cycle_previous_asset_key", cycle_previous_asset_key)
 
 func load_settings():
 	# Load settings from editor settings
@@ -1645,6 +1700,12 @@ func load_settings():
 	if editor_settings.has_setting("simple_asset_placer/transform_mode_key"):
 		transform_mode_key = editor_settings.get_setting("simple_asset_placer/transform_mode_key")
 	
+	# Load asset cycling settings
+	if editor_settings.has_setting("simple_asset_placer/cycle_next_asset_key"):
+		cycle_next_asset_key = editor_settings.get_setting("simple_asset_placer/cycle_next_asset_key")
+	if editor_settings.has_setting("simple_asset_placer/cycle_previous_asset_key"):
+		cycle_previous_asset_key = editor_settings.get_setting("simple_asset_placer/cycle_previous_asset_key")
+	
 	# Update UI to reflect loaded settings
 	update_ui_from_settings()
 
@@ -1740,6 +1801,12 @@ func update_ui_from_settings():
 		fine_height_increment_spin.value = fine_height_increment
 	if large_height_increment_spin:
 		large_height_increment_spin.value = large_height_increment
+	
+	# Update asset cycling controls
+	if cycle_next_asset_key_button:
+		cycle_next_asset_key_button.text = cycle_next_asset_key
+	if cycle_previous_asset_key_button:
+		cycle_previous_asset_key_button.text = cycle_previous_asset_key
 
 func _disconnect_ui_signals():
 	"""Temporarily disconnect UI signals to prevent unwanted save triggers"""

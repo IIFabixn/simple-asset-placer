@@ -75,33 +75,33 @@ static func _update_key_states():
 	"""Update all key states based on current settings"""
 	var current_time = Time.get_ticks_msec() / 1000.0  # Convert to seconds
 	
-	# Core navigation keys
-	current_keys["tab"] = Input.is_key_pressed(string_to_keycode(settings.get("transform_mode_key", "TAB")))
+	# Core navigation keys - use universal modifier support
+	current_keys["tab"] = _check_key_with_modifiers(settings.get("transform_mode_key", "TAB"))
 	current_keys["escape"] = Input.is_key_pressed(KEY_ESCAPE)
 	current_keys["shift"] = Input.is_key_pressed(KEY_SHIFT)
 	current_keys["ctrl"] = Input.is_key_pressed(KEY_CTRL)
 	current_keys["alt"] = Input.is_key_pressed(KEY_ALT)
 	
-	# Settings-based keys
-	current_keys["cancel"] = Input.is_key_pressed(string_to_keycode(settings.get("cancel_key", "ESCAPE")))
+	# Settings-based keys - use universal modifier support
+	current_keys["cancel"] = _check_key_with_modifiers(settings.get("cancel_key", "ESCAPE"))
 	var height_up_key = settings.get("height_up_key", "Q")
 	var height_down_key = settings.get("height_down_key", "E")
 	var reset_height_key = settings.get("reset_height_key", "R")
-	current_keys["height_up"] = Input.is_key_pressed(string_to_keycode(height_up_key))
-	current_keys["height_down"] = Input.is_key_pressed(string_to_keycode(height_down_key))
-	current_keys["reset_height"] = Input.is_key_pressed(string_to_keycode(reset_height_key))
+	current_keys["height_up"] = _check_key_with_modifiers(height_up_key)
+	current_keys["height_down"] = _check_key_with_modifiers(height_down_key)
+	current_keys["reset_height"] = _check_key_with_modifiers(reset_height_key)
 	
-	# Position adjustment keys
+	# Position adjustment keys - use universal modifier support
 	var position_left_key = settings.get("position_left_key", "A")
 	var position_right_key = settings.get("position_right_key", "D")
 	var position_forward_key = settings.get("position_forward_key", "W")
 	var position_backward_key = settings.get("position_backward_key", "S")
 	var reset_position_key = settings.get("reset_position_key", "G")
-	current_keys["position_left"] = Input.is_key_pressed(string_to_keycode(position_left_key))
-	current_keys["position_right"] = Input.is_key_pressed(string_to_keycode(position_right_key))
-	current_keys["position_forward"] = Input.is_key_pressed(string_to_keycode(position_forward_key))
-	current_keys["position_backward"] = Input.is_key_pressed(string_to_keycode(position_backward_key))
-	current_keys["reset_position"] = Input.is_key_pressed(string_to_keycode(reset_position_key))
+	current_keys["position_left"] = _check_key_with_modifiers(position_left_key)
+	current_keys["position_right"] = _check_key_with_modifiers(position_right_key)
+	current_keys["position_forward"] = _check_key_with_modifiers(position_forward_key)
+	current_keys["position_backward"] = _check_key_with_modifiers(position_backward_key)
+	current_keys["reset_position"] = _check_key_with_modifiers(reset_position_key)
 	
 	# Track key press times for grace period
 	_track_key_press_time("height_up", current_time)
@@ -113,28 +113,108 @@ static func _update_key_states():
 	_track_key_press_time("position_backward", current_time)
 	_track_key_press_time("reset_position", current_time)
 	
-	# Rotation keys
-	current_keys["rotate_x"] = Input.is_key_pressed(string_to_keycode(settings.get("rotate_x_key", "X")))
-	current_keys["rotate_y"] = Input.is_key_pressed(string_to_keycode(settings.get("rotate_y_key", "Y")))
-	current_keys["rotate_z"] = Input.is_key_pressed(string_to_keycode(settings.get("rotate_z_key", "Z")))
-	current_keys["reset_rotation"] = Input.is_key_pressed(string_to_keycode(settings.get("reset_rotation_key", "T")))
+	# Rotation keys - use universal modifier support
+	current_keys["rotate_x"] = _check_key_with_modifiers(settings.get("rotate_x_key", "X"))
+	current_keys["rotate_y"] = _check_key_with_modifiers(settings.get("rotate_y_key", "Y"))
+	current_keys["rotate_z"] = _check_key_with_modifiers(settings.get("rotate_z_key", "Z"))
+	current_keys["reset_rotation"] = _check_key_with_modifiers(settings.get("reset_rotation_key", "T"))
 	
 	# Track rotation key press times for grace period
 	_track_key_press_time("rotate_x", current_time)
 	_track_key_press_time("rotate_y", current_time)
 	_track_key_press_time("rotate_z", current_time)
 	
-	# Scale keys
+	# Scale keys - use universal modifier support
 	var scale_up_key = settings.get("scale_up_key", "PAGE_UP")
 	var scale_down_key = settings.get("scale_down_key", "PAGE_DOWN") 
 	var scale_reset_key = settings.get("scale_reset_key", "HOME")
-	current_keys["scale_up"] = Input.is_key_pressed(string_to_keycode(scale_up_key))
-	current_keys["scale_down"] = Input.is_key_pressed(string_to_keycode(scale_down_key))
-	current_keys["reset_scale"] = Input.is_key_pressed(string_to_keycode(scale_reset_key))
+	current_keys["scale_up"] = _check_key_with_modifiers(scale_up_key)
+	current_keys["scale_down"] = _check_key_with_modifiers(scale_down_key)
+	current_keys["reset_scale"] = _check_key_with_modifiers(scale_reset_key)
 	
 	# Track scale key press times for grace period
 	_track_key_press_time("scale_up", current_time)
 	_track_key_press_time("scale_down", current_time)
+	
+	# Asset cycling keys - support both direct key and modifier combinations
+	var cycle_next_key = settings.get("cycle_next_asset_key", "BRACKETRIGHT")
+	var cycle_prev_key = settings.get("cycle_previous_asset_key", "BRACKETLEFT")
+	current_keys["cycle_next_asset"] = _check_key_with_modifiers(cycle_next_key)
+	current_keys["cycle_previous_asset"] = _check_key_with_modifiers(cycle_prev_key)
+	
+	# Track cycling key press times for tap vs hold detection
+	_track_key_press_time("cycle_next_asset", current_time)
+	_track_key_press_time("cycle_previous_asset", current_time)
+
+static func _check_key_with_modifiers(key_string: String) -> bool:
+	"""Check if key is pressed, supporting both direct keys and modifier combinations
+	Handles cases like 'BRACKETLEFT' or 'CTRL+ALT+8' for different keyboard layouts
+	
+	IMPORTANT: For modifier combinations, ALL specified modifiers must be pressed
+	along with the base key. This allows proper detection of keyboard layouts that
+	require modifier combinations to produce bracket characters."""
+	
+	# Check if the key string contains modifier combinations (e.g., "CTRL+ALT+8")
+	if "+" in key_string:
+		var parts = key_string.split("+")
+		var required_modifiers = {
+			"ctrl": false,
+			"alt": false,
+			"shift": false,
+			"meta": false
+		}
+		var base_key = ""
+		
+		# Parse modifiers and base key
+		for part in parts:
+			part = part.strip_edges().to_upper()
+			if part == "CTRL":
+				required_modifiers["ctrl"] = true
+			elif part == "ALT":
+				required_modifiers["alt"] = true
+			elif part == "SHIFT":
+				required_modifiers["shift"] = true
+			elif part == "META":
+				required_modifiers["meta"] = true
+			else:
+				# Last non-modifier part is the base key
+				base_key = part
+		
+		# Check that ALL required modifiers are currently pressed
+		if required_modifiers["ctrl"] and not Input.is_key_pressed(KEY_CTRL):
+			return false
+		if required_modifiers["alt"] and not Input.is_key_pressed(KEY_ALT):
+			return false
+		if required_modifiers["shift"] and not Input.is_key_pressed(KEY_SHIFT):
+			return false
+		if required_modifiers["meta"] and not Input.is_key_pressed(KEY_META):
+			return false
+		
+		# Check if base key is pressed
+		if not base_key.is_empty():
+			var keycode = string_to_keycode(base_key)
+			if keycode != KEY_NONE:
+				return Input.is_key_pressed(keycode)
+			# Fallback: try to parse as a number key directly
+			if base_key.is_valid_int():
+				var key_num = base_key.to_int()
+				if key_num >= 0 and key_num <= 9:
+					# Map number to KEY enum (KEY_0 through KEY_9)
+					var number_keycode = KEY_0 + key_num
+					return Input.is_key_pressed(number_keycode)
+		
+		return false
+	else:
+		# Simple key without modifiers - check that NO modifiers are pressed
+		# This ensures CTRL+ALT+8 doesn't trigger a binding for just "8"
+		if Input.is_key_pressed(KEY_CTRL) or Input.is_key_pressed(KEY_ALT) or \
+		   Input.is_key_pressed(KEY_SHIFT) or Input.is_key_pressed(KEY_META):
+			return false
+		
+		var keycode = string_to_keycode(key_string)
+		if keycode != KEY_NONE:
+			return Input.is_key_pressed(keycode)
+		return false
 
 static func _track_key_press_time(key_name: String, current_time: float):
 	"""Track when a key was just pressed for tap vs hold detection"""
@@ -458,6 +538,42 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 	
 	# No action key held - return empty dict (don't consume event, allow viewport zoom)
 	return {}
+
+## Asset Cycling Input Detection
+
+static func should_cycle_next_asset() -> bool:
+	"""Check if user wants to cycle to next asset (tap or hold)"""
+	return is_key_just_pressed("cycle_next_asset") or is_key_held_with_repeat("cycle_next_asset")
+
+static func should_cycle_previous_asset() -> bool:
+	"""Check if user wants to cycle to previous asset (tap or hold)"""
+	return is_key_just_pressed("cycle_previous_asset") or is_key_held_with_repeat("cycle_previous_asset")
+
+static func is_key_held_with_repeat(key_name: String, repeat_delay: float = 0.15) -> bool:
+	"""Check if key is held long enough to trigger repeated actions"""
+	if not is_key_pressed(key_name):
+		return false
+	
+	if not key_press_times.has(key_name):
+		return false
+	
+	var current_time = Time.get_ticks_msec() / 1000.0
+	var time_since_press = current_time - key_press_times[key_name]
+	
+	# Key must be held beyond grace period
+	if time_since_press < key_tap_grace_period:
+		return false
+	
+	# Calculate how many repeats should have occurred
+	var time_in_repeat_phase = time_since_press - key_tap_grace_period
+	var repeat_count = int(time_in_repeat_phase / repeat_delay)
+	
+	# Check if we should trigger this frame based on repeat timing
+	var next_repeat_time = key_tap_grace_period + (repeat_count * repeat_delay)
+	var time_to_next = (key_press_times[key_name] + next_repeat_time + repeat_delay) - current_time
+	
+	# Trigger if we're within one frame of the next repeat
+	return time_to_next <= 0.016  # ~1 frame at 60fps
 
 ## Debug and Inspection
 

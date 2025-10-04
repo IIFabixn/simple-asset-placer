@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.2.1] - 2025-10-04
+
+### 🐛 Fixed
+- **Pure Modifier Key Bindings**: Fixed support for binding pure modifiers (ALT, CTRL, SHIFT, META) to modifier keys (Large Increment, Reverse Direction)
+- **Modifier-Only Combinations**: Fixed capturing modifier-only combinations like CTRL+ALT without requiring a base key
+- **Key Chord Recording**: Improved key binding capture to record all pressed keys and capture complete combinations on release
+- **Modifier Key Recognition**: Fixed issue where modifier keys were not being recognized during gameplay (rotation, scale, height adjustments)
+- **Configurable Modifiers in Transformation Manager**: Updated all transformation logic to use configurable modifier keys instead of hardcoded SHIFT/ALT
+- **Input Dictionary Completeness**: Added missing `reverse_modifier_held` field to scale input dictionary
+
+### 🔧 Improved
+- **Key Binding Capture Logic**: Redesigned to use a recording approach that tracks all pressed keys and captures on complete release
+- **Action Key Detection**: Action keys (Y, X, Z, Q, E, etc.) now properly detected even when modifiers are held
+- **Modifier Separation**: Modifier state checks are now independent from action key detection, allowing proper combinations like SHIFT+Y for reverse rotation
+
 ## [1.2.0] - 2025-10-04
 
 ### ✨ New Features

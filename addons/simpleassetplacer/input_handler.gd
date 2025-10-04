@@ -82,6 +82,10 @@ static func _update_key_states():
 	current_keys["ctrl"] = Input.is_key_pressed(KEY_CTRL)
 	current_keys["alt"] = Input.is_key_pressed(KEY_ALT)
 	
+	# Configurable modifier keys
+	current_keys["reverse_modifier"] = _check_key_with_modifiers(settings.get("reverse_modifier_key", "SHIFT"))
+	current_keys["large_increment_modifier"] = _check_key_with_modifiers(settings.get("large_increment_modifier_key", "ALT"))
+	
 	# Settings-based keys - use universal modifier support
 	current_keys["cancel"] = _check_key_with_modifiers(settings.get("cancel_key", "ESCAPE"))
 	var height_up_key = settings.get("height_up_key", "Q")
@@ -148,11 +152,26 @@ static func _update_key_states():
 
 static func _check_key_with_modifiers(key_string: String) -> bool:
 	"""Check if key is pressed, supporting both direct keys and modifier combinations
-	Handles cases like 'BRACKETLEFT' or 'CTRL+ALT+8' for different keyboard layouts
+	Handles cases like 'BRACKETLEFT', 'CTRL+ALT+8', or pure modifiers like 'ALT', 'CTRL'
 	
 	IMPORTANT: For modifier combinations, ALL specified modifiers must be pressed
 	along with the base key. This allows proper detection of keyboard layouts that
-	require modifier combinations to produce bracket characters."""
+	require modifier combinations to produce bracket characters.
+	
+	Pure modifiers (e.g., just 'ALT' or 'CTRL') are also supported as valid bindings."""
+	
+	# Normalize the key string
+	var normalized_key = key_string.strip_edges().to_upper()
+	
+	# Check if this is a pure modifier key binding (just ALT, CTRL, SHIFT, or META)
+	if normalized_key == "CTRL":
+		return Input.is_key_pressed(KEY_CTRL)
+	elif normalized_key == "ALT":
+		return Input.is_key_pressed(KEY_ALT)
+	elif normalized_key == "SHIFT":
+		return Input.is_key_pressed(KEY_SHIFT)
+	elif normalized_key == "META":
+		return Input.is_key_pressed(KEY_META)
 	
 	# Check if the key string contains modifier combinations (e.g., "CTRL+ALT+8")
 	if "+" in key_string:
@@ -190,7 +209,7 @@ static func _check_key_with_modifiers(key_string: String) -> bool:
 		if required_modifiers["meta"] and not Input.is_key_pressed(KEY_META):
 			return false
 		
-		# Check if base key is pressed
+		# Check if base key is pressed (if there is one)
 		if not base_key.is_empty():
 			var keycode = string_to_keycode(base_key)
 			if keycode != KEY_NONE:
@@ -202,17 +221,20 @@ static func _check_key_with_modifiers(key_string: String) -> bool:
 					# Map number to KEY enum (KEY_0 through KEY_9)
 					var number_keycode = KEY_0 + key_num
 					return Input.is_key_pressed(number_keycode)
-		
-		return false
-	else:
-		# Simple key without modifiers - check that NO modifiers are pressed
-		# This ensures CTRL+ALT+8 doesn't trigger a binding for just "8"
-		if Input.is_key_pressed(KEY_CTRL) or Input.is_key_pressed(KEY_ALT) or \
-		   Input.is_key_pressed(KEY_SHIFT) or Input.is_key_pressed(KEY_META):
 			return false
-		
+		else:
+			# No base key, just modifiers (e.g., "CTRL+ALT")
+			# All required modifiers are pressed (checked above), so return true
+			return true
+	else:
+		# Simple key without modifiers
 		var keycode = string_to_keycode(key_string)
 		if keycode != KEY_NONE:
+			# Just check if the key is pressed
+			# We DON'T prevent modifiers from being held alongside action keys
+			# because the system checks modifiers separately (e.g., for reverse rotation)
+			# Modifier conflict prevention is handled by having explicit modifier combinations
+			# in the key binding itself (e.g., "CTRL+Y" vs "Y")
 			return Input.is_key_pressed(keycode)
 		return false
 
@@ -367,6 +389,14 @@ static func is_ctrl_held() -> bool:
 static func is_alt_held() -> bool:
 	return is_key_pressed("alt")
 
+static func is_reverse_modifier_held() -> bool:
+	"""Check if the configured reverse modifier key is held"""
+	return is_key_pressed("reverse_modifier")
+
+static func is_large_increment_modifier_held() -> bool:
+	"""Check if the configured large increment modifier key is held"""
+	return is_key_pressed("large_increment_modifier")
+
 ## Input Utility Functions
 
 static func string_to_keycode(key_string: String) -> Key:
@@ -387,7 +417,9 @@ static func get_rotation_input() -> Dictionary:
 		"reset_pressed": is_key_just_pressed("reset_rotation") and not right_mouse_held,
 		"shift_held": is_shift_held(),
 		"ctrl_held": is_ctrl_held(),
-		"alt_held": is_alt_held()
+		"alt_held": is_alt_held(),
+		"reverse_modifier_held": is_reverse_modifier_held(),
+		"large_increment_modifier_held": is_large_increment_modifier_held()
 	}
 
 static func get_scale_input() -> Dictionary:
@@ -400,7 +432,9 @@ static func get_scale_input() -> Dictionary:
 		"down_pressed": is_key_just_pressed("scale_down") and not right_mouse_held,
 		"reset_pressed": is_key_just_pressed("reset_scale") and not right_mouse_held,
 		"shift_held": is_shift_held(),
-		"alt_held": is_alt_held()
+		"alt_held": is_alt_held(),
+		"reverse_modifier_held": is_reverse_modifier_held(),
+		"large_increment_modifier_held": is_large_increment_modifier_held()
 	}
 
 static func get_position_input() -> Dictionary:
@@ -421,7 +455,9 @@ static func get_position_input() -> Dictionary:
 		"left_clicked": is_mouse_button_just_pressed("left") and is_mouse_in_viewport(),
 		"shift_held": is_shift_held(),
 		"ctrl_held": is_ctrl_held(),
-		"alt_held": is_alt_held()
+		"alt_held": is_alt_held(),
+		"reverse_modifier_held": is_reverse_modifier_held(),
+		"large_increment_modifier_held": is_large_increment_modifier_held()
 	}
 
 static func get_navigation_input() -> Dictionary:
@@ -459,7 +495,7 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 		return {
 			"action": "height",
 			"direction": wheel_direction,
-			"reverse_modifier": event.shift_pressed  # SHIFT reverses direction
+			"reverse_modifier": is_reverse_modifier_held()
 		}
 	
 	# Scale adjustment keys (PAGE_UP/PAGE_DOWN)
@@ -470,7 +506,7 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 		return {
 			"action": "scale",
 			"direction": wheel_direction,
-			"large_increment": event.alt_pressed  # ALT for large steps
+			"large_increment": is_large_increment_modifier_held()
 		}
 	
 	# Rotation keys (X/Y/Z)
@@ -480,8 +516,8 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 			"action": "rotation",
 			"axis": "X",
 			"direction": wheel_direction,
-			"large_increment": event.alt_pressed,
-			"reverse_modifier": event.shift_pressed
+			"large_increment": is_large_increment_modifier_held(),
+			"reverse_modifier": is_reverse_modifier_held()
 		}
 	elif is_key_held_for_wheel("rotate_y"):
 		pending_taps.erase("rotate_y")
@@ -489,8 +525,8 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 			"action": "rotation",
 			"axis": "Y",
 			"direction": wheel_direction,
-			"large_increment": event.alt_pressed,
-			"reverse_modifier": event.shift_pressed
+			"large_increment": is_large_increment_modifier_held(),
+			"reverse_modifier": is_reverse_modifier_held()
 		}
 	elif is_key_held_for_wheel("rotate_z"):
 		pending_taps.erase("rotate_z")
@@ -498,8 +534,8 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 			"action": "rotation",
 			"axis": "Z",
 			"direction": wheel_direction,
-			"large_increment": event.alt_pressed,
-			"reverse_modifier": event.shift_pressed
+			"large_increment": is_large_increment_modifier_held(),
+			"reverse_modifier": is_reverse_modifier_held()
 		}
 	
 	# Position adjustment keys (W/A/S/D)
@@ -509,7 +545,7 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 			"action": "position",
 			"axis": "forward",
 			"direction": wheel_direction,
-			"reverse_modifier": event.shift_pressed
+			"reverse_modifier": is_reverse_modifier_held()
 		}
 	elif is_key_held_for_wheel("position_backward"):
 		pending_taps.erase("position_backward")
@@ -517,7 +553,7 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 			"action": "position",
 			"axis": "backward",
 			"direction": wheel_direction,
-			"reverse_modifier": event.shift_pressed
+			"reverse_modifier": is_reverse_modifier_held()
 		}
 	elif is_key_held_for_wheel("position_left"):
 		pending_taps.erase("position_left")
@@ -525,7 +561,7 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 			"action": "position",
 			"axis": "left",
 			"direction": wheel_direction,
-			"reverse_modifier": event.shift_pressed
+			"reverse_modifier": is_reverse_modifier_held()
 		}
 	elif is_key_held_for_wheel("position_right"):
 		pending_taps.erase("position_right")
@@ -533,7 +569,7 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 			"action": "position",
 			"axis": "right",
 			"direction": wheel_direction,
-			"reverse_modifier": event.shift_pressed
+			"reverse_modifier": is_reverse_modifier_held()
 		}
 	
 	# No action key held - return empty dict (don't consume event, allow viewport zoom)

@@ -506,6 +506,11 @@ static func create_grid_overlay(center: Vector3, grid_size: float, grid_extent: 
 	grid_overlay = MeshInstance3D.new()
 	grid_overlay.name = "AssetPlacerGrid"
 	
+	# IMPORTANT: Set top_level = true to make grid independent of parent's transform
+	# This prevents the grid from being affected by the scene root's rotation/scale
+	# Without this, if the scene root is rotated (e.g., 180° Y rotation), the grid would be flipped
+	grid_overlay.top_level = true
+	
 	# Create grid mesh
 	var immediate_mesh = ImmediateMesh.new()
 	grid_overlay.mesh = immediate_mesh

@@ -299,10 +299,11 @@ static func _update_grid_overlay():
 		var center = Vector3.ZERO
 		if current_mode == Mode.PLACEMENT:
 			# Use base position (without height offset) for grid placement
-			# This ensures the grid stays at ground level, not elevated with the object
+			# No coordinate inversion needed - grid is now independent of scene root transform
 			center = PositionManager.get_base_position()
 		elif current_mode == Mode.TRANSFORM:
 			# Use center of selected nodes
+			# No coordinate inversion needed - grid is now independent of scene root transform
 			var target_nodes = transform_data.get("target_nodes", [])
 			if not target_nodes.is_empty():
 				for node in target_nodes:

@@ -269,8 +269,8 @@ func setup_ui():
 	# Center snapping options
 	var snap_center_label = Label.new()
 	snap_center_label.text = "Snap Using Center Position:"
-	snap_center_label.add_theme_font_size_override("font_size", 12)
-	snap_center_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 0.9))
+	snap_center_label.add_theme_font_size_override("font_size", 14)
+	snap_center_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.9))
 	vbox.add_child(snap_center_label)
 	
 	var snap_center_x_check = CheckBox.new()

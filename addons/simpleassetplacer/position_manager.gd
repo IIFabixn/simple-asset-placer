@@ -81,7 +81,7 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 				# Compare against last raycast XZ position to avoid interference from manual_position_offset
 				var new_xz = Vector2(new_pos.x, new_pos.z)
 				var xz_distance = new_xz.distance_to(last_raycast_xz)
-				should_update_base_height = xz_distance > 0.01  # Small threshold to avoid floating point issues
+				should_update_base_height = xz_distance > 0.1  # Threshold to avoid false positives from tiny mouse movements
 			
 			if should_update_base_height:
 				# Update base_height from raycast and apply offset
@@ -130,7 +130,7 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 		# Compare against last raycast XZ position to avoid interference from manual_position_offset
 		var new_xz = Vector2(pos.x, pos.z)
 		var xz_distance = new_xz.distance_to(last_raycast_xz)
-		should_update_base_height_fallback = xz_distance > 0.01
+		should_update_base_height_fallback = xz_distance > 0.1
 	
 	if should_update_base_height_fallback:
 		# Set base_height from plane and mark as initialized

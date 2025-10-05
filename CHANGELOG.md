@@ -2,7 +2,18 @@
 
 ## [Unreleased]
 
+## [1.3.2] - 2025-10-05
+
 ### 🐛 Fixed
+- **Orphaned Tag Data**: Tag system now automatically cleans up data for deleted assets
+  - Tags, favorites, and recent assets for deleted files are automatically removed
+  - Cleanup runs automatically when plugin loads or when refresh button is clicked
+  - Tag usage statistics are recalculated after cleanup
+  - Prevents stale references and keeps `.assetcategories` file clean
+- **Position Reset on Large Rotation**: Fixed position getting reset unexpectedly after rotating with large increments
+  - Increased XZ distance threshold from 0.01 to 0.1 units in position change detection
+  - Prevents tiny mouse movements during rotation from triggering false position updates
+  - Asset position now remains stable when rotating with 90° or other large increments
 - **Grid Offset Snapping**: Fixed grid offset not being applied to snapping calculations
   - Grid offset spinbox controls are now properly stored as class member variables (`grid_offset_x_spin`, `grid_offset_z_spin`)
   - Fixed `_on_grid_setting_changed()` callback to access spinbox values using member variables instead of failing node path lookups

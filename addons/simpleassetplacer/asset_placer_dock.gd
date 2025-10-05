@@ -239,6 +239,16 @@ func update_responsive_sizes():
 func discover_assets():
 	"""Discover all 3D assets in the project using AssetScanner"""
 	discovered_assets = AssetScanner.scan_for_assets("res://", true)
+	
+	# Clean up orphaned data after scanning assets
+	if category_manager and discovered_assets.size() > 0:
+		var asset_paths = []
+		for asset in discovered_assets:
+			asset_paths.append(asset.path)
+		
+		# Perform silent cleanup (only warns in console if items found)
+		category_manager.cleanup_all_orphaned_data(asset_paths)
+	
 	update_meshlib_browser()
 	# Discover assets for the model library browser
 	if modellib_browser:
@@ -267,6 +277,23 @@ func _on_asset_selected(asset_info: Dictionary):
 		PluginLogger.error(PluginConstants.COMPONENT_DOCK, "Failed to load resource: " + asset_info.path)
 
 func _on_refresh_pressed():
+	# Clean up orphaned data before refreshing
+	if category_manager and discovered_assets.size() > 0:
+		var asset_paths = []
+		for asset in discovered_assets:
+			asset_paths.append(asset.path)
+		
+		# Perform cleanup
+		var cleanup_results = category_manager.cleanup_all_orphaned_data(asset_paths)
+		
+		# Log cleanup results if anything was cleaned
+		if cleanup_results["total_items_cleaned"] > 0:
+			PluginLogger.info(PluginConstants.COMPONENT_DOCK, "Cleanup completed: %d tags, %d favorites, %d recent assets removed" % [
+				cleanup_results["tags"]["removed_assets"],
+				cleanup_results["favorites_removed"],
+				cleanup_results["recent_removed"]
+			])
+	
 	discover_assets()
 
 func _on_search_changed(new_text: String):

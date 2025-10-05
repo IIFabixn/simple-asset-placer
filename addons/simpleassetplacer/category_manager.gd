@@ -221,6 +221,154 @@ func _recalculate_tag_usage():
 					tag_usage[tag] = 1
 
 
+## Clean up tags for assets that no longer exist
+func cleanup_orphaned_tags(valid_asset_paths: Array) -> Dictionary:
+	"""
+	Remove tags for assets that no longer exist in the project.
+	
+	Args:
+		valid_asset_paths: Array of valid asset paths currently in the project
+		
+	Returns:
+		Dictionary with cleanup results: {
+			"removed_assets": int,  # Number of assets removed from tags
+			"removed_tags": Array,  # List of tag names that became empty
+			"assets_cleaned": Array  # List of asset keys that were removed
+		}
+	"""
+	var removed_count = 0
+	var removed_tag_names = []
+	var cleaned_asset_keys = []
+	
+	# Build set of valid asset keys (using basename as key)
+	var valid_keys = {}
+	for path in valid_asset_paths:
+		var key = path.get_file().get_basename()
+		valid_keys[key] = true
+	
+	# Find tags for assets that no longer exist
+	var keys_to_remove = []
+	for asset_key in custom_tags.keys():
+		if not valid_keys.has(asset_key):
+			keys_to_remove.append(asset_key)
+	
+	# Remove orphaned tags
+	for key in keys_to_remove:
+		custom_tags.erase(key)
+		cleaned_asset_keys.append(key)
+		removed_count += 1
+	
+	# Recalculate tag usage statistics
+	var old_tags = tag_usage.keys()
+	_recalculate_tag_usage()
+	
+	# Find tags that no longer have any usage
+	for old_tag in old_tags:
+		if not tag_usage.has(old_tag) or tag_usage[old_tag] == 0:
+			removed_tag_names.append(old_tag)
+	
+	# Save changes if any orphaned tags were removed
+	if removed_count > 0:
+		save_config_file()
+		categories_updated.emit()
+		
+		# Log the cleanup results
+		push_warning("CategoryManager: Cleaned up %d orphaned tag entries" % removed_count)
+		if removed_tag_names.size() > 0:
+			push_warning("CategoryManager: Removed %d unused tags: %s" % [removed_tag_names.size(), ", ".join(removed_tag_names)])
+	
+	return {
+		"removed_assets": removed_count,
+		"removed_tags": removed_tag_names,
+		"assets_cleaned": cleaned_asset_keys
+	}
+
+
+## Validate and clean favorites list (remove non-existent assets)
+func cleanup_favorites(valid_asset_paths: Array) -> int:
+	"""
+	Remove favorites that no longer exist in the project.
+	
+	Args:
+		valid_asset_paths: Array of valid asset paths currently in the project
+		
+	Returns:
+		Number of favorites removed
+	"""
+	var valid_paths_set = {}
+	for path in valid_asset_paths:
+		valid_paths_set[path] = true
+	
+	var favorites_to_remove = []
+	for fav_path in favorites:
+		if not valid_paths_set.has(fav_path):
+			favorites_to_remove.append(fav_path)
+	
+	for path in favorites_to_remove:
+		favorites.erase(path)
+	
+	if favorites_to_remove.size() > 0:
+		save_editor_settings()
+		categories_updated.emit()
+		push_warning("CategoryManager: Cleaned up %d orphaned favorites" % favorites_to_remove.size())
+	
+	return favorites_to_remove.size()
+
+
+## Validate and clean recent assets list (remove non-existent assets)
+func cleanup_recent_assets(valid_asset_paths: Array) -> int:
+	"""
+	Remove recent assets that no longer exist in the project.
+	
+	Args:
+		valid_asset_paths: Array of valid asset paths currently in the project
+		
+	Returns:
+		Number of recent assets removed
+	"""
+	var valid_paths_set = {}
+	for path in valid_asset_paths:
+		valid_paths_set[path] = true
+	
+	var recent_to_remove = []
+	for recent_path in recent_assets:
+		if not valid_paths_set.has(recent_path):
+			recent_to_remove.append(recent_path)
+	
+	for path in recent_to_remove:
+		recent_assets.erase(path)
+	
+	if recent_to_remove.size() > 0:
+		save_editor_settings()
+		categories_updated.emit()
+		push_warning("CategoryManager: Cleaned up %d orphaned recent assets" % recent_to_remove.size())
+	
+	return recent_to_remove.size()
+
+
+## Perform full cleanup of all orphaned data
+func cleanup_all_orphaned_data(valid_asset_paths: Array) -> Dictionary:
+	"""
+	Clean up all orphaned data (tags, favorites, recent assets).
+	
+	Args:
+		valid_asset_paths: Array of valid asset paths currently in the project
+		
+	Returns:
+		Dictionary with comprehensive cleanup results
+	"""
+	var tag_results = cleanup_orphaned_tags(valid_asset_paths)
+	var favorites_removed = cleanup_favorites(valid_asset_paths)
+	var recent_removed = cleanup_recent_assets(valid_asset_paths)
+	
+	return {
+		"tags": tag_results,
+		"favorites_removed": favorites_removed,
+		"recent_removed": recent_removed,
+		"total_items_cleaned": tag_results["removed_assets"] + favorites_removed + recent_removed
+	}
+
+
 ## Get all custom tags for an asset (by name or path)
 func get_custom_tags(asset_path: String) -> Array:
 	var asset_name = asset_path.get_file().get_basename()

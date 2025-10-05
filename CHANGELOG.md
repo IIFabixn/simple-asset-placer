@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [1.3.1] - 2025-10-05
+
+### 🐛 Fixed
+- **Critical Runtime Error**: Fixed missing `fine_increment_modifier_held` key in rotation and scale input dictionaries
+  - Added `fine_increment_modifier_held` to `get_rotation_input()` function
+  - Added `fine_increment_modifier_held` to `get_scale_input()` function
+  - Eliminated hundreds of runtime errors when using rotation or scale transformations
+  - Ensures consistent modifier key structure across all input query functions
+
+### 🏗️ Technical Improvements
+- **Code Cleanup**: Removed deprecated helper functions (`is_shift_held()`, `is_ctrl_held()`, `is_alt_held()`) from input dictionaries
+  - All input now uses configurable modifier system (`reverse_modifier_held`, `large_increment_modifier_held`, `fine_increment_modifier_held`)
+
 ## [1.3.0] - 2025-10-05
 
 ### ✨ New Features

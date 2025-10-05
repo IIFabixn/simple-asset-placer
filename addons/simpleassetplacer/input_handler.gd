@@ -398,15 +398,6 @@ static func is_action_pressed(action_name: String) -> bool:
 
 ## Modifier Key Helpers
 
-static func is_shift_held() -> bool:
-	return is_key_pressed("shift")
-
-static func is_ctrl_held() -> bool:
-	return is_key_pressed("ctrl")
-
-static func is_alt_held() -> bool:
-	return is_key_pressed("alt")
-
 static func is_reverse_modifier_held() -> bool:
 	"""Check if the configured reverse modifier key is held"""
 	return is_key_pressed("reverse_modifier")
@@ -437,11 +428,9 @@ static func get_rotation_input() -> Dictionary:
 		"y_pressed": (is_key_just_pressed("rotate_y") or is_action_key_held_with_repeat("rotate_y", "rotation")) and not right_mouse_held, 
 		"z_pressed": (is_key_just_pressed("rotate_z") or is_action_key_held_with_repeat("rotate_z", "rotation")) and not right_mouse_held,
 		"reset_pressed": is_key_just_pressed("reset_rotation") and not right_mouse_held,
-		"shift_held": is_shift_held(),
-		"ctrl_held": is_ctrl_held(),
-		"alt_held": is_alt_held(),
 		"reverse_modifier_held": is_reverse_modifier_held(),
-		"large_increment_modifier_held": is_large_increment_modifier_held()
+		"large_increment_modifier_held": is_large_increment_modifier_held(),
+		"fine_increment_modifier_held": is_fine_increment_modifier_held()
 	}
 
 static func get_scale_input() -> Dictionary:
@@ -453,10 +442,9 @@ static func get_scale_input() -> Dictionary:
 		"up_pressed": (is_key_just_pressed("scale_up") or is_action_key_held_with_repeat("scale_up", "scale")) and not right_mouse_held,
 		"down_pressed": (is_key_just_pressed("scale_down") or is_action_key_held_with_repeat("scale_down", "scale")) and not right_mouse_held,
 		"reset_pressed": is_key_just_pressed("reset_scale") and not right_mouse_held,
-		"shift_held": is_shift_held(),
-		"alt_held": is_alt_held(),
 		"reverse_modifier_held": is_reverse_modifier_held(),
-		"large_increment_modifier_held": is_large_increment_modifier_held()
+		"large_increment_modifier_held": is_large_increment_modifier_held(),
+		"fine_increment_modifier_held": is_fine_increment_modifier_held()
 	}
 
 static func get_position_input() -> Dictionary:
@@ -475,9 +463,6 @@ static func get_position_input() -> Dictionary:
 		"reset_position_pressed": is_key_just_pressed("reset_position") and not right_mouse_held,
 		"mouse_position": get_mouse_position(),
 		"left_clicked": is_mouse_button_just_pressed("left") and is_mouse_in_viewport(),
-		"shift_held": is_shift_held(),
-		"ctrl_held": is_ctrl_held(),
-		"alt_held": is_alt_held(),
 		"reverse_modifier_held": is_reverse_modifier_held(),
 		"large_increment_modifier_held": is_large_increment_modifier_held(),
 		"fine_increment_modifier_held": is_fine_increment_modifier_held()

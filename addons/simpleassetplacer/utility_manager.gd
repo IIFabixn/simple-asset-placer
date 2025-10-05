@@ -84,12 +84,12 @@ static func extract_mesh_from_children(node: Node3D) -> Mesh:
 
 static func place_asset_in_scene(asset_path: String, position: Vector3 = Vector3.ZERO, settings: Dictionary = {}) -> Node:
 	"""Place an asset file in the scene with applied transformations"""
-	print("UtilityManager: Placing asset: ", asset_path, " at position: ", position)
+	PluginLogger.info("UtilityManager", "Placing asset: " + asset_path + " at position: " + str(position))
 	
 	# Load the asset
 	var asset = load(asset_path)
 	if not asset:
-		print("UtilityManager: Failed to load asset: ", asset_path)
+		PluginLogger.error("UtilityManager", "Failed to load asset: " + asset_path)
 		return null
 	
 	var scene_instance = null
@@ -101,11 +101,11 @@ static func place_asset_in_scene(asset_path: String, position: Vector3 = Vector3
 		scene_instance = MeshInstance3D.new()
 		scene_instance.mesh = asset
 	else:
-		print("UtilityManager: Unsupported asset type for: ", asset_path)
+		PluginLogger.error("UtilityManager", "Unsupported asset type for: " + asset_path)
 		return null
 	
 	if not scene_instance:
-		print("UtilityManager: Failed to instantiate asset: ", asset_path)
+		PluginLogger.error("UtilityManager", "Failed to instantiate asset: " + asset_path)
 		return null
 	
 	# Generate unique name and add to scene first
@@ -133,10 +133,10 @@ static func place_asset_in_scene(asset_path: String, position: Vector3 = Vector3
 		var scale_multiplier = ScaleManager.get_scale()
 		scene_instance.scale *= scale_multiplier
 		
-		print("UtilityManager: Successfully placed asset as: ", unique_name)
+		PluginLogger.info("UtilityManager", "Successfully placed asset as: " + unique_name)
 		return scene_instance
 	else:
-		print("UtilityManager: No current scene root found")
+		PluginLogger.error("UtilityManager", "No current scene root found")
 		scene_instance.queue_free()
 		return null
 
@@ -144,7 +144,7 @@ static func place_meshlib_item_in_scene(meshlib: MeshLibrary, item_id: int, posi
 	"""Place a MeshLibrary item in the scene with applied transformations"""
 	var mesh = meshlib.get_item_mesh(item_id)
 	if not mesh:
-		print("UtilityManager: Invalid mesh for item ID: ", item_id)
+		PluginLogger.error("UtilityManager", "Invalid mesh for item ID: " + str(item_id))
 		return null
 	
 	var mesh_instance = MeshInstance3D.new()
@@ -172,23 +172,23 @@ static func place_meshlib_item_in_scene(meshlib: MeshLibrary, item_id: int, posi
 		if settings.get("random_rotation", false):
 			var random_y_rotation = randf_range(0.0, TAU)  # Full 360 degrees in radians
 			mesh_instance.rotate_y(random_y_rotation)
-			print("UtilityManager: Applied random Y rotation: ", rad_to_deg(random_y_rotation), " degrees")
+			PluginLogger.debug("UtilityManager", "Applied random Y rotation: " + str(rad_to_deg(random_y_rotation)) + " degrees")
 		
 		# Apply scale (assume uniform scale from ScaleManager)
 		var scale_multiplier = ScaleManager.get_scale()
 		mesh_instance.scale *= scale_multiplier
 		
-		print("UtilityManager: Successfully placed meshlib item as: ", unique_name)
+		PluginLogger.info("UtilityManager", "Successfully placed meshlib item as: " + unique_name)
 		return mesh_instance
 	else:
-		print("UtilityManager: No current scene root found")
+		PluginLogger.error("UtilityManager", "No current scene root found")
 		mesh_instance.queue_free()
 		return null
 
 static func place_mesh_in_scene(mesh: Mesh, position: Vector3, settings: Dictionary = {}) -> MeshInstance3D:
 	"""Place a mesh in the scene with applied transformations"""
 	if not mesh:
-		print("UtilityManager: No mesh provided")
+		PluginLogger.error("UtilityManager", "No mesh provided")
 		return null
 	
 	var mesh_instance = MeshInstance3D.new()
@@ -214,15 +214,14 @@ static func place_mesh_in_scene(mesh: Mesh, position: Vector3, settings: Diction
 		if settings.get("random_rotation", false):
 			var random_y_rotation = randf_range(0.0, TAU)  # Full 360 degrees in radians
 			mesh_instance.rotate_y(random_y_rotation)
-			print("UtilityManager: Applied random Y rotation: ", rad_to_deg(random_y_rotation), " degrees")
+			PluginLogger.debug("UtilityManager", "Applied random Y rotation: " + str(rad_to_deg(random_y_rotation)) + " degrees")
 		
 		# Apply scale (assume uniform scale from ScaleManager)
 		var scale_multiplier = ScaleManager.get_scale()
 		mesh_instance.scale *= scale_multiplier
 		
-		print("UtilityManager: Successfully placed mesh as: ", unique_name)
 		return mesh_instance
 	else:
-		print("UtilityManager: No current scene root found")
+		PluginLogger.error("UtilityManager", "No current scene root found")
 		mesh_instance.queue_free()
 		return null

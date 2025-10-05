@@ -808,7 +808,7 @@ static func generate_meshlib_thumbnail(meshlib: MeshLibrary, item_id: int = -1) 
 	
 	# Check if viewport is still valid after awaits
 	if not viewport or not is_instance_valid(viewport):
-		print("ThumbnailGenerator: Viewport became invalid during meshlib generation")
+		PluginLogger.warning("ThumbnailGenerator", "Viewport became invalid during meshlib generation")
 		return null
 	
 	# Get the viewport texture

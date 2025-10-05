@@ -14,6 +14,8 @@ var align_with_normal_check: CheckBox
 var snap_enabled_check: CheckBox
 var snap_step_spin: SpinBox
 var show_grid_check: CheckBox
+var grid_offset_x_spin: SpinBox
+var grid_offset_z_spin: SpinBox
 var random_rotation_check: CheckBox
 var scale_spin: SpinBox
 var collision_check: CheckBox
@@ -154,6 +156,7 @@ var cycle_previous_asset_key: String = "BRACKETLEFT" # [ key - cycle to previous
 func _ready():
 	setup_ui()
 	load_settings()
+	update_ui_from_settings()
 	# Connect to settings_changed signal to auto-save
 	settings_changed.connect(save_settings)
 
@@ -338,18 +341,18 @@ func setup_ui():
 	offset_x_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	settings_grid.add_child(offset_x_label)
 	
-	var offset_x_spin = SpinBox.new()
-	offset_x_spin.name = "GridOffsetXSpin"
-	offset_x_spin.min_value = -1000.0
-	offset_x_spin.max_value = 1000.0
-	offset_x_spin.step = 0.1
-	offset_x_spin.value = snap_offset.x
-	offset_x_spin.custom_minimum_size.x = 80
-	offset_x_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	offset_x_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	offset_x_spin.tooltip_text = "Offset the grid from world origin on X-axis"
-	offset_x_spin.value_changed.connect(_on_grid_setting_changed)
-	settings_grid.add_child(offset_x_spin)
+	grid_offset_x_spin = SpinBox.new()
+	grid_offset_x_spin.name = "GridOffsetXSpin"
+	grid_offset_x_spin.min_value = -1000.0
+	grid_offset_x_spin.max_value = 1000.0
+	grid_offset_x_spin.step = 0.1
+	grid_offset_x_spin.value = snap_offset.x
+	grid_offset_x_spin.custom_minimum_size.x = 80
+	grid_offset_x_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid_offset_x_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	grid_offset_x_spin.tooltip_text = "Offset the grid from world origin on X-axis"
+	grid_offset_x_spin.value_changed.connect(_on_grid_setting_changed)
+	settings_grid.add_child(grid_offset_x_spin)
 	
 	# Grid offset Z
 	var offset_z_label = Label.new()
@@ -357,18 +360,18 @@ func setup_ui():
 	offset_z_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	settings_grid.add_child(offset_z_label)
 	
-	var offset_z_spin = SpinBox.new()
-	offset_z_spin.name = "GridOffsetZSpin"
-	offset_z_spin.min_value = -1000.0
-	offset_z_spin.max_value = 1000.0
-	offset_z_spin.step = 0.1
-	offset_z_spin.value = snap_offset.z
-	offset_z_spin.custom_minimum_size.x = 80
-	offset_z_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	offset_z_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	offset_z_spin.tooltip_text = "Offset the grid from world origin on Z-axis"
-	offset_z_spin.value_changed.connect(_on_grid_setting_changed)
-	settings_grid.add_child(offset_z_spin)
+	grid_offset_z_spin = SpinBox.new()
+	grid_offset_z_spin.name = "GridOffsetZSpin"
+	grid_offset_z_spin.min_value = -1000.0
+	grid_offset_z_spin.max_value = 1000.0
+	grid_offset_z_spin.step = 0.1
+	grid_offset_z_spin.value = snap_offset.z
+	grid_offset_z_spin.custom_minimum_size.x = 80
+	grid_offset_z_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid_offset_z_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	grid_offset_z_spin.tooltip_text = "Offset the grid from world origin on Z-axis"
+	grid_offset_z_spin.value_changed.connect(_on_grid_setting_changed)
+	settings_grid.add_child(grid_offset_z_spin)
 	
 	# Random rotation option (spans both columns)
 	random_rotation_check = CheckBox.new()
@@ -1498,10 +1501,8 @@ func _on_grid_setting_changed(value = null):
 		snap_y_step = snap_y_step_spin.value
 	
 	# Update offset settings
-	var offset_x_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/GridOffsetXSpin")
-	var offset_z_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/GridOffsetZSpin")
-	if offset_x_spin and offset_z_spin:
-		snap_offset = Vector3(offset_x_spin.value, snap_offset.y, offset_z_spin.value)
+	if grid_offset_x_spin and grid_offset_z_spin:
+		snap_offset = Vector3(grid_offset_x_spin.value, snap_offset.y, grid_offset_z_spin.value)
 	
 	settings_changed.emit()
 
@@ -1592,7 +1593,7 @@ func _perform_reset_settings():
 	save_settings()
 	settings_changed.emit()
 	
-	print("Settings reset to defaults")
+	PluginLogger.info("PlacementSettings", "Settings reset to defaults")
 
 func _on_clear_cache_pressed():
 	# Clear the thumbnail cache in ThumbnailGenerator
@@ -2027,13 +2028,12 @@ func update_ui_from_settings():
 	if snap_y_step_spin:
 		snap_y_step_spin.value = snap_y_step
 	
-	var offset_x_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/GridOffsetXSpin")
-	if offset_x_spin:
-		offset_x_spin.value = snap_offset.x
+	# Update grid offset spinboxes
+	if grid_offset_x_spin:
+		grid_offset_x_spin.value = snap_offset.x
 	
-	var offset_z_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/GridOffsetZSpin")
-	if offset_z_spin:
-		offset_z_spin.value = snap_offset.z
+	if grid_offset_z_spin:
+		grid_offset_z_spin.value = snap_offset.z
 	
 	# Update modifier key controls
 	if reverse_modifier_key_button:

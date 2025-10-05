@@ -43,14 +43,14 @@ static var preview_color: Color = Color.WHITE
 static func start_preview_mesh(mesh: Mesh, settings: Dictionary = {}):
 	"""Start preview with a mesh"""
 	if not mesh:
-		print("PreviewManager: Cannot start preview - no mesh provided")
+		PluginLogger.error("PreviewManager", "Cannot start preview - no mesh provided")
 		return
 	
 	cleanup_preview()
 	
 	var current_scene = EditorInterface.get_edited_scene_root()
 	if not current_scene:
-		print("PreviewManager: No scene available for preview")
+		PluginLogger.error("PreviewManager", "No scene available for preview")
 		return
 	
 	# Create preview mesh instance
@@ -71,24 +71,24 @@ static func start_preview_mesh(mesh: Mesh, settings: Dictionary = {}):
 	preview_mesh.rotation = current_rotation
 	preview_mesh.scale = current_scale
 	
-	print("PreviewManager: Started mesh preview")
+	PluginLogger.info("PreviewManager", "Started mesh preview")
 
 static func start_preview_asset(asset_path: String, settings: Dictionary = {}):
 	"""Start preview with an asset file"""
 	if asset_path == "":
-		print("PreviewManager: Cannot start preview - no asset path provided")
+		PluginLogger.error("PreviewManager", "Cannot start preview - no asset path provided")
 		return
 	
 	var asset = load(asset_path)
 	if not asset:
-		print("PreviewManager: Failed to load asset: ", asset_path)
+		PluginLogger.error("PreviewManager", "Failed to load asset: " + asset_path)
 		return
 	
 	cleanup_preview()
 	
 	var current_scene = EditorInterface.get_edited_scene_root()
 	if not current_scene:
-		print("PreviewManager: No scene available for preview")
+		PluginLogger.error("PreviewManager", "No scene available for preview")
 		return
 	
 	var preview_node = null
@@ -104,11 +104,11 @@ static func start_preview_asset(asset_path: String, settings: Dictionary = {}):
 		# Use transparency instead of material override
 		preview_node.transparency = 1.0 - preview_opacity
 	else:
-		print("PreviewManager: Unsupported asset type for: ", asset_path)
+		PluginLogger.error("PreviewManager", "Unsupported asset type for: " + asset_path)
 		return
 	
 	if not preview_node:
-		print("PreviewManager: Failed to create preview node from: ", asset_path)
+		PluginLogger.error("PreviewManager", "Failed to create preview node from: " + asset_path)
 		return
 	
 	preview_mesh = preview_node
@@ -125,7 +125,7 @@ static func start_preview_asset(asset_path: String, settings: Dictionary = {}):
 	preview_mesh.rotation = current_rotation
 	preview_mesh.scale = current_scale
 	
-	print("PreviewManager: Started asset preview for: ", asset_path)
+	PluginLogger.info("PreviewManager", "Started asset preview for: " + asset_path)
 
 static func _apply_preview_transparency_to_children(node: Node):
 	"""Apply transparency to all GeometryInstance3D children (preserves original materials)"""
@@ -212,7 +212,7 @@ static func set_preview_opacity(opacity: float):
 	if preview_material:
 		preview_material.albedo_color.a = preview_opacity
 	
-	print("PreviewManager: Set preview opacity to ", preview_opacity)
+	PluginLogger.debug("PreviewManager", "Set preview opacity to " + str(preview_opacity))
 
 static func set_preview_color(color: Color):
 	"""Set preview color tint"""
@@ -221,7 +221,7 @@ static func set_preview_color(color: Color):
 	if preview_material:
 		preview_material.albedo_color = Color(color.r, color.g, color.b, preview_opacity)
 	
-	print("PreviewManager: Set preview color to ", color)
+	PluginLogger.debug("PreviewManager", "Set preview color to " + str(color))
 
 ## Preview Cleanup
 
@@ -230,7 +230,7 @@ static func cleanup_preview():
 	if preview_mesh and is_instance_valid(preview_mesh):
 		preview_mesh.queue_free()
 		preview_mesh = null
-		print("PreviewManager: Cleaned up preview")
+		PluginLogger.debug("PreviewManager", "Cleaned up preview")
 
 ## Configuration
 
@@ -279,13 +279,13 @@ static func is_preview_in_camera_view(camera: Camera3D) -> bool:
 
 static func debug_print_preview_state():
 	"""Print current preview state for debugging"""
-	print("PreviewManager State:")
-	print("  Has Preview: ", has_preview())
-	print("  Position: ", current_position)
-	print("  Rotation: ", current_rotation)
-	print("  Scale: ", current_scale)
-	print("  Opacity: ", preview_opacity)
-	print("  Color: ", preview_color)
+	PluginLogger.debug("PreviewManager", "PreviewManager State:")
+	PluginLogger.debug("PreviewManager", "  Has Preview: " + str(has_preview()))
+	PluginLogger.debug("PreviewManager", "  Position: " + str(current_position))
+	PluginLogger.debug("PreviewManager", "  Rotation: " + str(current_rotation))
+	PluginLogger.debug("PreviewManager", "  Scale: " + str(current_scale))
+	PluginLogger.debug("PreviewManager", "  Opacity: " + str(preview_opacity))
+	PluginLogger.debug("PreviewManager", "  Color: " + str(preview_color))
 
 static func get_preview_info() -> Dictionary:
 	"""Get comprehensive preview information"""

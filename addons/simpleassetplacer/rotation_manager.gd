@@ -63,7 +63,7 @@ static func get_rotation_offset_degrees() -> Vector3:
 static func reset_rotation():
 	"""Reset manual rotation offset to zero (keeps surface alignment)"""
 	manual_rotation_offset = Vector3.ZERO
-	print("RotationManager: Manual rotation offset reset to zero")
+	PluginLogger.debug("RotationManager", "Manual rotation offset reset to zero")
 
 static func reset_surface_alignment():
 	"""Reset surface alignment rotation to zero"""
@@ -73,7 +73,7 @@ static func reset_all_rotation():
 	"""Reset both manual offset and surface alignment rotation"""
 	manual_rotation_offset = Vector3.ZERO
 	surface_alignment_rotation = Vector3.ZERO
-	print("RotationManager: All rotation reset to zero")
+	PluginLogger.debug("RotationManager", "All rotation reset to zero")
 
 ## Rotation Modifications
 
@@ -102,7 +102,7 @@ static func rotate_axis(axis: String, degrees: float):
 		"Z":
 			rotate_z(degrees)
 		_:
-			print("RotationManager: Invalid axis: ", axis)
+			PluginLogger.warning("RotationManager", "Invalid axis: " + axis)
 
 static func add_rotation(delta_rotation: Vector3):
 	"""Add a rotation delta (in radians)"""
@@ -210,7 +210,7 @@ static func apply_rotation_step(node: Node3D, axis: String, degrees: float, orig
 		"Z":
 			rotate_z(degrees)
 		_:
-			print("RotationManager: Invalid axis: ", axis)
+			PluginLogger.warning("RotationManager", "Invalid axis: " + axis)
 			return
 	
 	# If in placement mode, also rotate the position offset so it follows the mesh rotation
@@ -221,13 +221,13 @@ static func apply_rotation_step(node: Node3D, axis: String, degrees: float, orig
 	
 	# Apply the combined rotation (original + surface alignment + manual offset) to the node
 	apply_rotation_to_node(node, original_rotation)
-	print("RotationManager: Applied ", degrees, "° manual rotation offset to ", axis, " axis")
+	PluginLogger.debug("RotationManager", "Applied " + str(degrees) + "° manual rotation offset to " + axis + " axis")
 
 static func reset_node_rotation(node: Node3D):
 	"""Reset a node's rotation to zero"""
 	if node:
 		node.rotation = Vector3.ZERO
-		print("RotationManager: Reset rotation for node: ", node.name)
+		PluginLogger.debug("RotationManager", "Reset rotation for node: " + node.name)
 
 static func lerp_to_rotation(target_rotation: Vector3, weight: float):
 	"""Smoothly interpolate to a target rotation offset"""
@@ -289,7 +289,7 @@ static func set_rotation_preset(preset_name: String):
 		"180z":
 			set_rotation_offset_degrees(Vector3(0, 0, 180))
 		_:
-			print("RotationManager: Unknown preset: ", preset_name)
+			PluginLogger.warning("RotationManager", "Unknown preset: " + preset_name)
 
 ## Configuration and Settings
 
@@ -312,10 +312,10 @@ static func get_configuration() -> Dictionary:
 static func debug_print_rotation():
 	"""Print current rotation state for debugging"""
 	var rot_deg = get_rotation_offset_degrees()
-	print("RotationManager State:")
-	print("  Rotation Offset (degrees): X:%.1f Y:%.1f Z:%.1f" % [rot_deg.x, rot_deg.y, rot_deg.z])
-	print("  Rotation Offset (radians): X:%.3f Y:%.3f Z:%.3f" % [manual_rotation_offset.x, manual_rotation_offset.y, manual_rotation_offset.z])
-	print("  Magnitude: %.3f" % get_rotation_magnitude())
+	PluginLogger.debug("RotationManager", "RotationManager State:")
+	PluginLogger.debug("RotationManager", "  Rotation Offset (degrees): X:%.1f Y:%.1f Z:%.1f" % [rot_deg.x, rot_deg.y, rot_deg.z])
+	PluginLogger.debug("RotationManager", "  Rotation Offset (radians): X:%.3f Y:%.3f Z:%.3f" % [manual_rotation_offset.x, manual_rotation_offset.y, manual_rotation_offset.z])
+	PluginLogger.debug("RotationManager", "  Magnitude: %.3f" % get_rotation_magnitude())
 
 static func get_rotation_info() -> Dictionary:
 	"""Get comprehensive rotation information"""

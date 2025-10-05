@@ -1,5 +1,8 @@
 {
 	"recently_used": [
+		"buildings",
+		"mountain",
+		"terrain",
 		"nature",
 		"roof",
 		"floor",
@@ -8,14 +11,27 @@
 		"cube"
 	],
 	"tag_usage": {
-		"cube": 1.0,
-		"detail": 6.0,
-		"floor": 12.0,
+		"buildings": 4,
+		"cube": 1,
+		"detail": 6,
+		"floor": 12,
 		"nature": 2,
-		"roof": 9.0,
-		"wall": 41.0
+		"roof": 9,
+		"wall": 41
 	},
 	"tags": {
+		"building_a": [
+			"buildings"
+		],
+		"building_b": [
+			"buildings"
+		],
+		"building_c": [
+			"buildings"
+		],
+		"building_d": [
+			"buildings"
+		],
 		"cone_blend": [
 			"cube"
 		],

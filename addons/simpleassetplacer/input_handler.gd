@@ -714,4 +714,4 @@ static func debug_print_input_state():
 	"""Print current input state (for debugging)"""
 	var pressed = get_all_pressed_keys()
 	if not pressed.is_empty():
-		print("InputHandler: Pressed keys: ", pressed)
+		PluginLogger.debug("InputHandler", "Pressed keys: " + str(pressed))

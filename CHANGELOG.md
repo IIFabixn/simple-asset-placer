@@ -2,6 +2,47 @@
 
 ## [Unreleased]
 
+## [1.3.2] - 2025-10-05
+
+### 🐛 Fixed
+- **Orphaned Tag Data**: Tag system now automatically cleans up data for deleted assets
+  - Tags, favorites, and recent assets for deleted files are automatically removed
+  - Cleanup runs automatically when plugin loads or when refresh button is clicked
+  - Tag usage statistics are recalculated after cleanup
+  - Prevents stale references and keeps `.assetcategories` file clean
+- **Position Reset on Large Rotation**: Fixed position getting reset unexpectedly after rotating with large increments
+  - Increased XZ distance threshold from 0.01 to 0.1 units in position change detection
+  - Prevents tiny mouse movements during rotation from triggering false position updates
+  - Asset position now remains stable when rotating with 90° or other large increments
+- **Grid Offset Snapping**: Fixed grid offset not being applied to snapping calculations
+  - Grid offset spinbox controls are now properly stored as class member variables (`grid_offset_x_spin`, `grid_offset_z_spin`)
+  - Fixed `_on_grid_setting_changed()` callback to access spinbox values using member variables instead of failing node path lookups
+  - Grid offset values now correctly update the `snap_offset` variable when changed in the UI
+  - Snapping now properly offsets from world origin (e.g., 0.5 offset results in snapping to -6.5, -1.5 instead of -6.0, -1.0)
+- **Grid Offset Settings Persistence**: Fixed grid offset values not loading on plugin startup
+  - Added `update_ui_from_settings()` call in `_ready()` to apply loaded settings to UI controls
+  - Updated `update_ui_from_settings()` to use member variable references for grid offset spinboxes
+  - Grid offset values now persist correctly across Godot sessions
+- **Settings System**: Fixed critical issues with settings not being saved or loaded correctly
+  - Connected all missing signal handlers for grid controls (8 controls)
+  - Connected all missing signal handlers for position increment controls (3 controls)
+  - Added `_on_grid_setting_changed()` handler for grid extent, Y-axis snapping, center snapping, and grid offset controls
+  - Added `_on_position_increment_changed()` handler for position increment spinboxes
+  - Updated `save_settings()` to save all grid settings (grid_extent, snap_center_x/y/z, position increments)
+  - Updated `load_settings()` to load all grid settings with proper defaults
+  - Enhanced `_disconnect_ui_signals()` and `_connect_ui_signals()` to properly handle grid and position controls
+  - Fixed initial values for grid controls to use actual settings instead of hardcoded defaults
+  - All 11 previously unconnected controls now properly save/load their values
+
+### 🔧 Improved
+- **Settings Persistence**: All placement settings now correctly persist across Godot sessions
+  - Grid display size setting now saves/loads properly
+  - Y-axis snapping settings (enabled and step size) now persist
+  - Grid center snapping options (X/Y/Z) now save/load correctly
+  - Grid offset values (X/Z) now persist properly and update UI on load
+  - Position increment values (normal/fine/large) now save/load correctly
+  - UI controls now display loaded values on startup
+
 ## [1.3.1] - 2025-10-05
 
 ### 🐛 Fixed

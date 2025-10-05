@@ -405,7 +405,7 @@ func _on_asset_selection_changed(_item: TreeItem, _column: int, _selected: bool)
 	_update_button_states()
 
 func _on_asset_nothing_selected() -> void:
-	print("[Tag Dialog] Nothing selected signal received")
+	PluginLogger.debug("TagManagementDialog", "Nothing selected signal received")
 	_update_selected_assets()
 	_update_button_states()
 
@@ -453,7 +453,7 @@ func _on_bulk_add_tags() -> void:
 	_update_selected_assets()
 	
 	var selected_tags = _get_selected_tags()
-	print("[Tag Dialog] Bulk add: %d tags to %d assets" % [selected_tags.size(), selected_asset_paths.size()])
+	PluginLogger.info("TagManagementDialog", "Bulk add: %d tags to %d assets" % [selected_tags.size(), selected_asset_paths.size()])
 	if selected_tags.is_empty() or selected_asset_paths.is_empty():
 		return
 	
@@ -480,7 +480,7 @@ func _on_bulk_remove_tags() -> void:
 	_update_selected_assets()
 	
 	var selected_tags = _get_selected_tags()
-	print("[Tag Dialog] Bulk remove: %d tags from %d assets" % [selected_tags.size(), selected_asset_paths.size()])
+	PluginLogger.info("TagManagementDialog", "Bulk remove: %d tags from %d assets" % [selected_tags.size(), selected_asset_paths.size()])
 	if selected_tags.is_empty() or selected_asset_paths.is_empty():
 		return
 	
@@ -662,9 +662,9 @@ func _on_create_new_tag() -> void:
 	_update_selected_assets()
 	
 	# Debug: Print current selection state
-	print("[Tag Dialog] Creating new tag with %d assets selected" % selected_asset_paths.size())
+	PluginLogger.debug("TagManagementDialog", "Creating new tag with %d assets selected" % selected_asset_paths.size())
 	if selected_asset_paths.size() > 0:
-		print("[Tag Dialog] Selected assets: ", selected_asset_paths)
+		PluginLogger.debug("TagManagementDialog", "Selected assets: " + str(selected_asset_paths))
 	
 	var dialog = AcceptDialog.new()
 	dialog.title = "Create New Tag"
@@ -712,10 +712,10 @@ func _on_create_new_tag() -> void:
 		
 		# Add the tag to all selected assets (if any) or just initialize it
 		if not selected_asset_paths.is_empty():
-			print("[Tag Dialog] Assigning tag '%s' to %d selected assets" % [new_tag, selected_asset_paths.size()])
+			PluginLogger.info("TagManagementDialog", "Assigning tag '%s' to %d selected assets" % [new_tag, selected_asset_paths.size()])
 			# Add to ALL selected assets, not just the first one
 			for asset_path in selected_asset_paths:
-				print("[Tag Dialog]   - Adding to: ", asset_path)
+				PluginLogger.debug("TagManagementDialog", "  - Adding to: " + asset_path)
 				category_manager.add_tag(asset_path, new_tag)
 			category_manager.save_config_file()
 			_populate_asset_tree()
@@ -734,7 +734,7 @@ func _on_create_new_tag() -> void:
 				success_dialog.queue_free()
 			)
 		else:
-			print("[Tag Dialog] No assets selected, initializing tag '%s' in system only" % new_tag)
+			PluginLogger.info("TagManagementDialog", "No assets selected, initializing tag '%s' in system only" % new_tag)
 			# Initialize the tag with 0 usage count so it appears in the tag list
 			# This is stored in tag_usage and persisted to the config file
 			if not category_manager.tag_usage.has(new_tag):
@@ -744,7 +744,7 @@ func _on_create_new_tag() -> void:
 			_update_statistics()
 			
 			# Don't show a popup - just let the user see the new tag in the list and continue working
-			print("[Tag Dialog] Tag '%s' now visible in tag list with 0 usage, ready to assign" % new_tag)
+			PluginLogger.info("TagManagementDialog", "Tag '%s' now visible in tag list with 0 usage, ready to assign" % new_tag)
 		
 		dialog.queue_free()
 	)

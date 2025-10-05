@@ -587,13 +587,13 @@ static func remove_grid_overlay():
 
 static func debug_print_overlay_state():
 	"""Print current overlay state for debugging"""
-	print("OverlayManager State:")
-	print("  Initialized: ", overlays_initialized)
-	print("  Show Overlays: ", show_overlays)
-	print("  Current Mode: ", current_mode)
-	print("  Main Overlay Valid: ", main_overlay != null and is_instance_valid(main_overlay))
-	print("  Rotation Overlay Valid: ", rotation_overlay != null and is_instance_valid(rotation_overlay))
-	print("  Scale Overlay Valid: ", scale_overlay != null and is_instance_valid(scale_overlay))
-	print("  Position Overlay Valid: ", position_overlay != null and is_instance_valid(position_overlay))
-	print("  Status Overlay Valid: ", status_overlay != null and is_instance_valid(status_overlay))
-	print("  Grid Overlay Valid: ", grid_overlay != null and is_instance_valid(grid_overlay))
+	PluginLogger.debug("OverlayManager", "OverlayManager State:")
+	PluginLogger.debug("OverlayManager", "  Initialized: " + str(overlays_initialized))
+	PluginLogger.debug("OverlayManager", "  Show Overlays: " + str(show_overlays))
+	PluginLogger.debug("OverlayManager", "  Current Mode: " + str(current_mode))
+	PluginLogger.debug("OverlayManager", "  Main Overlay Valid: " + str(main_overlay != null and is_instance_valid(main_overlay)))
+	PluginLogger.debug("OverlayManager", "  Rotation Overlay Valid: " + str(rotation_overlay != null and is_instance_valid(rotation_overlay)))
+	PluginLogger.debug("OverlayManager", "  Scale Overlay Valid: " + str(scale_overlay != null and is_instance_valid(scale_overlay)))
+	PluginLogger.debug("OverlayManager", "  Position Overlay Valid: " + str(position_overlay != null and is_instance_valid(position_overlay)))
+	PluginLogger.debug("OverlayManager", "  Status Overlay Valid: " + str(status_overlay != null and is_instance_valid(status_overlay)))
+	PluginLogger.debug("OverlayManager", "  Grid Overlay Valid: " + str(grid_overlay != null and is_instance_valid(grid_overlay)))

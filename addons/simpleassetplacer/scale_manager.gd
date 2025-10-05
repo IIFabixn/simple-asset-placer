@@ -59,24 +59,24 @@ static func get_scale_vector() -> Vector3:
 static func reset_scale():
 	"""Reset scale multiplier to 1.0 (original size)"""
 	set_scale_multiplier(1.0)
-	print("ScaleManager: Scale multiplier reset to 1.0")
+	PluginLogger.debug("ScaleManager", "Scale multiplier reset to 1.0")
 
 ## Scale Modifications
 
 static func increase_scale(amount: float = 0.1):
 	"""Increase scale multiplier by amount"""
 	set_scale_multiplier(scale_multiplier + amount)
-	print("ScaleManager: Increased scale multiplier by ", amount, " to ", scale_multiplier)
+	PluginLogger.debug("ScaleManager", "Increased scale multiplier by " + str(amount) + " to " + str(scale_multiplier))
 
 static func decrease_scale(amount: float = 0.1):
 	"""Decrease scale multiplier by amount"""
 	set_scale_multiplier(scale_multiplier - amount)
-	print("ScaleManager: Decreased scale multiplier by ", amount, " to ", scale_multiplier)
+	PluginLogger.debug("ScaleManager", "Decreased scale multiplier by " + str(amount) + " to " + str(scale_multiplier))
 
 static func multiply_scale(factor: float):
 	"""Multiply current scale multiplier by a factor"""
 	set_scale_multiplier(scale_multiplier * factor)
-	print("ScaleManager: Multiplied scale by ", factor, " to ", scale_multiplier)
+	PluginLogger.debug("ScaleManager", "Multiplied scale by " + str(factor) + " to " + str(scale_multiplier))
 
 static func scale_up(factor: float = 1.1):
 	"""Scale up by a factor (default 10% increase)"""
@@ -98,7 +98,7 @@ static func scale_axis(axis: String, amount: float):
 		"Z":
 			non_uniform_multiplier.z = max(0.01, non_uniform_multiplier.z + amount)
 		_:
-			print("ScaleManager: Invalid axis: ", axis)
+			PluginLogger.warning("ScaleManager", "Invalid axis: " + axis)
 			return
 	
 	# Update uniform scale multiplier
@@ -114,7 +114,7 @@ static func multiply_axis_scale(axis: String, factor: float):
 		"Z":
 			non_uniform_multiplier.z = max(0.01, non_uniform_multiplier.z * factor)
 		_:
-			print("ScaleManager: Invalid axis: ", axis)
+			PluginLogger.warning("ScaleManager", "Invalid axis: " + axis)
 			return
 	
 	# Update uniform scale multiplier
@@ -189,7 +189,7 @@ static func set_scale_preset(preset_name: String):
 		"quarter":
 			set_scale_multiplier(0.25)
 		_:
-			print("ScaleManager: Unknown preset: ", preset_name)
+			PluginLogger.warning("ScaleManager", "Unknown preset: " + preset_name)
 
 ## Scale Interpolation
 
@@ -247,11 +247,11 @@ static func get_scale_display_text() -> String:
 
 static func debug_print_scale():
 	"""Print current scale state for debugging"""
-	print("ScaleManager State:")
-	print("  Uniform Scale Multiplier: %.3f (%.1f%%)" % [scale_multiplier, get_scale_percentage()])
-	print("  Scale Multiplier Vector: X:%.3f Y:%.3f Z:%.3f" % [non_uniform_multiplier.x, non_uniform_multiplier.y, non_uniform_multiplier.z])
-	print("  Is Uniform: ", is_uniform_scale())
-	print("  Is Default: ", is_scale_at_default())
+	PluginLogger.debug("ScaleManager", "ScaleManager State:")
+	PluginLogger.debug("ScaleManager", "  Uniform Scale Multiplier: %.3f (%.1f%%)" % [scale_multiplier, get_scale_percentage()])
+	PluginLogger.debug("ScaleManager", "  Scale Multiplier Vector: X:%.3f Y:%.3f Z:%.3f" % [non_uniform_multiplier.x, non_uniform_multiplier.y, non_uniform_multiplier.z])
+	PluginLogger.debug("ScaleManager", "  Is Uniform: " + str(is_uniform_scale()))
+	PluginLogger.debug("ScaleManager", "  Is Default: " + str(is_scale_at_default()))
 
 static func get_scale_info() -> Dictionary:
 	"""Get comprehensive scale information"""

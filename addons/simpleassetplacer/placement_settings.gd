@@ -261,11 +261,12 @@ func setup_ui():
 	grid_extent_spin.min_value = 5.0
 	grid_extent_spin.max_value = 100.0
 	grid_extent_spin.step = 5.0
-	grid_extent_spin.value = 20.0
+	grid_extent_spin.value = grid_extent
 	grid_extent_spin.custom_minimum_size.x = 80
 	grid_extent_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grid_extent_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	grid_extent_spin.tooltip_text = "Size of the grid overlay in world units (radius from center)"
+	grid_extent_spin.value_changed.connect(_on_grid_setting_changed)
 	settings_grid.add_child(grid_extent_spin)
 	
 	# Center snapping options
@@ -278,34 +279,38 @@ func setup_ui():
 	var snap_center_x_check = CheckBox.new()
 	snap_center_x_check.name = "SnapCenterXCheck"
 	snap_center_x_check.text = "X-axis (Center X)"
-	snap_center_x_check.button_pressed = false
+	snap_center_x_check.button_pressed = snap_center_x
 	snap_center_x_check.tooltip_text = "Snap using the center position of the object on X-axis"
 	snap_center_x_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	snap_center_x_check.toggled.connect(_on_grid_setting_changed)
 	vbox.add_child(snap_center_x_check)
 	
 	var snap_center_y_check = CheckBox.new()
 	snap_center_y_check.name = "SnapCenterYCheck"
 	snap_center_y_check.text = "Y-axis (Center Y)"
-	snap_center_y_check.button_pressed = false
+	snap_center_y_check.button_pressed = snap_center_y
 	snap_center_y_check.tooltip_text = "Snap using the center position of the object on Y-axis"
 	snap_center_y_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	snap_center_y_check.toggled.connect(_on_grid_setting_changed)
 	vbox.add_child(snap_center_y_check)
 	
 	var snap_center_z_check = CheckBox.new()
 	snap_center_z_check.name = "SnapCenterZCheck"
 	snap_center_z_check.text = "Z-axis (Center Z)"
-	snap_center_z_check.button_pressed = false
+	snap_center_z_check.button_pressed = snap_center_z
 	snap_center_z_check.tooltip_text = "Snap using the center position of the object on Z-axis"
 	snap_center_z_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	snap_center_z_check.toggled.connect(_on_grid_setting_changed)
 	vbox.add_child(snap_center_z_check)
 	
 	# Y-axis snapping checkbox (spans both columns)
 	var snap_y_check = CheckBox.new()
 	snap_y_check.name = "SnapYCheck"
 	snap_y_check.text = "Enable Vertical (Y) Snapping"
-	snap_y_check.button_pressed = false
+	snap_y_check.button_pressed = snap_y_enabled
 	snap_y_check.tooltip_text = "Snap height to grid (useful for stacking objects)"
 	snap_y_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	snap_y_check.toggled.connect(_on_grid_setting_changed)
 	vbox.add_child(snap_y_check)
 	
 	# Y-axis snap step
@@ -319,11 +324,12 @@ func setup_ui():
 	snap_y_step_spin.min_value = 0.1
 	snap_y_step_spin.max_value = 1000.0
 	snap_y_step_spin.step = 0.1
-	snap_y_step_spin.value = 1.0
+	snap_y_step_spin.value = snap_y_step
 	snap_y_step_spin.custom_minimum_size.x = 80
 	snap_y_step_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	snap_y_step_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	snap_y_step_spin.tooltip_text = "Grid spacing for Y-axis snapping"
+	snap_y_step_spin.value_changed.connect(_on_grid_setting_changed)
 	settings_grid.add_child(snap_y_step_spin)
 	
 	# Grid offset X
@@ -337,11 +343,12 @@ func setup_ui():
 	offset_x_spin.min_value = -1000.0
 	offset_x_spin.max_value = 1000.0
 	offset_x_spin.step = 0.1
-	offset_x_spin.value = 0.0
+	offset_x_spin.value = snap_offset.x
 	offset_x_spin.custom_minimum_size.x = 80
 	offset_x_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	offset_x_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	offset_x_spin.tooltip_text = "Offset the grid from world origin on X-axis"
+	offset_x_spin.value_changed.connect(_on_grid_setting_changed)
 	settings_grid.add_child(offset_x_spin)
 	
 	# Grid offset Z
@@ -355,11 +362,12 @@ func setup_ui():
 	offset_z_spin.min_value = -1000.0
 	offset_z_spin.max_value = 1000.0
 	offset_z_spin.step = 0.1
-	offset_z_spin.value = 0.0
+	offset_z_spin.value = snap_offset.z
 	offset_z_spin.custom_minimum_size.x = 80
 	offset_z_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	offset_z_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	offset_z_spin.tooltip_text = "Offset the grid from world origin on Z-axis"
+	offset_z_spin.value_changed.connect(_on_grid_setting_changed)
 	settings_grid.add_child(offset_z_spin)
 	
 	# Random rotation option (spans both columns)
@@ -883,6 +891,7 @@ func setup_ui():
 	position_increment_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	position_increment_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	position_increment_spin.tooltip_text = "Normal position increment"
+	position_increment_spin.value_changed.connect(_on_position_increment_changed)
 	position_grid.add_child(position_increment_spin)
 	
 	# Fine Position Step
@@ -900,6 +909,7 @@ func setup_ui():
 	fine_position_increment_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	fine_position_increment_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	fine_position_increment_spin.tooltip_text = "Fine position increment (with CTRL modifier)"
+	fine_position_increment_spin.value_changed.connect(_on_position_increment_changed)
 	position_grid.add_child(fine_position_increment_spin)
 	
 	# Large Position Step
@@ -917,6 +927,7 @@ func setup_ui():
 	large_position_increment_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	large_position_increment_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	large_position_increment_spin.tooltip_text = "Large position increment (with ALT modifier)"
+	large_position_increment_spin.value_changed.connect(_on_position_increment_changed)
 	position_grid.add_child(large_position_increment_spin)
 	
 	# Add separator for modifier keys
@@ -1451,6 +1462,49 @@ func _on_height_step_changed(value: float):
 	large_height_increment = large_height_increment_spin.value
 	settings_changed.emit()
 
+func _on_position_increment_changed(value: float):
+	# Update position increment settings
+	position_increment = position_increment_spin.value
+	fine_position_increment = fine_position_increment_spin.value
+	large_position_increment = large_position_increment_spin.value
+	settings_changed.emit()
+
+func _on_grid_setting_changed(value = null):
+	# Update grid extent
+	var grid_extent_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/GridExtentSpin")
+	if grid_extent_spin:
+		grid_extent = grid_extent_spin.value
+	
+	# Update snap center settings
+	var snap_center_x_check = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SnapCenterXCheck")
+	if snap_center_x_check:
+		snap_center_x = snap_center_x_check.button_pressed
+	
+	var snap_center_y_check = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SnapCenterYCheck")
+	if snap_center_y_check:
+		snap_center_y = snap_center_y_check.button_pressed
+	
+	var snap_center_z_check = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SnapCenterZCheck")
+	if snap_center_z_check:
+		snap_center_z = snap_center_z_check.button_pressed
+	
+	# Update Y-axis snap settings
+	var snap_y_check = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SnapYCheck")
+	if snap_y_check:
+		snap_y_enabled = snap_y_check.button_pressed
+	
+	var snap_y_step_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/SnapYStepSpin")
+	if snap_y_step_spin:
+		snap_y_step = snap_y_step_spin.value
+	
+	# Update offset settings
+	var offset_x_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/GridOffsetXSpin")
+	var offset_z_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/GridOffsetZSpin")
+	if offset_x_spin and offset_z_spin:
+		snap_offset = Vector3(offset_x_spin.value, snap_offset.y, offset_z_spin.value)
+	
+	settings_changed.emit()
+
 func _on_reset_settings_pressed():
 	"""Reset all settings to their default values"""
 	# Show confirmation dialog
@@ -1680,6 +1734,17 @@ func save_settings():
 	# Save asset cycling settings
 	editor_settings.set_setting("simple_asset_placer/cycle_next_asset_key", cycle_next_asset_key)
 	editor_settings.set_setting("simple_asset_placer/cycle_previous_asset_key", cycle_previous_asset_key)
+	
+	# Save grid settings
+	editor_settings.set_setting("simple_asset_placer/grid_extent", grid_extent)
+	editor_settings.set_setting("simple_asset_placer/snap_center_x", snap_center_x)
+	editor_settings.set_setting("simple_asset_placer/snap_center_y", snap_center_y)
+	editor_settings.set_setting("simple_asset_placer/snap_center_z", snap_center_z)
+	
+	# Save position increment settings
+	editor_settings.set_setting("simple_asset_placer/position_increment", position_increment)
+	editor_settings.set_setting("simple_asset_placer/fine_position_increment", fine_position_increment)
+	editor_settings.set_setting("simple_asset_placer/large_position_increment", large_position_increment)
 
 func load_settings():
 	# Load settings from editor settings
@@ -1811,6 +1876,24 @@ func load_settings():
 	if editor_settings.has_setting("simple_asset_placer/cycle_previous_asset_key"):
 		cycle_previous_asset_key = editor_settings.get_setting("simple_asset_placer/cycle_previous_asset_key")
 	
+	# Load grid settings
+	if editor_settings.has_setting("simple_asset_placer/grid_extent"):
+		grid_extent = editor_settings.get_setting("simple_asset_placer/grid_extent")
+	if editor_settings.has_setting("simple_asset_placer/snap_center_x"):
+		snap_center_x = editor_settings.get_setting("simple_asset_placer/snap_center_x")
+	if editor_settings.has_setting("simple_asset_placer/snap_center_y"):
+		snap_center_y = editor_settings.get_setting("simple_asset_placer/snap_center_y")
+	if editor_settings.has_setting("simple_asset_placer/snap_center_z"):
+		snap_center_z = editor_settings.get_setting("simple_asset_placer/snap_center_z")
+	
+	# Load position increment settings
+	if editor_settings.has_setting("simple_asset_placer/position_increment"):
+		position_increment = editor_settings.get_setting("simple_asset_placer/position_increment")
+	if editor_settings.has_setting("simple_asset_placer/fine_position_increment"):
+		fine_position_increment = editor_settings.get_setting("simple_asset_placer/fine_position_increment")
+	if editor_settings.has_setting("simple_asset_placer/large_position_increment"):
+		large_position_increment = editor_settings.get_setting("simple_asset_placer/large_position_increment")
+	
 	# Update UI to reflect loaded settings
 	update_ui_from_settings()
 
@@ -1912,6 +1995,59 @@ func update_ui_from_settings():
 		cycle_next_asset_key_button.text = cycle_next_asset_key
 	if cycle_previous_asset_key_button:
 		cycle_previous_asset_key_button.text = cycle_previous_asset_key
+	
+	# Update position controls
+	if position_left_key_button:
+		position_left_key_button.text = position_left_key
+	if position_right_key_button:
+		position_right_key_button.text = position_right_key
+	if position_forward_key_button:
+		position_forward_key_button.text = position_forward_key
+	if position_backward_key_button:
+		position_backward_key_button.text = position_backward_key
+	if reset_position_key_button:
+		reset_position_key_button.text = reset_position_key
+	if position_increment_spin:
+		position_increment_spin.value = position_increment
+	if fine_position_increment_spin:
+		fine_position_increment_spin.value = fine_position_increment
+	if large_position_increment_spin:
+		large_position_increment_spin.value = large_position_increment
+	
+	# Update grid controls
+	var grid_extent_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/GridExtentSpin")
+	if grid_extent_spin:
+		grid_extent_spin.value = grid_extent
+	
+	var snap_y_check = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SnapYCheck")
+	if snap_y_check:
+		snap_y_check.button_pressed = snap_y_enabled
+	
+	var snap_y_step_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/SnapYStepSpin")
+	if snap_y_step_spin:
+		snap_y_step_spin.value = snap_y_step
+	
+	var offset_x_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/GridOffsetXSpin")
+	if offset_x_spin:
+		offset_x_spin.value = snap_offset.x
+	
+	var offset_z_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/GridOffsetZSpin")
+	if offset_z_spin:
+		offset_z_spin.value = snap_offset.z
+	
+	# Update modifier key controls
+	if reverse_modifier_key_button:
+		reverse_modifier_key_button.text = reverse_modifier_key
+	if large_increment_modifier_key_button:
+		large_increment_modifier_key_button.text = large_increment_modifier_key
+	if fine_increment_modifier_key_button:
+		fine_increment_modifier_key_button.text = fine_increment_modifier_key
+	
+	# Update control key controls
+	if cancel_key_button:
+		cancel_key_button.text = cancel_key
+	if transform_mode_key_button:
+		transform_mode_key_button.text = transform_mode_key
 
 func _disconnect_ui_signals():
 	"""Temporarily disconnect UI signals to prevent unwanted save triggers"""
@@ -1933,6 +2069,47 @@ func _disconnect_ui_signals():
 		reset_scale_on_exit_check.toggled.disconnect(_on_setting_changed)
 	if reset_rotation_on_exit_check and reset_rotation_on_exit_check.toggled.is_connected(_on_setting_changed):
 		reset_rotation_on_exit_check.toggled.disconnect(_on_setting_changed)
+	
+	# Disconnect grid control signals
+	var grid_extent_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/GridExtentSpin")
+	if grid_extent_spin and grid_extent_spin.value_changed.is_connected(_on_grid_setting_changed):
+		grid_extent_spin.value_changed.disconnect(_on_grid_setting_changed)
+	
+	var snap_y_check = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SnapYCheck")
+	if snap_y_check and snap_y_check.toggled.is_connected(_on_grid_setting_changed):
+		snap_y_check.toggled.disconnect(_on_grid_setting_changed)
+	
+	var snap_y_step_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/SnapYStepSpin")
+	if snap_y_step_spin and snap_y_step_spin.value_changed.is_connected(_on_grid_setting_changed):
+		snap_y_step_spin.value_changed.disconnect(_on_grid_setting_changed)
+	
+	var snap_center_x_check = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SnapCenterXCheck")
+	if snap_center_x_check and snap_center_x_check.toggled.is_connected(_on_grid_setting_changed):
+		snap_center_x_check.toggled.disconnect(_on_grid_setting_changed)
+	
+	var snap_center_y_check = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SnapCenterYCheck")
+	if snap_center_y_check and snap_center_y_check.toggled.is_connected(_on_grid_setting_changed):
+		snap_center_y_check.toggled.disconnect(_on_grid_setting_changed)
+	
+	var snap_center_z_check = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SnapCenterZCheck")
+	if snap_center_z_check and snap_center_z_check.toggled.is_connected(_on_grid_setting_changed):
+		snap_center_z_check.toggled.disconnect(_on_grid_setting_changed)
+	
+	var offset_x_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/GridOffsetXSpin")
+	if offset_x_spin and offset_x_spin.value_changed.is_connected(_on_grid_setting_changed):
+		offset_x_spin.value_changed.disconnect(_on_grid_setting_changed)
+	
+	var offset_z_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/GridOffsetZSpin")
+	if offset_z_spin and offset_z_spin.value_changed.is_connected(_on_grid_setting_changed):
+		offset_z_spin.value_changed.disconnect(_on_grid_setting_changed)
+	
+	# Disconnect position increment signals
+	if position_increment_spin and position_increment_spin.value_changed.is_connected(_on_position_increment_changed):
+		position_increment_spin.value_changed.disconnect(_on_position_increment_changed)
+	if fine_position_increment_spin and fine_position_increment_spin.value_changed.is_connected(_on_position_increment_changed):
+		fine_position_increment_spin.value_changed.disconnect(_on_position_increment_changed)
+	if large_position_increment_spin and large_position_increment_spin.value_changed.is_connected(_on_position_increment_changed):
+		large_position_increment_spin.value_changed.disconnect(_on_position_increment_changed)
 
 func _connect_ui_signals():
 	"""Reconnect UI signals after updating UI from loaded settings"""
@@ -1955,16 +2132,43 @@ func _connect_ui_signals():
 	if reset_rotation_on_exit_check and not reset_rotation_on_exit_check.toggled.is_connected(_on_setting_changed):
 		reset_rotation_on_exit_check.toggled.connect(_on_setting_changed)
 	
-	# Update modifier key controls
-	if reverse_modifier_key_button:
-		reverse_modifier_key_button.text = reverse_modifier_key
-	if large_increment_modifier_key_button:
-		large_increment_modifier_key_button.text = large_increment_modifier_key
-	if fine_increment_modifier_key_button:
-		fine_increment_modifier_key_button.text = fine_increment_modifier_key
+	# Reconnect grid control signals
+	var grid_extent_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/GridExtentSpin")
+	if grid_extent_spin and not grid_extent_spin.value_changed.is_connected(_on_grid_setting_changed):
+		grid_extent_spin.value_changed.connect(_on_grid_setting_changed)
 	
-	# Update control key controls
-	if cancel_key_button:
-		cancel_key_button.text = cancel_key
-	if transform_mode_key_button:
-		transform_mode_key_button.text = transform_mode_key
+	var snap_y_check = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SnapYCheck")
+	if snap_y_check and not snap_y_check.toggled.is_connected(_on_grid_setting_changed):
+		snap_y_check.toggled.connect(_on_grid_setting_changed)
+	
+	var snap_y_step_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/SnapYStepSpin")
+	if snap_y_step_spin and not snap_y_step_spin.value_changed.is_connected(_on_grid_setting_changed):
+		snap_y_step_spin.value_changed.connect(_on_grid_setting_changed)
+	
+	var snap_center_x_check = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SnapCenterXCheck")
+	if snap_center_x_check and not snap_center_x_check.toggled.is_connected(_on_grid_setting_changed):
+		snap_center_x_check.toggled.connect(_on_grid_setting_changed)
+	
+	var snap_center_y_check = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SnapCenterYCheck")
+	if snap_center_y_check and not snap_center_y_check.toggled.is_connected(_on_grid_setting_changed):
+		snap_center_y_check.toggled.connect(_on_grid_setting_changed)
+	
+	var snap_center_z_check = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SnapCenterZCheck")
+	if snap_center_z_check and not snap_center_z_check.toggled.is_connected(_on_grid_setting_changed):
+		snap_center_z_check.toggled.connect(_on_grid_setting_changed)
+	
+	var offset_x_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/GridOffsetXSpin")
+	if offset_x_spin and not offset_x_spin.value_changed.is_connected(_on_grid_setting_changed):
+		offset_x_spin.value_changed.connect(_on_grid_setting_changed)
+	
+	var offset_z_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/GridOffsetZSpin")
+	if offset_z_spin and not offset_z_spin.value_changed.is_connected(_on_grid_setting_changed):
+		offset_z_spin.value_changed.connect(_on_grid_setting_changed)
+	
+	# Reconnect position increment signals
+	if position_increment_spin and not position_increment_spin.value_changed.is_connected(_on_position_increment_changed):
+		position_increment_spin.value_changed.connect(_on_position_increment_changed)
+	if fine_position_increment_spin and not fine_position_increment_spin.value_changed.is_connected(_on_position_increment_changed):
+		fine_position_increment_spin.value_changed.connect(_on_position_increment_changed)
+	if large_position_increment_spin and not large_position_increment_spin.value_changed.is_connected(_on_position_increment_changed):
+		large_position_increment_spin.value_changed.connect(_on_position_increment_changed)

@@ -64,6 +64,7 @@ var large_position_increment_spin: SpinBox
 # Modifier Key Controls
 var reverse_modifier_key_button: Button
 var large_increment_modifier_key_button: Button
+var fine_increment_modifier_key_button: Button
 
 # Control Key Controls
 var cancel_key_button: Button
@@ -140,6 +141,7 @@ var large_position_increment: float = 1.0 # Large position step (with ALT)
 # Modifier Key Settings
 var reverse_modifier_key: String = "SHIFT"    # Reverse rotation direction
 var large_increment_modifier_key: String = "ALT"  # Large increments
+var fine_increment_modifier_key: String = "CTRL"  # Fine/half-step increments
 
 # Control Settings
 var cancel_key: String = "ESCAPE"    # Cancel placement mode
@@ -269,8 +271,8 @@ func setup_ui():
 	# Center snapping options
 	var snap_center_label = Label.new()
 	snap_center_label.text = "Snap Using Center Position:"
-	snap_center_label.add_theme_font_size_override("font_size", 12)
-	snap_center_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 0.9))
+	snap_center_label.add_theme_font_size_override("font_size", 14)
+	snap_center_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.9))
 	vbox.add_child(snap_center_label)
 	
 	var snap_center_x_check = CheckBox.new()
@@ -963,6 +965,19 @@ func setup_ui():
 	large_increment_modifier_key_button.tooltip_text = "Click to set modifier key for large increments. Press ESC to cancel."
 	modifier_grid.add_child(large_increment_modifier_key_button)
 	
+	# Fine Increment Modifier Key
+	var fine_increment_modifier_label = Label.new()
+	fine_increment_modifier_label.text = "Fine Increment:"
+	fine_increment_modifier_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	modifier_grid.add_child(fine_increment_modifier_label)
+	
+	fine_increment_modifier_key_button = Button.new()
+	fine_increment_modifier_key_button.text = fine_increment_modifier_key
+	fine_increment_modifier_key_button.custom_minimum_size.x = 80
+	fine_increment_modifier_key_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	fine_increment_modifier_key_button.tooltip_text = "Click to set modifier key for fine/half-step increments (for grid snapping). Press ESC to cancel."
+	modifier_grid.add_child(fine_increment_modifier_key_button)
+	
 	# Add separator for control settings
 	var control_separator = HSeparator.new()
 	control_separator.add_theme_constant_override("separation", 8)
@@ -1120,6 +1135,7 @@ func setup_ui():
 	# Connect modifier key control signals
 	reverse_modifier_key_button.pressed.connect(_on_key_binding_button_pressed.bind(reverse_modifier_key_button, "reverse_modifier_key"))
 	large_increment_modifier_key_button.pressed.connect(_on_key_binding_button_pressed.bind(large_increment_modifier_key_button, "large_increment_modifier_key"))
+	fine_increment_modifier_key_button.pressed.connect(_on_key_binding_button_pressed.bind(fine_increment_modifier_key_button, "fine_increment_modifier_key"))
 	
 	# Connect control key signals
 	cancel_key_button.pressed.connect(_on_key_binding_button_pressed.bind(cancel_key_button, "cancel_key"))
@@ -1578,6 +1594,7 @@ func get_placement_settings() -> Dictionary:
 		"large_position_increment": large_position_increment,
 		"reverse_modifier_key": reverse_modifier_key,
 		"large_increment_modifier_key": large_increment_modifier_key,
+		"fine_increment_modifier_key": fine_increment_modifier_key,
 		"cancel_key": cancel_key,
 		"transform_mode_key": transform_mode_key,
 		"cycle_next_asset_key": cycle_next_asset_key,
@@ -1654,6 +1671,7 @@ func save_settings():
 	# Save modifier key settings
 	editor_settings.set_setting("simple_asset_placer/reverse_modifier_key", reverse_modifier_key)
 	editor_settings.set_setting("simple_asset_placer/large_increment_modifier_key", large_increment_modifier_key)
+	editor_settings.set_setting("simple_asset_placer/fine_increment_modifier_key", fine_increment_modifier_key)
 	
 	# Save control settings
 	editor_settings.set_setting("simple_asset_placer/cancel_key", cancel_key)
@@ -1778,6 +1796,8 @@ func load_settings():
 		reverse_modifier_key = editor_settings.get_setting("simple_asset_placer/reverse_modifier_key")
 	if editor_settings.has_setting("simple_asset_placer/large_increment_modifier_key"):
 		large_increment_modifier_key = editor_settings.get_setting("simple_asset_placer/large_increment_modifier_key")
+	if editor_settings.has_setting("simple_asset_placer/fine_increment_modifier_key"):
+		fine_increment_modifier_key = editor_settings.get_setting("simple_asset_placer/fine_increment_modifier_key")
 	
 	# Load control settings
 	if editor_settings.has_setting("simple_asset_placer/cancel_key"):
@@ -1940,6 +1960,8 @@ func _connect_ui_signals():
 		reverse_modifier_key_button.text = reverse_modifier_key
 	if large_increment_modifier_key_button:
 		large_increment_modifier_key_button.text = large_increment_modifier_key
+	if fine_increment_modifier_key_button:
+		fine_increment_modifier_key_button.text = fine_increment_modifier_key
 	
 	# Update control key controls
 	if cancel_key_button:

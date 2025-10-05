@@ -1,0 +1,29 @@
+[gd_scene load_steps=6 format=3 uid="uid://b2u5e78en3vxj"]
+
+[ext_resource type="PackedScene" uid="uid://byrpbqsy81o63" path="res://sample/assets/kenny_retro-medival-kit/roof-corner.glb" id="1_r8rjx"]
+[ext_resource type="PackedScene" uid="uid://c868uybopcv4p" path="res://sample/assets/kenny_retro-medival-kit/roof.glb" id="2_g6dek"]
+[ext_resource type="PackedScene" uid="uid://b4fs2jnwapp4t" path="res://sample/assets/kenny_retro-medival-kit/wall.glb" id="3_wqtd7"]
+[ext_resource type="PackedScene" uid="uid://bb4arsaxe1kgb" path="res://sample/assets/kenny_retro-medival-kit/wall-window.glb" id="4_wn14e"]
+[ext_resource type="PackedScene" uid="uid://bl0j27onfyd1t" path="res://sample/assets/kenny_retro-medival-kit/wall-door.glb" id="5_7baqy"]
+
+[node name="Node3D" type="Node3D"]
+
+[node name="Node3D" type="Node3D" parent="."]
+
+[node name="roof-corner" parent="Node3D" instance=ExtResource("1_r8rjx")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0.50000006, 1, -0.50000006)
+
+[node name="roof" parent="Node3D" instance=ExtResource("2_g6dek")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.50000006, 1.0000001, 0.49999994)
+
+[node name="roof_2" parent="Node3D" instance=ExtResource("2_g6dek")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -0.49999994, 1.0000001, -0.50000006)
+
+[node name="wall" parent="Node3D" instance=ExtResource("3_wqtd7")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -2.3841858e-07, -0.5)
+
+[node name="wall-window" parent="Node3D" instance=ExtResource("4_wn14e")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -0.5, 0, -0.5)
+
+[node name="wall-door" parent="Node3D" instance=ExtResource("5_7baqy")]
+transform = Transform3D(-1, 0, -3.8941437e-07, 0, 1, 0, 3.8941437e-07, 0, -1, 0.5, 0, 0.5)

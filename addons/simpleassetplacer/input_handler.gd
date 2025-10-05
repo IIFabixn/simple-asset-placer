@@ -42,6 +42,17 @@ static var key_press_times: Dictionary = {}  # Track when each key was pressed
 static var key_tap_grace_period: float = 0.15  # 150ms to distinguish tap from hold
 static var pending_taps: Dictionary = {}  # Keys that might be taps, waiting for release
 
+# Hold-to-repeat tracking for action keys
+static var active_repeat_key: String = ""  # Single key currently repeating (only one at a time)
+static var active_repeat_modifiers: Dictionary = {}  # Modifier state when repeat started
+static var wheel_interrupted_keys: Dictionary = {}  # Keys interrupted by wheel, require re-press
+static var repeat_intervals: Dictionary = {
+	"rotation": 0.1,  # 100ms for responsive rotation
+	"scale": 0.08,    # 80ms for smooth scaling
+	"height": 0.08,   # 80ms for height adjustment
+	"position": 0.05  # 50ms for smooth movement
+}
+
 # Viewport cache for proper mouse coordinate conversion
 static var cached_viewport: SubViewport = null
 
@@ -85,6 +96,7 @@ static func _update_key_states():
 	# Configurable modifier keys
 	current_keys["reverse_modifier"] = _check_key_with_modifiers(settings.get("reverse_modifier_key", "SHIFT"))
 	current_keys["large_increment_modifier"] = _check_key_with_modifiers(settings.get("large_increment_modifier_key", "ALT"))
+	current_keys["fine_increment_modifier"] = _check_key_with_modifiers(settings.get("fine_increment_modifier_key", "CTRL"))
 	
 	# Settings-based keys - use universal modifier support
 	current_keys["cancel"] = _check_key_with_modifiers(settings.get("cancel_key", "ESCAPE"))
@@ -257,6 +269,12 @@ static func _track_key_press_time(key_name: String, current_time: float):
 	# If key was released, clean up tracking
 	elif not is_pressed and key_press_times.has(key_name):
 		key_press_times.erase(key_name)
+		# Clear wheel interruption flag on release (allows re-press to work)
+		wheel_interrupted_keys.erase(key_name)
+		# Clear active repeat if this was the repeating key
+		if active_repeat_key == key_name:
+			active_repeat_key = ""
+			active_repeat_modifiers.clear()
 
 
 
@@ -397,6 +415,10 @@ static func is_large_increment_modifier_held() -> bool:
 	"""Check if the configured large increment modifier key is held"""
 	return is_key_pressed("large_increment_modifier")
 
+static func is_fine_increment_modifier_held() -> bool:
+	"""Check if the configured fine/half-step increment modifier key is held"""
+	return is_key_pressed("fine_increment_modifier")
+
 ## Input Utility Functions
 
 static func string_to_keycode(key_string: String) -> Key:
@@ -411,9 +433,9 @@ static func get_rotation_input() -> Dictionary:
 	var right_mouse_held = is_mouse_button_pressed("right")
 	
 	return {
-		"x_pressed": is_key_just_pressed("rotate_x") and not right_mouse_held,
-		"y_pressed": is_key_just_pressed("rotate_y") and not right_mouse_held, 
-		"z_pressed": is_key_just_pressed("rotate_z") and not right_mouse_held,
+		"x_pressed": (is_key_just_pressed("rotate_x") or is_action_key_held_with_repeat("rotate_x", "rotation")) and not right_mouse_held,
+		"y_pressed": (is_key_just_pressed("rotate_y") or is_action_key_held_with_repeat("rotate_y", "rotation")) and not right_mouse_held, 
+		"z_pressed": (is_key_just_pressed("rotate_z") or is_action_key_held_with_repeat("rotate_z", "rotation")) and not right_mouse_held,
 		"reset_pressed": is_key_just_pressed("reset_rotation") and not right_mouse_held,
 		"shift_held": is_shift_held(),
 		"ctrl_held": is_ctrl_held(),
@@ -428,8 +450,8 @@ static func get_scale_input() -> Dictionary:
 	var right_mouse_held = is_mouse_button_pressed("right")
 	
 	return {
-		"up_pressed": is_key_just_pressed("scale_up") and not right_mouse_held,
-		"down_pressed": is_key_just_pressed("scale_down") and not right_mouse_held,
+		"up_pressed": (is_key_just_pressed("scale_up") or is_action_key_held_with_repeat("scale_up", "scale")) and not right_mouse_held,
+		"down_pressed": (is_key_just_pressed("scale_down") or is_action_key_held_with_repeat("scale_down", "scale")) and not right_mouse_held,
 		"reset_pressed": is_key_just_pressed("reset_scale") and not right_mouse_held,
 		"shift_held": is_shift_held(),
 		"alt_held": is_alt_held(),
@@ -443,13 +465,13 @@ static func get_position_input() -> Dictionary:
 	var right_mouse_held = is_mouse_button_pressed("right")
 	
 	return {
-		"height_up_pressed": is_key_just_pressed("height_up") and not right_mouse_held,
-		"height_down_pressed": is_key_just_pressed("height_down") and not right_mouse_held,
+		"height_up_pressed": (is_key_just_pressed("height_up") or is_action_key_held_with_repeat("height_up", "height")) and not right_mouse_held,
+		"height_down_pressed": (is_key_just_pressed("height_down") or is_action_key_held_with_repeat("height_down", "height")) and not right_mouse_held,
 		"reset_height_pressed": is_key_just_pressed("reset_height") and not right_mouse_held,
-		"position_left_pressed": is_key_just_pressed("position_left") and not right_mouse_held,
-		"position_right_pressed": is_key_just_pressed("position_right") and not right_mouse_held,
-		"position_forward_pressed": is_key_just_pressed("position_forward") and not right_mouse_held,
-		"position_backward_pressed": is_key_just_pressed("position_backward") and not right_mouse_held,
+		"position_left_pressed": (is_key_just_pressed("position_left") or is_action_key_held_with_repeat("position_left", "position")) and not right_mouse_held,
+		"position_right_pressed": (is_key_just_pressed("position_right") or is_action_key_held_with_repeat("position_right", "position")) and not right_mouse_held,
+		"position_forward_pressed": (is_key_just_pressed("position_forward") or is_action_key_held_with_repeat("position_forward", "position")) and not right_mouse_held,
+		"position_backward_pressed": (is_key_just_pressed("position_backward") or is_action_key_held_with_repeat("position_backward", "position")) and not right_mouse_held,
 		"reset_position_pressed": is_key_just_pressed("reset_position") and not right_mouse_held,
 		"mouse_position": get_mouse_position(),
 		"left_clicked": is_mouse_button_just_pressed("left") and is_mouse_in_viewport(),
@@ -457,7 +479,8 @@ static func get_position_input() -> Dictionary:
 		"ctrl_held": is_ctrl_held(),
 		"alt_held": is_alt_held(),
 		"reverse_modifier_held": is_reverse_modifier_held(),
-		"large_increment_modifier_held": is_large_increment_modifier_held()
+		"large_increment_modifier_held": is_large_increment_modifier_held(),
+		"fine_increment_modifier_held": is_fine_increment_modifier_held()
 	}
 
 static func get_navigation_input() -> Dictionary:
@@ -484,6 +507,22 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 	
 	# Determine wheel direction (+1 for up, -1 for down)
 	var wheel_direction = 1 if wheel_up else -1
+	
+	# Wheel usage interrupts any active hold-to-repeat
+	# Mark currently held action keys as wheel-interrupted (require re-press)
+	var action_keys = [
+		"rotate_x", "rotate_y", "rotate_z",
+		"scale_up", "scale_down",
+		"height_up", "height_down",
+		"position_forward", "position_backward", "position_left", "position_right"
+	]
+	for key in action_keys:
+		if is_key_held_for_wheel(key):
+			wheel_interrupted_keys[key] = true
+	
+	# Cancel active repeat
+	active_repeat_key = ""
+	active_repeat_modifiers.clear()
 	
 	# Check which action keys are currently held for wheel combo
 	# When wheel is used, any key that's being held (even if just pressed) can be used
@@ -599,6 +638,71 @@ static func is_key_held_with_repeat(key_name: String, repeat_delay: float = 0.15
 	# Key must be held beyond grace period
 	if time_since_press < key_tap_grace_period:
 		return false
+	
+	# Calculate how many repeats should have occurred
+	var time_in_repeat_phase = time_since_press - key_tap_grace_period
+	var repeat_count = int(time_in_repeat_phase / repeat_delay)
+	
+	# Check if we should trigger this frame based on repeat timing
+	var next_repeat_time = key_tap_grace_period + (repeat_count * repeat_delay)
+	var time_to_next = (key_press_times[key_name] + next_repeat_time + repeat_delay) - current_time
+	
+	# Trigger if we're within one frame of the next repeat
+	return time_to_next <= 0.016  # ~1 frame at 60fps
+
+static func is_action_key_held_with_repeat(key_name: String, action_type: String) -> bool:
+	"""
+	Check if an action key should trigger continuous actions while held.
+	
+	Features:
+	- Grace period: 150ms before repeat starts (preserves tap behavior)
+	- Only one action repeats at a time (new key cancels previous)
+	- Wheel interruption: using wheel requires key re-press
+	- Modifier changes: SHIFT/ALT press/release cancels repeat
+	
+	Args:
+		key_name: The key setting name (e.g., "rotate_x")
+		action_type: The action category ("rotation", "scale", "height", "position")
+	
+	Returns:
+		bool: True if the key should trigger this frame
+	"""
+	# Don't repeat if key is wheel-interrupted
+	if wheel_interrupted_keys.has(key_name):
+		return false
+	
+	# Check if key is held and get timing
+	if not key_press_times.has(key_name):
+		return false
+	
+	var current_time = Time.get_ticks_msec() / 1000.0
+	var time_since_press = current_time - key_press_times[key_name]
+	
+	# Key must be held beyond grace period
+	if time_since_press < key_tap_grace_period:
+		return false
+	
+	# Get current modifier state (using configured modifier keys)
+	var current_modifiers = {
+		"reverse_modifier": is_reverse_modifier_held(),
+		"large_increment_modifier": is_large_increment_modifier_held(),
+		"fine_increment_modifier": is_fine_increment_modifier_held()
+	}
+	
+	# If this is a new repeat or different key, initialize tracking
+	if active_repeat_key != key_name:
+		# Cancel previous repeat (only one at a time)
+		active_repeat_key = key_name
+		active_repeat_modifiers = current_modifiers.duplicate()
+	else:
+		# Check if modifier state changed - cancel repeat if so
+		if current_modifiers != active_repeat_modifiers:
+			active_repeat_key = ""
+			active_repeat_modifiers.clear()
+			return false
+	
+	# Get repeat interval for this action type
+	var repeat_delay = repeat_intervals.get(action_type, 0.1)
 	
 	# Calculate how many repeats should have occurred
 	var time_in_repeat_phase = time_since_press - key_tap_grace_period

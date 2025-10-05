@@ -379,8 +379,8 @@ static func _process_placement_input(camera: Camera3D):
 	var rotation_input = InputHandler.get_rotation_input()
 	var scale_input = InputHandler.get_scale_input()
 	
-	# Set half-step mode based on CTRL key state
-	PositionManager.use_half_step = position_input.ctrl_held
+	# Set half-step mode based on configured fine increment modifier
+	PositionManager.use_half_step = position_input.fine_increment_modifier_held
 	
 	# Handle height adjustments with reverse modifier and increment size support
 	var reverse_height = position_input.reverse_modifier_held  # Configurable reverse modifier
@@ -393,8 +393,8 @@ static func _process_placement_input(camera: Camera3D):
 		height_step = PositionManager.snap_y_step
 	
 	# Apply modifier keys for increment size
-	if position_input.ctrl_held:
-		# CTRL = fine adjustment (10% of base step)
+	if position_input.fine_increment_modifier_held:
+		# FINE_INCREMENT_MODIFIER = fine adjustment (10% of base step)
 		height_step *= 0.1
 	elif position_input.large_increment_modifier_held:
 		# Configurable large increment modifier = large adjustment (10x base step)
@@ -411,7 +411,7 @@ static func _process_placement_input(camera: Camera3D):
 	
 	# Handle position adjustments (WASD-style movement - camera relative)
 	var position_delta = settings.get("position_increment", 0.1)
-	if position_input.ctrl_held:
+	if position_input.fine_increment_modifier_held:
 		position_delta = settings.get("fine_position_increment", 0.01)
 	elif position_input.large_increment_modifier_held:
 		position_delta = settings.get("large_position_increment", 1.0)
@@ -532,8 +532,8 @@ static func _process_transform_input(camera: Camera3D):
 		height_step = PositionManager.snap_y_step
 	
 	# Apply modifier keys for increment size
-	if position_input.ctrl_held:
-		# CTRL = fine adjustment (10% of base step)
+	if position_input.fine_increment_modifier_held:
+		# FINE_INCREMENT_MODIFIER = fine adjustment (10% of base step)
 		height_step *= 0.1
 	elif position_input.large_increment_modifier_held:
 		# Configurable large increment modifier = large adjustment (10x base step)
@@ -554,7 +554,7 @@ static func _process_transform_input(camera: Camera3D):
 	
 	# Handle position adjustments (WASD-style movement) - this adds to XZ position
 	var position_delta = settings.get("position_increment", 0.1)
-	if position_input.ctrl_held:
+	if position_input.fine_increment_modifier_held:
 		position_delta = settings.get("fine_position_increment", 0.01)
 	elif position_input.large_increment_modifier_held:
 		position_delta = settings.get("large_position_increment", 1.0)
@@ -609,8 +609,8 @@ static func _process_transform_input(camera: Camera3D):
 	# Calculate XZ position using offset-from-center approach for proper grid snapping
 	var mouse_pos = position_input.mouse_position
 	
-	# Set half-step mode based on CTRL key state
-	PositionManager.use_half_step = position_input.ctrl_held
+	# Set half-step mode based on configured fine increment modifier
+	PositionManager.use_half_step = position_input.fine_increment_modifier_held
 	
 	# Get stored original center and node offsets (calculated once when transform mode started)
 	var original_center = transform_data.get("original_center", Vector3.ZERO)
@@ -711,9 +711,9 @@ static func _process_rotation_input(rotation_input: Dictionary, target_node: Nod
 	# These should be mutually exclusive - only one size modifier at a time
 	var rotation_step: float
 	
-	if rotation_input.large_increment_modifier_held and not rotation_input.ctrl_held:  # Large increment modifier only
+	if rotation_input.large_increment_modifier_held and not rotation_input.fine_increment_modifier_held:  # Large increment modifier only
 		rotation_step = settings.get("large_rotation_increment", 90.0)
-	elif rotation_input.ctrl_held and not rotation_input.large_increment_modifier_held:  # CTRL only = fine increment
+	elif rotation_input.fine_increment_modifier_held and not rotation_input.large_increment_modifier_held:  # FINE_INCREMENT_MODIFIER only = fine increment
 		rotation_step = settings.get("fine_rotation_increment", 5.0)
 	else:  # No modifier or both (default to base)
 		rotation_step = settings.get("rotation_increment", 15.0)

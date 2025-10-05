@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [1.3.0] - 2025-10-05
+
+### ✨ New Features
+
+#### Hold-to-Repeat System
+- **Continuous Actions While Holding Keys**: Hold transformation keys to repeatedly apply actions
+  - **Grace Period**: 150ms delay before repeat starts (preserves tap behavior for mouse wheel combos)
+  - **Smart Repeat Intervals**: Optimized for each action type
+    - Rotation: 100ms (responsive rotation)
+    - Scale: 80ms (smooth scaling)
+    - Height: 80ms (smooth vertical adjustment)
+    - Position: 50ms (smooth WASD movement)
+  - **Supported Keys**: Works with all transformation keys (X/Y/Z rotation, Q/E height, WASD position, PageUp/Down scale)
+  - **Single Action Priority**: Only one action repeats at a time (pressing new key cancels previous)
+  - **Modifier Change Detection**: Pressing/releasing SHIFT or ALT during repeat cancels it
+  - **Wheel Interruption**: Using mouse wheel interrupts repeat and requires key re-press
+  - **Tap Behavior Preserved**: Quick press (< 150ms) still performs single action for wheel combos
+
 ### 🐛 Fixed
 - **Grid Overlay Coordinate System**: Fixed grid overlay moving in opposite direction when transforming nodes
   - Root cause: Grid was inheriting flipped coordinate system from scene root nodes with 180° Y-axis rotation
@@ -11,6 +29,33 @@
 - **Random Y-Rotation Now Works**: Fixed broken random rotation feature - settings were being passed but never applied during placement
   - Added random rotation application in `utility_manager.gd` for all three placement functions (place_asset_in_scene, place_meshlib_item_in_scene, place_mesh_in_scene)
   - Random rotation now applies AFTER manual rotation offsets, giving full 0-360 degree randomization on Y-axis
+- **Hardcoded Modifier Keys**: Fixed all remaining hardcoded CTRL/SHIFT/ALT key references
+  - Added new configurable `fine_increment_modifier_key` setting (default: CTRL)
+  - Removed all hardcoded `ctrl_held` checks throughout codebase
+  - TransformationManager now uses `fine_increment_modifier_held` for grid snapping half-step mode
+  - Updated fine increment detection for height adjustments (placement and transform modes)
+  - Updated fine increment detection for WASD position adjustments (placement and transform modes)
+  - Updated rotation increment logic to use `fine_increment_modifier_held` instead of hardcoded CTRL
+  - All modifier keys now fully configurable: Reverse Direction, Large Increment, and Fine Increment
+  - Users can now bind all modifiers to any key combination
+
+### 🏗️ Technical Improvements
+- **InputHandler Enhancements**:
+  - Added `is_action_key_held_with_repeat()` function with comprehensive state tracking
+  - New tracking variables: `active_repeat_key`, `active_repeat_modifiers`, `wheel_interrupted_keys`, `repeat_intervals`
+  - Modifier tracking now uses all three configured modifier keys (`reverse_modifier_key`, `large_increment_modifier_key`, `fine_increment_modifier_key`)
+  - Added `is_fine_increment_modifier_held()` helper function for half-step detection
+  - Wheel interruption detection automatically flags held keys when wheel is used
+  - Automatic cleanup on key release (clears interruption flags and repeat state)
+- **Input Query Functions Updated**:
+  - `get_rotation_input()`: X/Y/Z keys support hold-to-repeat
+  - `get_scale_input()`: PageUp/Down keys support hold-to-repeat
+  - `get_position_input()`: Q/E (height) and WASD (position) keys support hold-to-repeat, added `fine_increment_modifier_held` field
+- **Settings System**:
+  - Added "Fine Increment" modifier key configuration in Settings → Modifier Keys
+  - All three modifier keys now fully configurable: Reverse Direction (SHIFT), Large Increment (ALT), Fine Increment (CTRL)
+  - UI controls for fine increment modifier key binding with key capture support
+  - Settings persist across sessions via EditorSettings
 
 ## [1.2.1] - 2025-10-04
 

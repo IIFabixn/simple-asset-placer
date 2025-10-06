@@ -104,6 +104,17 @@ static func rotate_axis(axis: String, degrees: float):
 		_:
 			PluginLogger.warning("RotationManager", "Invalid axis: " + axis)
 
+static func rotate_axis_with_modifiers(axis: String, base_degrees: float, modifiers: Dictionary):
+	"""Rotate around specified axis with modifier-adjusted step
+	
+	Args:
+		axis: Rotation axis ("X", "Y", or "Z")
+		base_degrees: Base rotation step in degrees
+		modifiers: Modifier state from InputHandler.get_modifier_state()
+	"""
+	var step_degrees = IncrementCalculator.calculate_rotation_step(base_degrees, modifiers)
+	rotate_axis(axis, step_degrees)
+
 static func add_rotation(delta_rotation: Vector3):
 	"""Add a rotation delta (in radians)"""
 	manual_rotation_offset += delta_rotation
@@ -222,6 +233,20 @@ static func apply_rotation_step(node: Node3D, axis: String, degrees: float, orig
 	# Apply the combined rotation (original + surface alignment + manual offset) to the node
 	apply_rotation_to_node(node, original_rotation)
 	PluginLogger.debug("RotationManager", "Applied " + str(degrees) + "° manual rotation offset to " + axis + " axis")
+
+static func apply_rotation_step_with_modifiers(node: Node3D, axis: String, base_degrees: float, modifiers: Dictionary, original_rotation: Vector3 = Vector3.ZERO, rotate_position_offset: bool = false):
+	"""Apply a rotation step with modifier-adjusted increment
+	
+	Args:
+		node: The Node3D to rotate
+		axis: Rotation axis ("X", "Y", or "Z")
+		base_degrees: Base rotation step in degrees (e.g., 15.0)
+		modifiers: Modifier state from InputHandler.get_modifier_state()
+		original_rotation: The node's original rotation (from transform mode)
+		rotate_position_offset: If true, also rotates the manual position offset
+	"""
+	var step_degrees = IncrementCalculator.calculate_rotation_step(base_degrees, modifiers)
+	apply_rotation_step(node, axis, step_degrees, original_rotation, rotate_position_offset)
 
 static func reset_node_rotation(node: Node3D):
 	"""Reset a node's rotation to zero"""

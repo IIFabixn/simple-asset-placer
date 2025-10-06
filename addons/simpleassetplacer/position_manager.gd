@@ -251,6 +251,16 @@ static func adjust_height(delta: float):
 	"""Adjust the current height offset (state only - position will be updated on next mouse update)"""
 	height_offset += delta
 
+static func adjust_height_with_modifiers(base_delta: float, modifiers: Dictionary):
+	"""Adjust height with modifier-calculated step
+	
+	Args:
+		base_delta: Base height step (e.g., 0.1)
+		modifiers: Modifier state from InputHandler.get_modifier_state()
+	"""
+	var step = IncrementCalculator.calculate_height_step(base_delta, modifiers)
+	adjust_height(step)
+
 static func increase_height():
 	"""Increase height by one step"""
 	# Use Y snap step if Y snapping is enabled, otherwise use height step size
@@ -293,6 +303,29 @@ static func move_backward(delta: float, camera: Camera3D = null):
 	var move_dir = _get_camera_forward_direction(camera) * -1.0  # Backward is negative forward
 	var movement = move_dir * delta
 	manual_position_offset += movement
+
+static func move_direction_with_modifiers(direction: String, base_delta: float, modifiers: Dictionary, camera: Camera3D = null):
+	"""Move in a direction with modifier-calculated step
+	
+	Args:
+		direction: Movement direction ("left", "right", "forward", "backward")
+		base_delta: Base movement step (e.g., 0.5 units)
+		modifiers: Modifier state from InputHandler.get_modifier_state()
+		camera: Camera for relative movement
+	"""
+	var step = IncrementCalculator.calculate_position_step(base_delta, modifiers)
+	
+	match direction.to_lower():
+		"left":
+			move_left(step, camera)
+		"right":
+			move_right(step, camera)
+		"forward":
+			move_forward(step, camera)
+		"backward":
+			move_backward(step, camera)
+		_:
+			PluginLogger.warning("PositionManager", "Invalid direction: " + direction)
 
 static func _get_camera_forward_direction(camera: Camera3D) -> Vector3:
 	"""Get the nearest axis-aligned direction for camera forward (snaps to +Z or -Z or +X or -X)"""

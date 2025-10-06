@@ -14,7 +14,7 @@ uv1_scale = Vector3(10, 10, 10)
 [node name="Node3D" type="Node3D"]
 
 [node name="CSGBox3D" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, -0.10000143, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.0030367, -0.08929825, 0.008166313)
 size = Vector3(25, 0.1, 25)
 material = SubResource("StandardMaterial3D_kem5a")
 

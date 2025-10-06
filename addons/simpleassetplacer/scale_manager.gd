@@ -73,6 +73,17 @@ static func decrease_scale(amount: float = 0.1):
 	set_scale_multiplier(scale_multiplier - amount)
 	PluginLogger.debug("ScaleManager", "Decreased scale multiplier by " + str(amount) + " to " + str(scale_multiplier))
 
+static func adjust_scale_with_modifiers(base_amount: float, modifiers: Dictionary):
+	"""Adjust scale with modifier-calculated step
+	
+	Args:
+		base_amount: Base scale step (e.g., 0.1)
+		modifiers: Modifier state from InputHandler.get_modifier_state()
+	"""
+	var step = IncrementCalculator.calculate_scale_step(base_amount, modifiers)
+	set_scale_multiplier(scale_multiplier + step)
+	PluginLogger.debug("ScaleManager", "Adjusted scale by " + str(step) + " to " + str(scale_multiplier))
+
 static func multiply_scale(factor: float):
 	"""Multiply current scale multiplier by a factor"""
 	set_scale_multiplier(scale_multiplier * factor)
@@ -103,6 +114,17 @@ static func scale_axis(axis: String, amount: float):
 	
 	# Update uniform scale multiplier
 	scale_multiplier = (non_uniform_multiplier.x + non_uniform_multiplier.y + non_uniform_multiplier.z) / 3.0
+
+static func scale_axis_with_modifiers(axis: String, base_amount: float, modifiers: Dictionary):
+	"""Scale a specific axis with modifier-calculated step
+	
+	Args:
+		axis: Scale axis ("X", "Y", or "Z")
+		base_amount: Base scale step (e.g., 0.1)
+		modifiers: Modifier state from InputHandler.get_modifier_state()
+	"""
+	var step = IncrementCalculator.calculate_scale_step(base_amount, modifiers)
+	scale_axis(axis, step)
 
 static func multiply_axis_scale(axis: String, factor: float):
 	"""Multiply a specific axis scale multiplier by a factor"""

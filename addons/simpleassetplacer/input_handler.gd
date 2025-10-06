@@ -410,6 +410,24 @@ static func is_fine_increment_modifier_held() -> bool:
 	"""Check if the configured fine/half-step increment modifier key is held"""
 	return is_key_pressed("fine_increment_modifier")
 
+static func get_modifier_state() -> Dictionary:
+	"""Get the current state of all configured increment modifiers in one call
+	
+	Returns the state of user-configured modifier keys, not raw keyboard modifiers.
+	Raw keyboard modifiers (SHIFT/CTRL/ALT) are only used internally for key binding
+	detection and should not be exposed in the public API.
+	
+	Returns: {
+		"reverse": bool,  # Configured reverse modifier (default: SHIFT)
+		"large": bool,    # Configured large increment modifier (default: ALT)
+		"fine": bool      # Configured fine increment modifier (default: CTRL)
+	}"""
+	return {
+		"reverse": is_reverse_modifier_held(),
+		"large": is_large_increment_modifier_held(),
+		"fine": is_fine_increment_modifier_held()
+	}
+
 ## Input Utility Functions
 
 static func string_to_keycode(key_string: String) -> Key:

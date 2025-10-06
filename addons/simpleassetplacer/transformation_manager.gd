@@ -195,10 +195,12 @@ static func start_transform_mode(target_nodes, dock_instance = null):
 		"original_center": center_pos,  # Store the original center position
 		"node_offsets": node_offsets,  # Store each node's offset from original center
 		"dock_reference": dock_instance,
-		"accumulated_xz_delta": Vector3.ZERO,  # Track accumulated WASD position adjustments
 		"accumulated_y_delta": 0.0,  # Track accumulated height adjustments
 		"snap_offset": snap_offset  # Offset to maintain position relative to snapped grid (calculated once at start)
 	}
+	
+	# Note: WASD position adjustments now use PositionManager.manual_position_offset
+	# This ensures position offsets persist between placement and transform modes
 	
 	# Initialize managers for transform mode
 	OverlayManager.initialize_overlays()
@@ -559,9 +561,6 @@ static func _process_transform_input(camera: Camera3D):
 	elif position_input.large_increment_modifier_held:
 		position_delta = settings.get("large_position_increment", 1.0)
 	
-	# Get accumulated delta from transform_data
-	var accumulated_delta = transform_data.get("accumulated_xz_delta", Vector3.ZERO)
-	
 	# Get camera-relative directions snapped to nearest axis
 	var camera_forward = Vector3(0, 0, -1)
 	var camera_right = Vector3(1, 0, 0)
@@ -588,23 +587,21 @@ static func _process_transform_input(camera: Camera3D):
 		else:
 			camera_right = Vector3(0, 0, sign(cam_right.z))
 	
-	# Handle position adjustments (WASD-style movement) - accumulate axis-aligned delta
+	# Handle position adjustments (WASD-style movement) - use PositionManager.manual_position_offset
+	# This ensures position offsets are shared between placement and transform modes
 	if position_input.position_left_pressed:
-		accumulated_delta -= camera_right * position_delta  # Left is negative right
+		PositionManager.manual_position_offset -= camera_right * position_delta  # Left is negative right
 	elif position_input.position_right_pressed:
-		accumulated_delta += camera_right * position_delta
+		PositionManager.manual_position_offset += camera_right * position_delta
 	
 	if position_input.position_forward_pressed:
-		accumulated_delta += camera_forward * position_delta
+		PositionManager.manual_position_offset += camera_forward * position_delta
 	elif position_input.position_backward_pressed:
-		accumulated_delta -= camera_forward * position_delta  # Backward is negative forward
+		PositionManager.manual_position_offset -= camera_forward * position_delta  # Backward is negative forward
 	
 	# Handle position reset
 	if position_input.reset_position_pressed:
-		accumulated_delta = Vector3.ZERO
-	
-	# Store back the accumulated delta
-	transform_data["accumulated_xz_delta"] = accumulated_delta
+		PositionManager.reset_position()
 	
 	# Calculate XZ position using offset-from-center approach for proper grid snapping
 	var mouse_pos = position_input.mouse_position
@@ -622,8 +619,8 @@ static func _process_transform_input(camera: Camera3D):
 	var mouse_center = PositionManager.get_current_position()
 	
 	# Calculate new center position:
-	# mouse_center (snapped) + snap_offset (preserves original grid alignment) + accumulated_delta (WASD movement)
-	var new_center = mouse_center + snap_offset + accumulated_delta
+	# mouse_center (snapped) + snap_offset (preserves original grid alignment) + manual_position_offset (WASD movement)
+	var new_center = mouse_center + snap_offset + PositionManager.manual_position_offset
 	
 	# Update surface normal alignment if enabled, otherwise reset it
 	if settings.get("align_with_normal", false):
@@ -949,9 +946,6 @@ static func _apply_position_adjustment(wheel_input: Dictionary):
 			# Get current camera for relative movement
 			var camera = EditorInterface.get_editor_viewport_3d(0).get_camera_3d()
 			if camera:
-				# Get accumulated delta
-				var accumulated_delta = transform_data.get("accumulated_xz_delta", Vector3.ZERO)
-				
 				# Calculate camera-relative directions (snapped to axes like keyboard input)
 				var camera_forward = Vector3(0, 0, -1)
 				var camera_right = Vector3(1, 0, 0)
@@ -978,19 +972,17 @@ static func _apply_position_adjustment(wheel_input: Dictionary):
 				else:
 					camera_right = Vector3(0, 0, sign(cam_right.z))
 				
-				# Add to accumulated delta based on axis
+				# Add to PositionManager.manual_position_offset based on axis
+				# This ensures position offsets are shared between placement and transform modes
 				match axis:
 					"forward":
-						accumulated_delta += camera_forward * movement_delta
+						PositionManager.manual_position_offset += camera_forward * movement_delta
 					"backward":
-						accumulated_delta -= camera_forward * movement_delta
+						PositionManager.manual_position_offset -= camera_forward * movement_delta
 					"left":
-						accumulated_delta -= camera_right * movement_delta
+						PositionManager.manual_position_offset -= camera_right * movement_delta
 					"right":
-						accumulated_delta += camera_right * movement_delta
-				
-				# Store back the accumulated delta
-				transform_data["accumulated_xz_delta"] = accumulated_delta
+						PositionManager.manual_position_offset += camera_right * movement_delta
 
 ## TAB KEY COORDINATION
 

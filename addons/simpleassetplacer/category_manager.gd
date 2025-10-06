@@ -18,9 +18,9 @@ signal tags_changed()
 # Configuration
 const CONFIG_FILE_NAME = ".assetcategories"
 const MAX_RECENT_ASSETS = 20
-const EDITOR_SETTINGS_FAVORITES_KEY = "simpleassetplacer/favorites"
-const EDITOR_SETTINGS_RECENT_KEY = "simpleassetplacer/recent_assets"
-const EDITOR_SETTINGS_IGNORED_KEY = "simpleassetplacer/ignored_assets"
+const EDITOR_SETTINGS_FAVORITES_KEY = "simple_asset_placer/categories/favorites"
+const EDITOR_SETTINGS_RECENT_KEY = "simple_asset_placer/categories/recent_assets"
+const EDITOR_SETTINGS_IGNORED_KEY = "simple_asset_placer/categories/ignored_assets"
 
 # Category types
 enum CategoryType {

@@ -25,6 +25,7 @@ var pressed_non_modifier_keys: Array = []
 
 # Settings properties - dynamically loaded from SettingsDefinition
 # Basic Settings
+var placement_strategy: String = "auto"
 var snap_to_ground: bool = false
 var align_with_normal: bool = false
 var snap_enabled: bool = false
@@ -93,6 +94,7 @@ var fine_increment_modifier_key: String = "CTRL"
 # Control Settings
 var cancel_key: String = "ESCAPE"
 var transform_mode_key: String = "TAB"
+var cycle_placement_mode_key: String = "P"
 
 # Asset Cycling Settings
 var cycle_next_asset_key: String = "BRACKETRIGHT"
@@ -144,7 +146,7 @@ func setup_ui():
 	_connect_all_signals()
 
 func _connect_all_signals():
-	# Connect checkbox signals
+	# Connect signals for all UI controls
 	for control_id in ui_controls:
 		var control = ui_controls[control_id]
 		
@@ -152,6 +154,8 @@ func _connect_all_signals():
 			control.toggled.connect(_on_setting_changed)
 		elif control is SpinBox:
 			control.value_changed.connect(_on_setting_changed)
+		elif control is OptionButton:
+			control.item_selected.connect(_on_option_selected.bind(control_id))
 		elif control is Button:
 			# Check if it's a key binding button or utility button
 			if control.has_meta("action"):
@@ -169,6 +173,18 @@ func _on_setting_changed(value = null):
 	SettingsPersistence.read_ui_to_settings(ui_controls, self)
 	save_settings()
 	settings_changed.emit()
+
+func _on_option_selected(index: int, control_id: String):
+	# Handle option button selection
+	var option_button = ui_controls[control_id] as OptionButton
+	if option_button:
+		# Get the setting meta to find the options array
+		var setting_meta = SettingsDefinition.get_setting_meta(control_id)
+		if setting_meta and index < setting_meta.options.size():
+			# Set the property value to the selected option string
+			set(control_id, setting_meta.options[index])
+			save_settings()
+			settings_changed.emit()
 
 func _on_key_binding_button_pressed(button: Button, key_property: String):
 	listening_button = button

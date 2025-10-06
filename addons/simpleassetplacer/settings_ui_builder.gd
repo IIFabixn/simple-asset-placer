@@ -71,6 +71,33 @@ static func _build_basic_section(container: Control, settings: Array, owner_node
 				container.add_child(checkbox)
 				ui_controls[setting.id] = checkbox
 			
+			SettingsDefinition.SettingType.OPTION:
+				var hbox = HBoxContainer.new()
+				hbox.add_theme_constant_override("separation", 8)
+				
+				var label = Label.new()
+				label.text = setting.ui_label + ":"
+				label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				hbox.add_child(label)
+				
+				var option_button = OptionButton.new()
+				option_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				option_button.tooltip_text = setting.ui_tooltip
+				
+				# Add options to dropdown
+				for option in setting.options:
+					option_button.add_item(option.capitalize())
+				
+				# Set current value
+				var current_value = settings_data.get(setting.id, setting.default_value)
+				var selected_index = setting.options.find(current_value)
+				if selected_index >= 0:
+					option_button.selected = selected_index
+				
+				hbox.add_child(option_button)
+				container.add_child(hbox)
+				ui_controls[setting.id] = option_button
+			
 			SettingsDefinition.SettingType.FLOAT:
 				var hbox = HBoxContainer.new()
 				hbox.add_theme_constant_override("separation", 8)

@@ -3,6 +3,19 @@
 ## [Unreleased]
 
 ### 🏗️ Refactored
+- **Placement Strategy System**: Implemented Strategy Pattern for clean separation of placement modes
+  - Created modular placement strategy architecture with base `PlacementStrategy` class
+  - Added `CollisionPlacementStrategy` for physics-based raycast placement with surface detection
+  - Added `PlanePlacementStrategy` for fixed-height horizontal plane projection
+  - Introduced `PlacementStrategyManager` to coordinate strategy selection and execution
+  - Refactored `PositionManager.update_position_from_mouse()` from 100+ to ~40 lines
+  - Removed complex nested conditionals in favor of strategy delegation
+  - New `placement_strategy` setting: "collision", "plane", or "auto" (backward compatible)
+  - Legacy `snap_to_ground` setting still works via auto-selection
+  - Easy to extend with new strategies (terrain, grid, spline, voxel, etc.)
+  - Each strategy is independently testable and maintainable
+  - Reduced code complexity by 60% in positioning logic
+  - See `PLACEMENT_STRATEGY_REFACTORING.md` for detailed documentation
 - **Settings System Architecture**: Major refactoring of placement settings for improved maintainability
   - Reduced `placement_settings.gd` from 2,178 lines to 301 lines (86% reduction)
   - Created data-driven architecture with helper classes:
@@ -17,7 +30,31 @@
   - 100% backward compatible - no changes needed to existing code
   - Overall reduction: 60% (from 2,178 to 873 lines across 4 files)
 
+### ✨ Added
+- **Visual Placement Strategy Indicator**: Added on-screen overlay showing active placement mode
+  - Displays strategy icon and name in top-right corner of 3D viewport
+  - 🎯 Collision icon for collision/raycast placement mode
+  - 📐 Plane icon for horizontal plane projection mode
+  - Semi-transparent design that doesn't obstruct the view
+  - Updates in real-time when switching strategies via keyboard or settings
+  - Only visible during placement or transform mode
+
 ### 🔧 Improved
+- **Collision Exclusion System**: Implemented proper self-collision prevention for preview meshes
+  - Preview meshes no longer interfere with placement raycast detection
+  - System recursively gathers collision RIDs from nodes being placed/transformed
+  - Supports all standard Godot collision nodes (StaticBody3D, RigidBody3D, Area3D, etc.)
+  - Properly excludes CollisionShape3D, CollisionPolygon3D children
+  - **Known Limitation**: CSG nodes cannot be excluded due to Godot 4 engine architecture (CSG collision RIDs not exposed through standard APIs)
+  - Recommendation: Use Plane placement strategy when working with CSG nodes
+- **Placement Mode Switching**: Added easy ways to switch between collision and plane placement strategies
+  - **Keyboard Shortcut**: Press `P` to cycle through placement modes (Collision ↔ Plane)
+  - **Settings Dropdown**: "Placement Mode" dropdown in Settings tab with options: Auto, Collision, Plane
+  - Real-time switching without exiting placement OR transform mode
+  - Works in both placement and transform modes
+  - Visual feedback via on-screen overlay and log messages showing active strategy
+  - Customizable hotkey via Editor Settings
+  - See `PLACEMENT_MODE_SWITCHING_GUIDE.md` for detailed usage instructions
 - **Increment Calculation System**: Introduced centralized increment calculation to eliminate code duplication
   - Created new `IncrementCalculator` utility class for unified step calculations with modifier support
   - Added `InputHandler.get_modifier_state()` to retrieve all modifier states in a single call
@@ -27,6 +64,10 @@
   - Single source of truth for modifier logic improves maintainability
 
 ### 🐛 Fixed
+- **Duplicate Strategy Logging**: Fixed placement strategy being set twice on mode entry
+  - Added caching in `PlacementStrategyManager` to track last requested strategy
+  - Only calls `set_strategy()` when strategy actually changes
+  - Eliminates redundant "Switched to [strategy]" log messages
 - **Reset Position on Exit Signal Connection**: Fixed missing signal reconnection for "Reset Position Offset" checkbox
   - Added missing signal disconnect/reconnect for `reset_position_on_exit_check` in `_disconnect_ui_signals()` and `_connect_ui_signals()` methods
   - Ensures setting updates are properly captured when UI signals are refreshed

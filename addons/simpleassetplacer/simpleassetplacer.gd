@@ -19,6 +19,9 @@ const ScaleManager = preload("res://addons/simpleassetplacer/scale_manager.gd")
 const PreviewManager = preload("res://addons/simpleassetplacer/preview_manager.gd")
 const TransformationManager = preload("res://addons/simpleassetplacer/transformation_manager.gd")
 
+# Import placement strategy system
+const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placement_strategy_manager.gd")
+
 # Import dock and utilities (keep existing)
 const AssetPlacerDock = preload("res://addons/simpleassetplacer/asset_placer_dock.gd")
 const ThumbnailGenerator = preload("res://addons/simpleassetplacer/thumbnail_generator.gd")
@@ -67,6 +70,9 @@ func _initialize_systems():
 	# Initialize error handler with editor interface instance
 	ErrorHandler.initialize(get_editor_interface())
 	
+	# Initialize placement strategy system
+	PlacementStrategyManager.initialize()
+	
 	# Initialize core systems
 	InputHandler.update_input_state({})  # Initialize with empty settings initially
 	PositionManager.configure({})
@@ -88,6 +94,7 @@ func _cleanup_systems():
 	TransformationManager.cleanup()
 	ThumbnailGenerator.cleanup()
 	ThumbnailQueueManager.cleanup()
+	PlacementStrategyManager.cleanup()
 
 ## Dock Management
 
@@ -103,6 +110,9 @@ func _setup_dock():
 	# Add to Godot dock
 	add_control_to_dock(DOCK_SLOT_RIGHT_UL, dock)
 	
+	# Store dock reference for UI updates
+	TransformationManager.dock_reference = dock
+	
 	PluginLogger.info(PluginConstants.COMPONENT_DOCK, "Dock setup complete")
 
 func _cleanup_dock():
@@ -111,6 +121,9 @@ func _cleanup_dock():
 		remove_control_from_docks(dock)
 		dock.queue_free()
 		dock = null
+	
+	# Clear dock reference
+	TransformationManager.dock_reference = null
 
 ## Settings Management
 

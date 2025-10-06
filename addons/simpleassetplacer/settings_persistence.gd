@@ -75,6 +75,11 @@ static func update_ui_from_settings(ui_controls: Dictionary, owner_node: Node):
 			SettingsDefinition.SettingType.KEY_BINDING:
 				if control is Button and value != null:
 					control.text = str(value)
+			SettingsDefinition.SettingType.OPTION:
+				if control is OptionButton and value != null:
+					var selected_index = setting.options.find(value)
+					if selected_index >= 0:
+						control.selected = selected_index
 
 # Read settings from UI controls back to properties
 static func read_ui_to_settings(ui_controls: Dictionary, owner_node: Node):
@@ -103,6 +108,11 @@ static func read_ui_to_settings(ui_controls: Dictionary, owner_node: Node):
 			SettingsDefinition.SettingType.FLOAT:
 				if control is SpinBox:
 					owner_node.set(setting.id, control.value)
+			SettingsDefinition.SettingType.OPTION:
+				if control is OptionButton:
+					var selected_index = control.selected
+					if selected_index >= 0 and selected_index < setting.options.size():
+						owner_node.set(setting.id, setting.options[selected_index])
 			SettingsDefinition.SettingType.KEY_BINDING:
 				if control is Button:
 					owner_node.set(setting.id, control.text)

@@ -70,6 +70,9 @@ static var mesh_placed_callback: Callable
 # Settings reference
 static var settings: Dictionary = {}
 
+# Dock reference (for UI updates)
+static var dock_reference = null
+
 # Focus management
 static var focus_grab_counter: int = 0  # Counter for repeated focus grabs
 
@@ -332,15 +335,22 @@ static func process_frame_input(camera: Camera3D, input_settings: Dictionary = {
 	# Store current settings for TAB key and other operations
 	settings = input_settings
 	
-	# Configure managers with current settings (important for both modes)
-	# This ensures snap settings and other options are always up-to-date
-	PositionManager.configure(input_settings)
-	
 	# Get the 3D viewport for proper mouse coordinate conversion
 	var viewport_3d = EditorInterface.get_editor_viewport_3d(0)
 	
 	# Update input system with viewport context
 	InputHandler.update_input_state(input_settings, viewport_3d)
+	
+	# Process global navigation input FIRST (so mode switching and strategy cycling happen before configure)
+	_process_navigation_input()
+	
+	# Re-fetch settings after navigation input (in case strategy was manually cycled)
+	settings = SettingsManager.get_combined_settings()
+	
+	# Configure managers with current settings (important for both modes)
+	# This ensures snap settings and other options are always up-to-date
+	# NOTE: This is AFTER navigation input so manual strategy changes take effect first
+	PositionManager.configure(settings)
 	
 	# Keep grabbing focus for the first few frames after mode starts
 	if focus_grab_counter > 0:
@@ -356,9 +366,6 @@ static func process_frame_input(camera: Camera3D, input_settings: Dictionary = {
 	
 	# Update grid overlay AFTER position updates (so it follows the object)
 	_update_grid_overlay()
-	
-	# Process global navigation input
-	_process_navigation_input()
 
 static func _process_placement_input(camera: Camera3D):
 	"""Process input for placement mode"""
@@ -452,7 +459,13 @@ static func _process_placement_input(camera: Camera3D):
 	# Y position is controlled by base_height + height_offset (manual Q/E keys)
 	# Manual WASD offsets are preserved via manual_position_offset in PositionManager
 	var mouse_pos = position_input.mouse_position
-	var world_pos = PositionManager.update_position_from_mouse(camera, mouse_pos, 1, true)
+	
+	# IMPORTANT: Exclude preview mesh from collision detection to prevent self-collision
+	var exclude_nodes = []
+	if PreviewManager.preview_mesh and is_instance_valid(PreviewManager.preview_mesh):
+		exclude_nodes.append(PreviewManager.preview_mesh)
+	
+	var world_pos = PositionManager.update_position_from_mouse(camera, mouse_pos, 1, true, exclude_nodes)
 	
 	# Get the updated position
 	var preview_pos = PositionManager.get_current_position()
@@ -606,7 +619,8 @@ static func _process_transform_input(camera: Camera3D):
 	# 1. Raycast to get world position
 	# 2. Apply grid snapping if enabled
 	# 3. Add manual_position_offset (WASD adjustments)
-	PositionManager.update_position_from_mouse(camera, mouse_pos)
+	# IMPORTANT: Pass target_nodes as exclusions to prevent self-collision
+	PositionManager.update_position_from_mouse(camera, mouse_pos, 1, false, target_nodes)
 	var new_center = PositionManager.get_current_position()
 	
 	# Update surface normal alignment if enabled, otherwise reset it
@@ -694,14 +708,11 @@ static func _process_rotation_input(rotation_input: Dictionary, target_node: Nod
 	var rotation_step: float
 	if rotation_input.large_increment_modifier_held:
 		rotation_step = settings.get("large_rotation_increment", 90.0)
-		PluginLogger.debug("TransformationManager", "Using LARGE rotation increment: " + str(rotation_step) + "°")
 	elif rotation_input.fine_increment_modifier_held:
 		rotation_step = settings.get("fine_rotation_increment", 5.0)
-		PluginLogger.debug("TransformationManager", "Using FINE rotation increment: " + str(rotation_step) + "°")
 	else:
 		rotation_step = settings.get("rotation_increment", 15.0)
-		PluginLogger.debug("TransformationManager", "Using BASE rotation increment: " + str(rotation_step) + "°")
-	
+		
 	# Apply reverse modifier (negative direction)
 	if rotation_input.reverse_modifier_held:
 		rotation_step = -rotation_step
@@ -762,6 +773,25 @@ static func _process_asset_cycling_input():
 	elif InputHandler.should_cycle_previous_asset():
 		dock.cycle_previous_asset()
 
+static func _cycle_placement_strategy():
+	"""Cycle through placement strategies and update settings"""
+	var new_strategy = PlacementStrategyManager.cycle_strategy()
+	
+	# Update the local settings dictionary so it persists during this session
+	if settings.has("placement_strategy"):
+		settings["placement_strategy"] = new_strategy
+	
+	# Update SettingsManager immediately so configure() uses the new value
+	SettingsManager.update_dock_settings({"placement_strategy": new_strategy})
+	
+	# Update the dock UI dropdown and save to EditorSettings for persistence
+	if dock_reference and dock_reference.has_method("update_placement_strategy_ui"):
+		dock_reference.update_placement_strategy_ui(new_strategy)
+	
+	# Show notification to user
+	var strategy_name = PlacementStrategyManager.get_active_strategy_name()
+	PluginLogger.info("TransformationManager", "Placement mode: " + strategy_name)
+
 static func _process_navigation_input():
 	"""Process navigation and mode control input"""
 	var nav_input = InputHandler.get_navigation_input()
@@ -773,6 +803,10 @@ static func _process_navigation_input():
 	# Handle cancel/escape
 	if nav_input.cancel_pressed or nav_input.escape_pressed:
 		exit_any_mode()
+	
+	# Handle placement mode cycling (works in both placement AND transform mode)
+	if InputHandler.should_cycle_placement_mode():
+		_cycle_placement_strategy()
 
 ## MOUSE WHEEL INPUT HANDLING
 

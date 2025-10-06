@@ -9,7 +9,8 @@ enum SettingType {
 	FLOAT,
 	STRING,
 	VECTOR3,
-	KEY_BINDING
+	KEY_BINDING,
+	OPTION  # Dropdown/OptionButton
 }
 
 # Setting metadata structure
@@ -24,6 +25,7 @@ class SettingMeta:
 	var max_value: float = 100.0
 	var step: float = 0.01
 	var section: String = ""  # UI section grouping
+	var options: Array = []  # For OPTION type: array of strings for dropdown
 	
 	func _init(p_id: String, p_editor_key: String, p_default, p_type: SettingType, p_label: String = ""):
 		id = p_id
@@ -37,14 +39,23 @@ static func get_all_settings() -> Array:
 	var settings: Array = []
 	
 	# Basic Settings Section
-	var snap_to_ground = SettingMeta.new("snap_to_ground", "simple_asset_placer/snap_to_ground", false, SettingType.BOOL, "Snap to Ground")
+	
+	# Placement Strategy (new unified setting with dropdown)
+	var placement_strategy = SettingMeta.new("placement_strategy", "simple_asset_placer/placement_strategy", "auto", SettingType.OPTION, "Placement Mode")
+	placement_strategy.section = "basic"
+	placement_strategy.options = ["auto", "collision", "plane"]
+	placement_strategy.ui_tooltip = "Auto: Use snap_to_ground setting | Collision: Raycast to surfaces | Plane: Fixed height projection"
+	settings.append(placement_strategy)
+	
+	# Legacy settings (kept for backward compatibility)
+	var snap_to_ground = SettingMeta.new("snap_to_ground", "simple_asset_placer/snap_to_ground", true, SettingType.BOOL, "Snap to Ground (Legacy)")
 	snap_to_ground.section = "basic"
-	snap_to_ground.ui_tooltip = "Automatically snap placed objects to ground surface"
+	snap_to_ground.ui_tooltip = "Legacy: Use collision-based placement (now controlled by placement_strategy)"
 	settings.append(snap_to_ground)
 	
 	var align_normal = SettingMeta.new("align_with_normal", "simple_asset_placer/align_with_normal", false, SettingType.BOOL, "Align with Surface Normal")
 	align_normal.section = "basic"
-	align_normal.ui_tooltip = "Align object rotation with surface normal"
+	align_normal.ui_tooltip = "Align object rotation with surface normal (works with collision placement)"
 	settings.append(align_normal)
 	
 	var snap_enabled = SettingMeta.new("snap_enabled", "simple_asset_placer/snap_enabled", false, SettingType.BOOL, "Enable Grid Snapping")
@@ -173,6 +184,7 @@ static func get_all_settings() -> Array:
 	# Key Bindings - Control
 	_add_key_binding(settings, "cancel_key", "ESCAPE", "Cancel Placement", "control")
 	_add_key_binding(settings, "transform_mode_key", "TAB", "Transform Mode", "control")
+	_add_key_binding(settings, "cycle_placement_mode_key", "P", "Cycle Placement Mode", "control")
 	_add_key_binding(settings, "cycle_next_asset_key", "BRACKETRIGHT", "Cycle Next Asset", "control")
 	_add_key_binding(settings, "cycle_previous_asset_key", "BRACKETLEFT", "Cycle Previous Asset", "control")
 	

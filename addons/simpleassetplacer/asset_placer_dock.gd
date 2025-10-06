@@ -12,6 +12,7 @@ const ModelLibraryBrowser = preload("res://addons/simpleassetplacer/modellib_bro
 const PlacementSettings = preload("res://addons/simpleassetplacer/placement_settings.gd")
 const AssetThumbnailItem = preload("res://addons/simpleassetplacer/asset_thumbnail_item.gd")
 const CategoryManager = preload("res://addons/simpleassetplacer/category_manager.gd")
+const SettingsDefinition = preload("res://addons/simpleassetplacer/settings_definition.gd")
 
 signal asset_selected(asset_path: String, mesh_resource: Resource, settings: Dictionary)
 signal meshlib_item_selected(meshlib: MeshLibrary, item_id: int, settings: Dictionary)
@@ -319,6 +320,53 @@ func get_placement_settings() -> Dictionary:
 	if placement_settings and placement_settings.has_method("get_placement_settings"):
 		return placement_settings.get_placement_settings()
 	return {}
+
+func refresh_placement_settings_ui():
+	"""Reload placement settings UI from saved values (useful after programmatic changes)"""
+	if placement_settings and placement_settings.has_method("load_settings"):
+		placement_settings.load_settings()
+
+func update_placement_strategy_ui(strategy: String):
+	"""Update the placement strategy dropdown UI to reflect programmatic changes"""
+	if not placement_settings:
+		PluginLogger.warning(PluginConstants.COMPONENT_DOCK, "Cannot update placement strategy UI - placement_settings not available")
+		return
+	
+	if not "ui_controls" in placement_settings:
+		PluginLogger.warning(PluginConstants.COMPONENT_DOCK, "Cannot update placement strategy UI - ui_controls not found")
+		return
+	
+	var ui_controls = placement_settings.ui_controls
+	if not ui_controls.has("placement_strategy"):
+		PluginLogger.warning(PluginConstants.COMPONENT_DOCK, "Cannot update placement strategy UI - control not found")
+		return
+	
+	var option_button = ui_controls["placement_strategy"]
+	if not option_button is OptionButton:
+		PluginLogger.warning(PluginConstants.COMPONENT_DOCK, "Cannot update placement strategy UI - control is not OptionButton")
+		return
+	
+	# Find the index of the strategy in the options
+	var all_settings = SettingsDefinition.get_all_settings()
+	for setting in all_settings:
+		if setting.id == "placement_strategy" and setting.options:
+			var selected_index = setting.options.find(strategy)
+			if selected_index >= 0:
+				# Update the UI dropdown
+				option_button.selected = selected_index
+				
+				# Update the node property
+				placement_settings.set("placement_strategy", strategy)
+				
+				# Save to EditorSettings so it persists
+				placement_settings.save_settings()
+				
+				PluginLogger.info(PluginConstants.COMPONENT_DOCK, "Updated placement strategy UI to: " + strategy)
+			else:
+				PluginLogger.warning(PluginConstants.COMPONENT_DOCK, "Strategy not found in options: " + strategy)
+			return
+	
+	PluginLogger.warning(PluginConstants.COMPONENT_DOCK, "Could not find placement_strategy setting definition")
 
 ## Asset Cycling Coordination
 

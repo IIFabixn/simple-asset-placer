@@ -5,6 +5,8 @@ class_name OverlayManager
 
 # Forward reference to TransformationManager for Mode enum
 const TransformationManager = preload("res://addons/simpleassetplacer/transformation_manager.gd")
+const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placement_strategy_manager.gd")
+const SettingsManager = preload("res://addons/simpleassetplacer/settings_manager.gd")
 
 """
 CENTRALIZED UI OVERLAY SYSTEM  
@@ -252,9 +254,9 @@ static func _create_status_overlay():
 	
 	panel.add_theme_stylebox_override("panel", style_box)
 	
-	# Position panel in bottom center
-	panel.size = Vector2(400, 120)
-	panel.position = Vector2(-200, -130)  # Centered horizontally, 130 pixels from bottom
+	# Position panel in bottom center (wider to accommodate placement strategy)
+	panel.size = Vector2(700, 120)
+	panel.position = Vector2(-350, -130)  # Centered horizontally, 130 pixels from bottom
 	panel.anchor_left = 0.5
 	panel.anchor_right = 0.5
 	panel.anchor_top = 1.0
@@ -267,7 +269,7 @@ static func _create_status_overlay():
 	status_label.add_theme_color_override("font_color", Color.WHITE)
 	status_label.add_theme_font_size_override("font_size", 14)
 	status_label.position = Vector2(10, 10)
-	status_label.size = Vector2(380, 25)
+	status_label.size = Vector2(680, 25)
 	
 	# Create transform info label
 	var transform_label = Label.new()
@@ -276,7 +278,7 @@ static func _create_status_overlay():
 	transform_label.add_theme_color_override("font_color", Color.CYAN)
 	transform_label.add_theme_font_size_override("font_size", 12)
 	transform_label.position = Vector2(10, 35)
-	transform_label.size = Vector2(380, 75)
+	transform_label.size = Vector2(680, 75)
 	transform_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	transform_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	
@@ -298,16 +300,20 @@ static func show_transform_overlay(mode: TransformationManager.Mode, node_name: 
 	var transform_label = status_overlay.get_node("StatusPanel/TransformLabel")
 	
 	if status_label and transform_label:
-		# Set mode-specific status message
+		# Get current placement strategy for display
+		var strategy_name = PlacementStrategyManager.get_active_strategy_name()
+		var strategy_icon = "🎯" if PlacementStrategyManager.get_active_strategy_type() == "collision" else "📐"
+		
+		# Set mode-specific status message with strategy indicator
 		match mode:
 			TransformationManager.Mode.PLACEMENT:
-				status_label.text = "🎯 PLACEMENT MODE" + (" - " + node_name if node_name != "" else "")
+				status_label.text = "🎯 PLACEMENT MODE" + (" - " + node_name if node_name != "" else "") + "  |  " + strategy_icon + " " + strategy_name
 				status_label.add_theme_color_override("font_color", Color.YELLOW)
 			TransformationManager.Mode.TRANSFORM:
-				status_label.text = "⚙️ TRANSFORM MODE" + (" - " + node_name if node_name != "" else "")
+				status_label.text = "⚙️ TRANSFORM MODE" + (" - " + node_name if node_name != "" else "") + "  |  " + strategy_icon + " " + strategy_name
 				status_label.add_theme_color_override("font_color", Color.CYAN)
 			_:
-				status_label.text = "🔧 Asset Placer Active"
+				status_label.text = "🔧 Asset Placer Active  |  " + strategy_icon + " " + strategy_name
 				status_label.add_theme_color_override("font_color", Color.GREEN)
 		
 		# Build transform info text
@@ -319,11 +325,23 @@ static func show_transform_overlay(mode: TransformationManager.Mode, node_name: 
 		if height_offset != 0.0:
 			transform_text += "Height Offset: %.2f" % height_offset
 		else:
-			# Show mode-specific keybinds
+			# Get actual keybinds from settings
+			var settings = SettingsManager.get_combined_settings()
+			var move_keys = "%s%s%s%s" % [
+				settings.get("position_forward_key", "W"),
+				settings.get("position_left_key", "A"),
+				settings.get("position_back_key", "S"),
+				settings.get("position_right_key", "D")
+			]
+			var height_up = settings.get("height_up_key", "Q")
+			var height_down = settings.get("height_down_key", "E")
+			var cycle_mode = settings.get("cycle_placement_mode_key", "P")
+			
+			# Show mode-specific keybinds with actual keys
 			if mode == TransformationManager.Mode.PLACEMENT:
-				transform_text += "WASD (Move)  Q/E (Height)  Mouse (Rotate)  PgUp/PgDn (Scale)"
+				transform_text += "%s (Move)  %s/%s (Height)  Mouse (Rotate)  PgUp/PgDn (Scale)  %s (Mode)" % [move_keys, height_up, height_down, cycle_mode]
 			else:  # transform mode
-				transform_text += "WASD (Move)  Q/E (Height)  Mouse+X/Y/Z (Rotate)  CTRL/ALT (Modifiers)"
+				transform_text += "%s (Move)  %s/%s (Height)  Mouse+X/Y/Z (Rotate)  %s (Mode)  CTRL/ALT (Modifiers)" % [move_keys, height_up, height_down, cycle_mode]
 		
 		transform_label.text = transform_text
 	

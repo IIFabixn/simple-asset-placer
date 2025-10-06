@@ -4,27 +4,35 @@ extends RefCounted
 class_name PositionManager
 
 """
-3D POSITIONING AND COLLISION SYSTEM
-===================================
+3D POSITIONING AND COLLISION SYSTEM (REFACTORED WITH STRATEGY PATTERN)
+======================================================================
 
-PURPOSE: Handles all 3D positioning logic including raycast collision and height management.
+PURPOSE: Handles all 3D positioning logic using pluggable placement strategies.
 
 RESPONSIBILITIES:
-- Mouse-to-world position conversion using camera raycasting  
-- Collision detection with configurable layers and masks
-- Height offset management (base height + adjustments)
+- Coordinate placement strategy selection and configuration
+- Manage height offset and manual position adjustments
+- Handle grid snapping and position constraints
 - Smooth interpolation between positions
-- Transform mode positioning (maintains height while following mouse)
-- Ground snapping and collision-based positioning
+- Transform mode positioning
 
-ARCHITECTURE POSITION: Pure positioning math and collision logic
+STRATEGY PATTERN: Delegates position calculation to PlacementStrategyManager which
+selects between collision-based or plane-based placement strategies.
+
+ARCHITECTURE POSITION: Position coordinator that delegates to strategies
 - Does NOT handle input detection (receives requests from TransformationManager)
 - Does NOT handle UI or overlays  
-- Does NOT know about placement/transform modes (works with any node)
+- Does NOT directly perform raycasting (delegates to strategies)
 
 USED BY: TransformationManager for all positioning operations
-DEPENDS ON: Godot 3D physics system, camera for raycasting
+DEPENDS ON: PlacementStrategyManager, camera for raycasting
 """
+
+# Import strategy manager
+const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placement_strategy_manager.gd")
+const PlacementStrategy = preload("res://addons/simpleassetplacer/placement_strategy.gd")
+const IncrementCalculator = preload("res://addons/simpleassetplacer/increment_calculator.gd")
+const PluginLogger = preload("res://addons/simpleassetplacer/plugin_logger.gd")
 
 # Current position state
 static var current_position: Vector3 = Vector3.ZERO
@@ -37,8 +45,6 @@ static var manual_position_offset: Vector3 = Vector3.ZERO  # Accumulated WASD po
 static var last_raycast_xz: Vector2 = Vector2.ZERO  # Track last raycast XZ position (without offsets) for change detection
 
 # Position calculation settings
-static var collision_enabled: bool = true
-static var snap_to_ground: bool = true
 static var height_step_size: float = 0.1
 static var collision_mask: int = 1  # Default collision layer
 static var snap_enabled: bool = false  # Grid snapping enabled
@@ -50,15 +56,26 @@ static var snap_center_x: bool = false  # Snap to grid using center position on 
 static var snap_center_y: bool = false  # Snap to grid using center position on Y-axis
 static var snap_center_z: bool = false  # Snap to grid using center position on Z-axis
 static var use_half_step: bool = false  # Use half-step snapping (for CTRL modifier)
+
+# Legacy settings (now handled by placement strategies)
 static var align_with_normal: bool = false  # Align rotation with surface normal
+static var snap_to_ground: bool = true  # Legacy: maps to collision strategy
 
-## Core Position Management
+## Core Position Management (REFACTORED)
 
-static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, collision_layer: int = 1, lock_y_axis: bool = false) -> Vector3:
-	"""Update target position based on mouse position and camera raycast
-	lock_y_axis: If true, only XZ is updated after initial setup, Y is calculated from base_height + height_offset
-	align_with_normal: Y always follows the surface (updates base_height every frame)
-	snap_to_ground + lock_y_axis: base_height only updates when XZ position changes (not from height offset changes)"""
+static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, collision_layer: int = 1, lock_y_axis: bool = false, exclude_nodes: Array = []) -> Vector3:
+	"""Update target position based on mouse position using placement strategy
+	
+	Args:
+		camera: Camera3D for ray projection
+		mouse_pos: Mouse position in viewport coordinates
+		collision_layer: Physics collision layer (legacy, now in config)
+		lock_y_axis: If true, only XZ updates after initial setup
+		exclude_nodes: Array of Node3D objects to exclude from collision (for transform mode)
+	
+	Returns:
+		Calculated world position
+	"""
 	if not camera:
 		return current_position
 	
@@ -66,154 +83,81 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 	var from = camera.project_ray_origin(mouse_pos)
 	var to = from + camera.project_ray_normal(mouse_pos) * 1000.0
 	
-	# Perform collision detection if enabled
-	if collision_enabled:
-		var new_pos = _raycast_to_world(from, to, collision_layer)
-		if new_pos != Vector3.INF:
-			# Determine Y position based on lock_y_axis flag, alignment mode, snap_to_ground, and whether this is initial positioning
-			# When aligning with normal, Y should always follow the surface
-			# When snap_to_ground with lock_y_axis, only update base_height if XZ changed significantly (not from height offset changes)
-			var should_update_base_height = false
-			if align_with_normal or not lock_y_axis or is_initial_position:
-				should_update_base_height = true
-			elif snap_to_ground and lock_y_axis:
-				# Only update base height if XZ position changed (not just height offset)
-				# Compare against last raycast XZ position to avoid interference from manual_position_offset
-				var new_xz = Vector2(new_pos.x, new_pos.z)
-				var xz_distance = new_xz.distance_to(last_raycast_xz)
-				should_update_base_height = xz_distance > 0.1  # Threshold to avoid false positives from tiny mouse movements
-			
-			if should_update_base_height:
-				# Update base_height from raycast and apply offset
-				base_height = new_pos.y
-				last_raycast_xz = Vector2(new_pos.x, new_pos.z)  # Store XZ for next frame comparison
-				
-				# When aligning with normal, apply height offset along the surface normal direction
-				if align_with_normal and height_offset != 0.0:
-					# Move along the surface normal by the height offset amount
-					var offset_vector = surface_normal.normalized() * height_offset
-					target_position = new_pos + offset_vector
-				else:
-					# Standard: just offset Y-axis
-					target_position.x = new_pos.x
-					target_position.z = new_pos.z
-					target_position.y = base_height + height_offset
-				
-				is_initial_position = false  # Mark that we've set initial position
-			else:
-				# Use base_height + height_offset (manual control only)
-				target_position.x = new_pos.x
-				target_position.z = new_pos.z
-				target_position.y = base_height + height_offset
-			
-			# Apply grid snapping if enabled (to base position only)
-			if snap_enabled:
-				target_position = _apply_grid_snap(target_position)
-			
-			# Apply manual position offset (from WASD keys) AFTER snapping
-			# This allows manual adjustments to work immediately without fighting the snap
-			target_position += manual_position_offset
-			
-			current_position = target_position
-			return current_position
+	# Pass exclusion list to strategy manager (important for transform mode)
+	var exclude_config = {"exclude_nodes": exclude_nodes} if exclude_nodes.size() > 0 else {}
 	
-	# Fallback: project to horizontal plane
-	var pos = _project_to_plane(from, to)
+	# Use strategy manager to calculate position with exclusions
+	var result: PlacementStrategy.PlacementResult = PlacementStrategyManager.calculate_position(from, to, exclude_config)
 	
-	# When aligning with normal or not initial, handle Y appropriately
-	# When snap_to_ground with lock_y_axis, only update if XZ changed
-	var should_update_base_height_fallback = false
+	# Check if we got a valid result
+	if result.position == Vector3.INF:
+		# Invalid result - keep current position
+		return current_position
+	
+	var new_pos = result.position
+	
+	# Update surface normal for rotation alignment
+	surface_normal = result.normal
+	
+	# Determine Y position based on lock_y_axis flag, alignment mode, and whether this is initial positioning
+	var should_update_base_height = false
+	
 	if align_with_normal or not lock_y_axis or is_initial_position:
-		should_update_base_height_fallback = true
-	elif snap_to_ground and lock_y_axis:
-		# Only update base height if XZ position changed
-		# Compare against last raycast XZ position to avoid interference from manual_position_offset
-		var new_xz = Vector2(pos.x, pos.z)
+		should_update_base_height = true
+	elif lock_y_axis:
+		# Only update base height if XZ position changed significantly
+		var new_xz = Vector2(new_pos.x, new_pos.z)
 		var xz_distance = new_xz.distance_to(last_raycast_xz)
-		should_update_base_height_fallback = xz_distance > 0.1
+		should_update_base_height = xz_distance > 0.1
 	
-	if should_update_base_height_fallback:
-		# Set base_height from plane and mark as initialized
-		base_height = pos.y
-		last_raycast_xz = Vector2(pos.x, pos.z)  # Store XZ for next frame comparison
+	if should_update_base_height:
+		# Update base_height from strategy result
+		base_height = new_pos.y
+		last_raycast_xz = Vector2(new_pos.x, new_pos.z)
 		
-		# When aligning with normal, apply height offset along surface normal
+		# When aligning with normal, apply height offset along the surface normal direction
 		if align_with_normal and height_offset != 0.0:
 			var offset_vector = surface_normal.normalized() * height_offset
-			pos = pos + offset_vector
+			target_position = new_pos + offset_vector
 		else:
-			# Standard Y-axis offset
-			pos.y = base_height + height_offset
+			# Standard: just offset Y-axis
+			target_position.x = new_pos.x
+			target_position.z = new_pos.z
+			target_position.y = base_height + height_offset
 		
 		is_initial_position = false
 	else:
-		# If Y is locked and not initial, use base_height + offset
-		pos.y = base_height + height_offset
+		# Use base_height + height_offset (manual control only)
+		target_position.x = new_pos.x
+		target_position.z = new_pos.z
+		target_position.y = base_height + height_offset
 	
 	# Apply grid snapping if enabled (to base position only)
 	if snap_enabled:
-		pos = _apply_grid_snap(pos)
+		target_position = _apply_grid_snap(target_position)
 	
 	# Apply manual position offset (from WASD keys) AFTER snapping
-	# This allows manual adjustments to work immediately without fighting the snap
-	pos += manual_position_offset
+	target_position += manual_position_offset
 	
-	# Update current/target positions before returning
-	current_position = pos
-	target_position = pos
+	# Update current position
+	current_position = target_position
 	
-	return pos
+	return current_position
+
+## Legacy Methods (Deprecated - kept for compatibility)
+# These methods are no longer used internally but kept in case external code references them
 
 static func _raycast_to_world(from: Vector3, to: Vector3, collision_layer: int) -> Vector3:
-	"""Perform raycast collision detection"""
-	# Get the current 3D world
-	var world = EditorInterface.get_edited_scene_root()
-	if not world:
-		return Vector3.INF
-	
-	var world_3d = world.get_world_3d()
-	if not world_3d:
-		return Vector3.INF
-	
-	# Create ray query
-	var space_state = world_3d.direct_space_state
-	if not space_state:
-		return Vector3.INF
-	
-	var query = PhysicsRayQueryParameters3D.create(from, to)
-	query.collision_mask = collision_layer
-	query.collide_with_areas = false
-	query.collide_with_bodies = true
-	
-	var result = space_state.intersect_ray(query)
-	if result:
-		# Store the surface normal for rotation alignment
-		if result.has("normal"):
-			surface_normal = result.normal
-		else:
-			surface_normal = Vector3.UP
-		return result.position
-	
-	# No collision - reset to default up normal
-	surface_normal = Vector3.UP
-	return Vector3.INF
+	"""DEPRECATED: Use PlacementStrategyManager instead
+	Legacy raycast method kept for compatibility"""
+	var result = PlacementStrategyManager.calculate_position_with_strategy(from, to, "collision")
+	return result.position if result.position != Vector3.INF else Vector3.INF
 
 static func _project_to_plane(from: Vector3, to: Vector3, plane_y: float = 0.0) -> Vector3:
-	"""Project ray to horizontal plane when no collision detected"""
-	var ray_dir = (to - from).normalized()
-	
-	# Create horizontal plane at current base_height (NOT including height_offset yet - that's applied by caller)
-	var plane = Plane(Vector3.UP, base_height + plane_y)
-	var intersection = plane.intersects_ray(from, ray_dir)
-	
-	# No actual surface, so normal is always up
-	surface_normal = Vector3.UP
-	
-	if intersection:
-		return intersection
-	
-	# If no intersection, return a position at base_height
-	return Vector3(from.x, base_height, from.z)
+	"""DEPRECATED: Use PlacementStrategyManager instead
+	Legacy plane projection kept for compatibility"""
+	var result = PlacementStrategyManager.calculate_position_with_strategy(from, to, "plane")
+	return result.position if result.position != Vector3.INF else Vector3(from.x, base_height, from.z)
 
 static func _apply_grid_snap(pos: Vector3) -> Vector3:
 	"""Apply grid snapping to a position (pivot-based with optional center snapping)"""
@@ -527,10 +471,9 @@ static func update_smooth_position(delta: float):
 ## Configuration
 
 static func configure(config: Dictionary):
-	"""Configure position manager settings"""
+	"""Configure position manager settings and placement strategies"""
+	# Configure legacy settings
 	snap_to_ground = config.get("snap_to_ground", true)
-	# "Snap to ground" enables collision detection for raycasting to surfaces
-	collision_enabled = snap_to_ground
 	height_step_size = config.get("height_step_size", 0.1)
 	collision_mask = config.get("collision_mask", 1)
 	interpolation_enabled = config.get("interpolation_enabled", false)
@@ -544,18 +487,22 @@ static func configure(config: Dictionary):
 	snap_center_y = config.get("snap_center_y", false)
 	snap_center_z = config.get("snap_center_z", false)
 	align_with_normal = config.get("align_with_normal", false)
+	
+	# Configure placement strategy manager
+	PlacementStrategyManager.configure(config)
 
 static func get_configuration() -> Dictionary:
 	"""Get current configuration"""
 	return {
-		"collision_enabled": collision_enabled,
 		"snap_to_ground": snap_to_ground,
 		"height_step_size": height_step_size,
 		"collision_mask": collision_mask,
 		"interpolation_enabled": interpolation_enabled,
 		"snap_enabled": snap_enabled,
 		"snap_step": snap_step,
-		"interpolation_speed": interpolation_speed
+		"interpolation_speed": interpolation_speed,
+		"align_with_normal": align_with_normal,
+		"placement_strategy": PlacementStrategyManager.get_active_strategy_type()
 	}
 
 ## Transform Node Positioning (for Transform Mode)

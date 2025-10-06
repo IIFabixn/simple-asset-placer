@@ -158,9 +158,14 @@ static func _update_key_states():
 	current_keys["cycle_next_asset"] = _check_key_with_modifiers(cycle_next_key)
 	current_keys["cycle_previous_asset"] = _check_key_with_modifiers(cycle_prev_key)
 	
+	# Placement mode cycling key
+	var cycle_mode_key = settings.get("cycle_placement_mode_key", "P")
+	current_keys["cycle_placement_mode"] = _check_key_with_modifiers(cycle_mode_key)
+	
 	# Track cycling key press times for tap vs hold detection
 	_track_key_press_time("cycle_next_asset", current_time)
 	_track_key_press_time("cycle_previous_asset", current_time)
+	_track_key_press_time("cycle_placement_mode", current_time)
 
 static func _check_key_with_modifiers(key_string: String) -> bool:
 	"""Check if key is pressed, supporting both direct keys and modifier combinations
@@ -626,6 +631,10 @@ static func should_cycle_next_asset() -> bool:
 static func should_cycle_previous_asset() -> bool:
 	"""Check if user wants to cycle to previous asset (tap or hold)"""
 	return is_key_just_pressed("cycle_previous_asset") or is_key_held_with_repeat("cycle_previous_asset")
+
+static func should_cycle_placement_mode() -> bool:
+	"""Check if user wants to cycle placement mode (collision/plane)"""
+	return is_key_just_pressed("cycle_placement_mode")
 
 static func is_key_held_with_repeat(key_name: String, repeat_delay: float = 0.15) -> bool:
 	"""Check if key is held long enough to trigger repeated actions"""

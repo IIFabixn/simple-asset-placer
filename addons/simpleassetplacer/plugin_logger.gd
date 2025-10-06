@@ -31,7 +31,7 @@ enum LogLevel {
 }
 
 # Current log level - messages below this level won't be printed
-static var current_level: LogLevel = LogLevel.INFO
+static var current_level: LogLevel = LogLevel.WARNING
 
 # Whether to include timestamps in logs
 static var include_timestamp: bool = false

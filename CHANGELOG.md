@@ -12,6 +12,13 @@
   - Single source of truth for modifier logic improves maintainability
 
 ### 🐛 Fixed
+- **Rotation/Scale Increment Values**: Fixed rotation and scale increments not using configured values
+  - Keyboard rotation now correctly uses `rotation_increment`, `fine_rotation_increment`, and `large_rotation_increment` from settings
+  - Mouse wheel rotation now correctly uses `fine_rotation_increment` (default) and `large_rotation_increment` (with ALT)
+  - Keyboard scale now correctly uses `scale_increment`, `fine_scale_increment`, and `large_scale_increment` from settings
+  - Previously used multiplier-based calculations (base × 5 = 75°) instead of configured values (90°)
+  - Large increment rotation with ALT now applies exactly 90° as configured, not 75° (15° × 5)
+  - Fine increment rotation with CTRL now applies exactly 5° as configured, not 1.5° (15° × 0.1)
 - **Position Offset Persistence**: Fixed position offsets not persisting between placement and transform modes
   - Unified both modes to use `PositionManager.manual_position_offset` for WASD position adjustments
   - Removed redundant `accumulated_xz_delta` tracking from transform mode

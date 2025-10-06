@@ -690,19 +690,19 @@ static func _process_rotation_input(rotation_input: Dictionary, target_node: Nod
 	if not target_node:
 		return
 	
-	# Handle rotation keys - use proper increment sizes and modifiers
-	# Priority: Large increment modifier > CTRL (fine) > Base
-	# These should be mutually exclusive - only one size modifier at a time
+	# Determine which increment to use based on modifiers (explicit values from settings)
 	var rotation_step: float
-	
-	if rotation_input.large_increment_modifier_held and not rotation_input.fine_increment_modifier_held:  # Large increment modifier only
+	if rotation_input.large_increment_modifier_held:
 		rotation_step = settings.get("large_rotation_increment", 90.0)
-	elif rotation_input.fine_increment_modifier_held and not rotation_input.large_increment_modifier_held:  # FINE_INCREMENT_MODIFIER only = fine increment
+		PluginLogger.debug("TransformationManager", "Using LARGE rotation increment: " + str(rotation_step) + "°")
+	elif rotation_input.fine_increment_modifier_held:
 		rotation_step = settings.get("fine_rotation_increment", 5.0)
-	else:  # No modifier or both (default to base)
+		PluginLogger.debug("TransformationManager", "Using FINE rotation increment: " + str(rotation_step) + "°")
+	else:
 		rotation_step = settings.get("rotation_increment", 15.0)
+		PluginLogger.debug("TransformationManager", "Using BASE rotation increment: " + str(rotation_step) + "°")
 	
-	# Apply reverse direction modifier (configurable)
+	# Apply reverse modifier (negative direction)
 	if rotation_input.reverse_modifier_held:
 		rotation_step = -rotation_step
 	
@@ -726,24 +726,20 @@ static func _process_scale_input(scale_input: Dictionary, target_node: Node3D = 
 	if not target_node:
 		return
 		
-	var scale_step = settings.get("scale_increment", 0.1)  # Default
-	var reverse_scale = scale_input.reverse_modifier_held  # Configurable reverse modifier
-	
-	# Apply modifier for increment size
-	if scale_input.large_increment_modifier_held:  # Configurable large increment modifier
+	# Determine which increment to use based on modifiers (explicit values from settings)
+	var scale_step: float
+	if scale_input.large_increment_modifier_held:
 		scale_step = settings.get("large_scale_increment", 0.5)
+	elif scale_input.fine_increment_modifier_held:
+		scale_step = settings.get("fine_scale_increment", 0.01)
+	else:
+		scale_step = settings.get("scale_increment", 0.1)
 	
 	if scale_input.up_pressed:
-		if reverse_scale:
-			ScaleManager.decrease_scale(scale_step)
-		else:
-			ScaleManager.increase_scale(scale_step)
+		ScaleManager.increase_scale(scale_step)
 		ScaleManager.apply_uniform_scale_to_node(target_node, original_scale)
 	elif scale_input.down_pressed:
-		if reverse_scale:
-			ScaleManager.increase_scale(scale_step)
-		else:
-			ScaleManager.decrease_scale(scale_step)
+		ScaleManager.decrease_scale(scale_step)
 		ScaleManager.apply_uniform_scale_to_node(target_node, original_scale)
 	elif scale_input.reset_pressed:
 		ScaleManager.reset_scale()
@@ -870,16 +866,20 @@ static func _apply_rotation_adjustment(wheel_input: Dictionary):
 	var large_increment = wheel_input.get("large_increment", false)
 	var reverse = wheel_input.get("reverse_modifier", false)
 	
-	# Mouse wheel: ALT = large increment, otherwise fine adjustment
-	# Use explicit if/else to prevent accidental addition of increments
-	var step: float
+	# Mouse wheel: Use configured increment values
+	# Wheel without modifiers = fine increment, with ALT = large increment
+	var rotation_step: float
 	if large_increment:
-		step = settings.get("large_rotation_increment", 90.0)
+		rotation_step = settings.get("large_rotation_increment", 90.0)
 	else:
-		step = settings.get("fine_rotation_increment", 5.0)
+		# Mouse wheel uses fine increment by default (unless ALT held for large)
+		rotation_step = settings.get("fine_rotation_increment", 5.0)
 	
+	# Apply reverse modifier (negative direction)
 	if reverse:
-		direction = -direction
+		rotation_step = -rotation_step
+	
+	var step = rotation_step
 	
 	if current_mode == Mode.PLACEMENT:
 		var target_node = PreviewManager.preview_mesh
@@ -895,81 +895,10 @@ static func _apply_rotation_adjustment(wheel_input: Dictionary):
 				RotationManager.apply_rotation_step(node, axis, step * direction, node_original_rotation, false)
 
 static func _apply_position_adjustment(wheel_input: Dictionary):
-	"""Apply position adjustment based on wheel input"""
-	var direction = wheel_input.get("direction", 0)
-	var axis = wheel_input.get("axis", "forward")
-	var reverse = wheel_input.get("reverse_modifier", false)
-	
-	# Mouse wheel uses fine adjustment by default
-	var step = settings.get("fine_position_increment", 0.01)
-	
-	if reverse:
-		direction = -direction
-	
-	# Calculate the actual movement delta based on axis
-	var movement_delta = step * direction
-	
-	if current_mode == Mode.PLACEMENT:
-		# Use PositionManager functions to properly update manual_position_offset
-		var camera = EditorInterface.get_editor_viewport_3d(0).get_camera_3d()
-		match axis:
-			"forward":
-				PositionManager.move_forward(movement_delta, camera)
-			"backward":
-				PositionManager.move_backward(movement_delta, camera)
-			"left":
-				PositionManager.move_left(movement_delta, camera)
-			"right":
-				PositionManager.move_right(movement_delta, camera)
-		
-		# Update preview position with the new offset
-		var preview_pos = PositionManager.get_current_position()
-		PreviewManager.update_preview_position(preview_pos)
-	
-	elif current_mode == Mode.TRANSFORM:
-		# Apply position adjustment to ALL nodes in transform mode
-		var target_nodes = transform_data.get("target_nodes", [])
-		if not target_nodes.is_empty():
-			# Get current camera for relative movement
-			var camera = EditorInterface.get_editor_viewport_3d(0).get_camera_3d()
-			if camera:
-				# Calculate camera-relative directions (snapped to axes like keyboard input)
-				var camera_forward = Vector3(0, 0, -1)
-				var camera_right = Vector3(1, 0, 0)
-				
-				# Get camera forward and project to XZ plane
-				var cam_forward = -camera.global_transform.basis.z
-				cam_forward.y = 0
-				cam_forward = cam_forward.normalized()
-				
-				# Snap forward to nearest axis (Z or X)
-				if abs(cam_forward.z) > abs(cam_forward.x):
-					camera_forward = Vector3(0, 0, sign(cam_forward.z))
-				else:
-					camera_forward = Vector3(sign(cam_forward.x), 0, 0)
-				
-				# Get camera right and project to XZ plane
-				var cam_right = camera.global_transform.basis.x
-				cam_right.y = 0
-				cam_right = cam_right.normalized()
-				
-				# Snap right to nearest axis (X or Z)
-				if abs(cam_right.x) > abs(cam_right.z):
-					camera_right = Vector3(sign(cam_right.x), 0, 0)
-				else:
-					camera_right = Vector3(0, 0, sign(cam_right.z))
-				
-				# Add to PositionManager.manual_position_offset based on axis
-				# This ensures position offsets are shared between placement and transform modes
-				match axis:
-					"forward":
-						PositionManager.manual_position_offset += camera_forward * movement_delta
-					"backward":
-						PositionManager.manual_position_offset -= camera_forward * movement_delta
-					"left":
-						PositionManager.manual_position_offset -= camera_right * movement_delta
-					"right":
-						PositionManager.manual_position_offset += camera_right * movement_delta
+	"""Apply position adjustment based on wheel input (currently not used for mouse wheel)"""
+	# This function is reserved for future mouse wheel position adjustments
+	# Currently, position adjustments are done via keyboard only
+	pass
 
 ## TAB KEY COORDINATION
 

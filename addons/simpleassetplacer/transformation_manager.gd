@@ -308,18 +308,24 @@ static func _update_grid_overlay():
 		var grid_extent = int(ceil(grid_extent_units / grid_size))
 		grid_extent = clamp(grid_extent, 5, 100)  # Min 5, max 100 cells
 		
-		# Check if grid needs updating based on position, height, or existence
+		# Check if grid needs updating based on position, height, half-step mode, or existence
 		var distance_from_last_center = center.distance_to(last_grid_center)
 		var current_height = center.y
 		var height_changed = abs(current_height - last_grid_height) > 0.01
+		var half_step_active = PositionManager.use_half_step
 		var needs_update = distance_from_last_center > grid_update_threshold or height_changed
 		
-		# Also check if grid overlay exists
+		# Also check if grid overlay exists or if half-step grid needs to be toggled
 		if not OverlayManager.grid_overlay or not is_instance_valid(OverlayManager.grid_overlay):
 			needs_update = true
 		
+		# Check if half-step grid state changed
+		var half_step_exists = OverlayManager.half_step_grid_overlay and is_instance_valid(OverlayManager.half_step_grid_overlay)
+		if half_step_active != half_step_exists:
+			needs_update = true
+		
 		if needs_update:
-			OverlayManager.create_grid_overlay(center, grid_size, grid_extent, offset)
+			OverlayManager.create_grid_overlay(center, grid_size, grid_extent, offset, half_step_active)
 			last_grid_center = center
 			last_grid_height = current_height
 	else:

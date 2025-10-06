@@ -37,7 +37,8 @@ static var rotation_overlay: Control = null
 static var scale_overlay: Control = null
 static var position_overlay: Control = null
 static var status_overlay: Control = null
-static var grid_overlay: Node3D = null  # 3D grid visualization
+static var grid_overlay: Node3D = null  # 3D grid visualization (main grid)
+static var half_step_grid_overlay: Node3D = null  # 3D half-step grid visualization (red)
 
 # Overlay state
 static var overlays_initialized: bool = false
@@ -463,6 +464,10 @@ static func cleanup_all_overlays():
 		grid_overlay.queue_free()
 		grid_overlay = null
 	
+	if half_step_grid_overlay and is_instance_valid(half_step_grid_overlay):
+		half_step_grid_overlay.queue_free()
+		half_step_grid_overlay = null
+	
 	if main_overlay and is_instance_valid(main_overlay):
 		main_overlay.queue_free()
 		main_overlay = null
@@ -504,23 +509,27 @@ static func configure_overlay_positions(positions: Dictionary):
 
 ## Grid Overlay
 
-static func create_grid_overlay(center: Vector3, grid_size: float, grid_extent: int = 10, offset: Vector3 = Vector3.ZERO):
+static func create_grid_overlay(center: Vector3, grid_size: float, grid_extent: int = 10, offset: Vector3 = Vector3.ZERO, show_half_step: bool = false):
 	"""Create a 3D grid visualization in the world
 	center: Center position of the grid
 	grid_size: Size of each grid cell
 	grid_extent: Number of cells in each direction from center
-	offset: Grid offset from world origin"""
+	offset: Grid offset from world origin
+	show_half_step: If true, show a red half-step grid overlay"""
 	
-	# Clean up existing grid
+	# Clean up existing grids
 	if grid_overlay and is_instance_valid(grid_overlay):
 		grid_overlay.queue_free()
+	if half_step_grid_overlay and is_instance_valid(half_step_grid_overlay):
+		half_step_grid_overlay.queue_free()
+		half_step_grid_overlay = null
 	
 	# Get the 3D editor viewport
 	var editor_root = EditorInterface.get_edited_scene_root()
 	if not editor_root:
 		return
 	
-	# Create grid node
+	# Create main grid node
 	grid_overlay = MeshInstance3D.new()
 	grid_overlay.name = "AssetPlacerGrid"
 	
@@ -533,7 +542,7 @@ static func create_grid_overlay(center: Vector3, grid_size: float, grid_extent: 
 	var immediate_mesh = ImmediateMesh.new()
 	grid_overlay.mesh = immediate_mesh
 	
-	# Create material for grid lines
+	# Create material for main grid lines
 	var material = StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.albedo_color = Color(0.5, 0.8, 1.0, 0.3)  # Light blue, semi-transparent
@@ -542,7 +551,7 @@ static func create_grid_overlay(center: Vector3, grid_size: float, grid_extent: 
 	material.disable_receive_shadows = true
 	grid_overlay.material_override = material
 	
-	# Draw grid lines
+	# Draw main grid lines
 	immediate_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
 	
 	# Calculate the range of grid lines to draw based on center position
@@ -577,29 +586,99 @@ static func create_grid_overlay(center: Vector3, grid_size: float, grid_extent: 
 	
 	immediate_mesh.surface_end()
 	
-	# Add to scene
+	# Add main grid to scene
 	editor_root.add_child(grid_overlay)
 	grid_overlay.global_position = Vector3.ZERO  # Lines use absolute world coordinates
+	
+	# Create half-step grid if requested
+	if show_half_step:
+		_create_half_step_grid(center, grid_size * 0.5, grid_extent * 2, offset, editor_root)
 
-static func update_grid_overlay(center: Vector3, grid_size: float, grid_extent: int = 10, offset: Vector3 = Vector3.ZERO):
+static func _create_half_step_grid(center: Vector3, half_grid_size: float, grid_extent: int, offset: Vector3, editor_root: Node):
+	"""Create a red half-step grid overlay for fine snapping visualization"""
+	
+	# Create half-step grid node
+	half_step_grid_overlay = MeshInstance3D.new()
+	half_step_grid_overlay.name = "AssetPlacerHalfStepGrid"
+	half_step_grid_overlay.top_level = true
+	
+	# Create half-step grid mesh
+	var half_mesh = ImmediateMesh.new()
+	half_step_grid_overlay.mesh = half_mesh
+	
+	# Create material for half-step grid lines (red, more transparent)
+	var half_material = StandardMaterial3D.new()
+	half_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	half_material.albedo_color = Color(1.0, 0.3, 0.3, 0.25)  # Red, semi-transparent
+	half_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	half_material.no_depth_test = true  # Always visible
+	half_material.disable_receive_shadows = true
+	half_step_grid_overlay.material_override = half_material
+	
+	# Draw half-step grid lines
+	half_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
+	
+	# Calculate grid positions for half-step grid
+	var center_grid_x = round((center.x - offset.x) / half_grid_size)
+	var center_grid_z = round((center.z - offset.z) / half_grid_size)
+	
+	var start_grid_x = center_grid_x - grid_extent
+	var end_grid_x = center_grid_x + grid_extent
+	var start_grid_z = center_grid_z - grid_extent
+	var end_grid_z = center_grid_z + grid_extent
+	
+	var y = center.y + 0.01  # Slightly above main grid to prevent z-fighting
+	
+	# Draw lines parallel to X axis (running along Z direction)
+	for grid_z in range(start_grid_z, end_grid_z + 1):
+		var z = grid_z * half_grid_size + offset.z
+		var x_start = start_grid_x * half_grid_size + offset.x
+		var x_end = end_grid_x * half_grid_size + offset.x
+		
+		half_mesh.surface_add_vertex(Vector3(x_start, y, z))
+		half_mesh.surface_add_vertex(Vector3(x_end, y, z))
+	
+	# Draw lines parallel to Z axis (running along X direction)
+	for grid_x in range(start_grid_x, end_grid_x + 1):
+		var x = grid_x * half_grid_size + offset.x
+		var z_start = start_grid_z * half_grid_size + offset.z
+		var z_end = end_grid_z * half_grid_size + offset.z
+		
+		half_mesh.surface_add_vertex(Vector3(x, y, z_start))
+		half_mesh.surface_add_vertex(Vector3(x, y, z_end))
+	
+	half_mesh.surface_end()
+	
+	# Add half-step grid to scene
+	editor_root.add_child(half_step_grid_overlay)
+	half_step_grid_overlay.global_position = Vector3.ZERO
+
+static func update_grid_overlay(center: Vector3, grid_size: float, grid_extent: int = 10, offset: Vector3 = Vector3.ZERO, show_half_step: bool = false):
 	"""Update existing grid or create new one"""
-	create_grid_overlay(center, grid_size, grid_extent, offset)
+	create_grid_overlay(center, grid_size, grid_extent, offset, show_half_step)
 
 static func hide_grid_overlay():
 	"""Hide the grid overlay"""
 	if grid_overlay and is_instance_valid(grid_overlay):
 		grid_overlay.visible = false
+	if half_step_grid_overlay and is_instance_valid(half_step_grid_overlay):
+		half_step_grid_overlay.visible = false
 
 static func show_grid_overlay():
 	"""Show the grid overlay"""
 	if grid_overlay and is_instance_valid(grid_overlay):
 		grid_overlay.visible = true
+	if half_step_grid_overlay and is_instance_valid(half_step_grid_overlay):
+		half_step_grid_overlay.visible = true
 
 static func remove_grid_overlay():
 	"""Remove and cleanup grid overlay"""
 	if grid_overlay and is_instance_valid(grid_overlay):
 		grid_overlay.queue_free()
 		grid_overlay = null
+	if half_step_grid_overlay and is_instance_valid(half_step_grid_overlay):
+		half_step_grid_overlay.queue_free()
+		half_step_grid_overlay = null
 
 ## Debug and Information
 
@@ -615,3 +694,4 @@ static func debug_print_overlay_state():
 	PluginLogger.debug("OverlayManager", "  Position Overlay Valid: " + str(position_overlay != null and is_instance_valid(position_overlay)))
 	PluginLogger.debug("OverlayManager", "  Status Overlay Valid: " + str(status_overlay != null and is_instance_valid(status_overlay)))
 	PluginLogger.debug("OverlayManager", "  Grid Overlay Valid: " + str(grid_overlay != null and is_instance_valid(grid_overlay)))
+	PluginLogger.debug("OverlayManager", "  Half-Step Grid Overlay Valid: " + str(half_step_grid_overlay != null and is_instance_valid(half_step_grid_overlay)))

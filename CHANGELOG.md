@@ -38,6 +38,12 @@
   - Semi-transparent design that doesn't obstruct the view
   - Updates in real-time when switching strategies via keyboard or settings
   - Only visible during placement or transform mode
+- **Half-Step Grid Visualization**: Visual feedback for fine-increment snapping mode
+  - Red half-step grid appears when fine increment modifier (CTRL by default) is held
+  - Shows grid at half the normal grid size for precise positioning
+  - Automatically updates when toggling between normal and half-step modes
+  - Semi-transparent red overlay layered above main blue grid
+  - Provides immediate visual confirmation of active snapping precision
 
 ### 🔧 Improved
 - **Collision Exclusion System**: Implemented proper self-collision prevention for preview meshes

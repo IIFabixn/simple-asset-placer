@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### 🏗️ Refactored
+- **Settings System Architecture**: Major refactoring of placement settings for improved maintainability
+  - Reduced `placement_settings.gd` from 2,178 lines to 301 lines (86% reduction)
+  - Created data-driven architecture with helper classes:
+    - `settings_definition.gd` (229 lines) - Single source of truth for all settings metadata
+    - `settings_ui_builder.gd` (234 lines) - Automated UI generation from settings definitions
+    - `settings_persistence.gd` (109 lines) - Centralized save/load operations
+  - Adding new settings now requires only 1 line instead of editing 15+ locations
+  - All settings handled uniformly through metadata-driven approach
+  - Eliminated 1,000+ lines of repetitive UI creation code
+  - Eliminated 400+ lines of repetitive save/load code
+  - Eliminated 200+ lines of signal connection/disconnection code
+  - 100% backward compatible - no changes needed to existing code
+  - Overall reduction: 60% (from 2,178 to 873 lines across 4 files)
+
 ### 🔧 Improved
 - **Increment Calculation System**: Introduced centralized increment calculation to eliminate code duplication
   - Created new `IncrementCalculator` utility class for unified step calculations with modifier support

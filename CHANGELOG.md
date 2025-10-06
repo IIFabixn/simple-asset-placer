@@ -12,6 +12,10 @@
   - Single source of truth for modifier logic improves maintainability
 
 ### 🐛 Fixed
+- **Reset Position on Exit Signal Connection**: Fixed missing signal reconnection for "Reset Position Offset" checkbox
+  - Added missing signal disconnect/reconnect for `reset_position_on_exit_check` in `_disconnect_ui_signals()` and `_connect_ui_signals()` methods
+  - Ensures setting updates are properly captured when UI signals are refreshed
+  - Maintains consistency with other reset behavior checkboxes (height, scale, rotation)
 - **Rotation/Scale Increment Values**: Fixed rotation and scale increments not using configured values
   - Keyboard rotation now correctly uses `rotation_increment`, `fine_rotation_increment`, and `large_rotation_increment` from settings
   - Mouse wheel rotation now correctly uses `fine_rotation_increment` (default) and `large_rotation_increment` (with ALT)

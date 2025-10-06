@@ -2069,6 +2069,8 @@ func _disconnect_ui_signals():
 		reset_scale_on_exit_check.toggled.disconnect(_on_setting_changed)
 	if reset_rotation_on_exit_check and reset_rotation_on_exit_check.toggled.is_connected(_on_setting_changed):
 		reset_rotation_on_exit_check.toggled.disconnect(_on_setting_changed)
+	if reset_position_on_exit_check and reset_position_on_exit_check.toggled.is_connected(_on_setting_changed):
+		reset_position_on_exit_check.toggled.disconnect(_on_setting_changed)
 	
 	# Disconnect grid control signals
 	var grid_extent_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/GridExtentSpin")
@@ -2131,6 +2133,8 @@ func _connect_ui_signals():
 		reset_scale_on_exit_check.toggled.connect(_on_setting_changed)
 	if reset_rotation_on_exit_check and not reset_rotation_on_exit_check.toggled.is_connected(_on_setting_changed):
 		reset_rotation_on_exit_check.toggled.connect(_on_setting_changed)
+	if reset_position_on_exit_check and not reset_position_on_exit_check.toggled.is_connected(_on_setting_changed):
+		reset_position_on_exit_check.toggled.connect(_on_setting_changed)
 	
 	# Reconnect grid control signals
 	var grid_extent_spin = get_node_or_null("ScrollContainer/MarginContainer/VBoxContainer/SettingsGrid/GridExtentSpin")

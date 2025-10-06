@@ -178,25 +178,13 @@ static func start_transform_mode(target_nodes, dock_instance = null):
 		if node.is_inside_tree():
 			node_offsets[node] = node.global_position - center_pos
 	
-	# Calculate snap offset ONCE at mode start to prevent jumping when snapping is enabled
-	# This preserves the original position relative to the grid
-	var snap_offset = Vector3.ZERO
-	if PositionManager.snap_enabled:
-		# Simulate what snapping would do to the center position
-		var snapped_center = center_pos
-		if PositionManager.snap_enabled:
-			snapped_center = PositionManager._apply_grid_snap(center_pos)
-		# Calculate offset needed to maintain original position
-		snap_offset = center_pos - snapped_center
-	
 	transform_data = {
 		"target_nodes": valid_nodes,  # Array of nodes
 		"original_transforms": original_transforms,  # Dictionary mapping node to original transform
 		"original_center": center_pos,  # Store the original center position
 		"node_offsets": node_offsets,  # Store each node's offset from original center
 		"dock_reference": dock_instance,
-		"accumulated_y_delta": 0.0,  # Track accumulated height adjustments
-		"snap_offset": snap_offset  # Offset to maintain position relative to snapped grid (calculated once at start)
+		"accumulated_y_delta": 0.0  # Track accumulated height adjustments
 	}
 	
 	# Note: WASD position adjustments now use PositionManager.manual_position_offset
@@ -612,15 +600,14 @@ static func _process_transform_input(camera: Camera3D):
 	# Get stored original center and node offsets (calculated once when transform mode started)
 	var original_center = transform_data.get("original_center", Vector3.ZERO)
 	var node_offsets = transform_data.get("node_offsets", {})
-	var snap_offset = transform_data.get("snap_offset", Vector3.ZERO)
 	
 	# Update position from mouse (with snapping if enabled)
+	# This works identically to placement mode:
+	# 1. Raycast to get world position
+	# 2. Apply grid snapping if enabled
+	# 3. Add manual_position_offset (WASD adjustments)
 	PositionManager.update_position_from_mouse(camera, mouse_pos)
-	var mouse_center = PositionManager.get_current_position()
-	
-	# Calculate new center position:
-	# mouse_center (snapped) + snap_offset (preserves original grid alignment) + manual_position_offset (WASD movement)
-	var new_center = mouse_center + snap_offset + PositionManager.manual_position_offset
+	var new_center = PositionManager.get_current_position()
 	
 	# Update surface normal alignment if enabled, otherwise reset it
 	if settings.get("align_with_normal", false):

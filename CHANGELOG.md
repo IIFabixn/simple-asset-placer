@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### 🔧 Improved
+- **Increment Calculation System**: Introduced centralized increment calculation to eliminate code duplication
+  - Created new `IncrementCalculator` utility class for unified step calculations with modifier support
+  - Added `InputHandler.get_modifier_state()` to retrieve all modifier states in a single call
+  - Added `*_with_modifiers()` methods to `RotationManager`, `ScaleManager`, and `PositionManager`
+  - Provides consistent increment scaling across all transform types (rotation, scale, position, height)
+  - Configurable multipliers (default: 5x for large increments, 0.1x for fine increments)
+  - Single source of truth for modifier logic improves maintainability
+
+### 🐛 Fixed
+- **Position Offset Persistence**: Fixed position offsets not persisting between placement and transform modes
+  - Unified both modes to use `PositionManager.manual_position_offset` for WASD position adjustments
+  - Removed redundant `accumulated_xz_delta` tracking from transform mode
+  - Position adjustments made in placement mode now correctly carry over to transform mode
+- **Position Jump on Mode Switch**: Fixed objects jumping to incorrect positions when entering transform mode
+  - Removed problematic `snap_offset` calculation that was causing double application of manual offsets
+  - Transform mode now uses identical positioning logic to placement mode
+  - Both modes follow the same process: raycast → grid snap → add manual offset
+  - Eliminates inconsistencies and ensures smooth mode transitions
+
 ## [1.3.2] - 2025-10-05
 
 ### 🐛 Fixed

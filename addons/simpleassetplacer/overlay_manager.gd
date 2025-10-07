@@ -33,9 +33,6 @@ DEPENDS ON: Godot UI system, EditorInterface for overlay containers
 
 # Overlay references
 static var main_overlay: Control = null
-static var rotation_overlay: Control = null
-static var scale_overlay: Control = null
-static var position_overlay: Control = null
 static var status_overlay: Control = null
 static var grid_overlay: Node3D = null  # 3D grid visualization (main grid)
 static var half_step_grid_overlay: Node3D = null  # 3D half-step grid visualization (red)
@@ -73,155 +70,6 @@ static func _create_main_overlay():
 	
 	# Create unified status overlay
 	_create_status_overlay()
-
-## Rotation Overlay
-
-static func _create_rotation_overlay():
-	"""Create rotation feedback overlay"""
-	if rotation_overlay and is_instance_valid(rotation_overlay):
-		return
-	
-	rotation_overlay = Control.new()
-	rotation_overlay.name = "RotationOverlay"
-	rotation_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	
-	# Create rotation display label
-	var rotation_label = Label.new()
-	rotation_label.name = "RotationLabel"
-	rotation_label.text = "Rotation: X: 0° Y: 0° Z: 0°"
-	rotation_label.add_theme_color_override("font_color", Color.WHITE)
-	rotation_label.add_theme_color_override("font_shadow_color", Color.BLACK)
-	rotation_label.add_theme_constant_override("shadow_offset_x", 2)
-	rotation_label.add_theme_constant_override("shadow_offset_y", 2)
-	rotation_label.position = Vector2(20, 60)
-	
-	rotation_overlay.add_child(rotation_label)
-	
-	if main_overlay:
-		main_overlay.add_child(rotation_overlay)
-	
-	rotation_overlay.visible = false
-
-static func show_rotation_overlay(rotation: Vector3, message: String = ""):
-	"""Show rotation overlay with current values"""
-	if not show_overlays or not rotation_overlay:
-		return
-	
-	var label = rotation_overlay.get_node("RotationLabel")
-	if label:
-		# Convert to degrees and normalize to 0-360 range for display
-		var x_deg = fmod(rad_to_deg(rotation.x) + 360.0, 360.0)
-		var y_deg = fmod(rad_to_deg(rotation.y) + 360.0, 360.0)
-		var z_deg = fmod(rad_to_deg(rotation.z) + 360.0, 360.0)
-		
-		var text = "Rotation: X: %.1f° Y: %.1f° Z: %.1f°" % [x_deg, y_deg, z_deg]
-		if message != "":
-			text += "\n" + message
-		label.text = text
-	
-	rotation_overlay.visible = true
-	rotation_overlay.modulate.a = 1.0
-
-static func hide_rotation_overlay():
-	"""Hide rotation overlay"""
-	if rotation_overlay:
-		rotation_overlay.visible = false
-
-## Scale Overlay
-
-static func _create_scale_overlay():
-	"""Create scale feedback overlay"""
-	if scale_overlay and is_instance_valid(scale_overlay):
-		return
-	
-	scale_overlay = Control.new()
-	scale_overlay.name = "ScaleOverlay"
-	scale_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	
-	# Create scale display label
-	var scale_label = Label.new()
-	scale_label.name = "ScaleLabel"
-	scale_label.text = "Scale: 100%"
-	scale_label.add_theme_color_override("font_color", Color.YELLOW)
-	scale_label.add_theme_color_override("font_shadow_color", Color.BLACK)
-	scale_label.add_theme_constant_override("shadow_offset_x", 2)
-	scale_label.add_theme_constant_override("shadow_offset_y", 2)
-	scale_label.position = Vector2(20, 100)
-	
-	scale_overlay.add_child(scale_label)
-	
-	if main_overlay:
-		main_overlay.add_child(scale_overlay)
-	
-	scale_overlay.visible = false
-
-static func show_scale_overlay(scale_value: float, message: String = ""):
-	"""Show scale overlay with current value"""
-	if not show_overlays or not scale_overlay:
-		return
-	
-	var label = scale_overlay.get_node("ScaleLabel")
-	if label:
-		var text = "Scale: %.1f%%" % (scale_value * 100.0)
-		if message != "":
-			text += " - " + message
-		label.text = text
-	
-	scale_overlay.visible = true
-	scale_overlay.modulate.a = 1.0
-
-static func hide_scale_overlay():
-	"""Hide scale overlay"""
-	if scale_overlay:
-		scale_overlay.visible = false
-
-## Position Overlay
-
-static func _create_position_overlay():
-	"""Create position feedback overlay"""
-	if position_overlay and is_instance_valid(position_overlay):
-		return
-	
-	position_overlay = Control.new()
-	position_overlay.name = "PositionOverlay"
-	position_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	
-	# Create position display label
-	var position_label = Label.new()
-	position_label.name = "PositionLabel"
-	position_label.text = "Position: X: 0.0 Y: 0.0 Z: 0.0"
-	position_label.add_theme_color_override("font_color", Color.CYAN)
-	position_label.add_theme_color_override("font_shadow_color", Color.BLACK)
-	position_label.add_theme_constant_override("shadow_offset_x", 2)
-	position_label.add_theme_constant_override("shadow_offset_y", 2)
-	position_label.position = Vector2(20, 140)
-	
-	position_overlay.add_child(position_label)
-	
-	if main_overlay:
-		main_overlay.add_child(position_overlay)
-	
-	position_overlay.visible = false
-
-static func show_position_overlay(position: Vector3, height_offset: float = 0.0):
-	"""Show position overlay with current values"""
-	if not show_overlays or not position_overlay:
-		return
-	
-	var label = position_overlay.get_node("PositionLabel")
-	if label:
-		var text = "Position: X: %.2f Y: %.2f Z: %.2f" % [position.x, position.y, position.z]
-		if height_offset != 0.0:
-			text += "\nHeight Offset: %.2f" % height_offset
-		label.text = text
-	
-	position_overlay.visible = true
-	position_overlay.modulate.a = 1.0
-
-static func hide_position_overlay():
-	"""Hide position overlay"""
-	if position_overlay:
-		position_overlay.visible = false
 
 ## Status Overlay
 
@@ -398,64 +246,22 @@ static func set_mode(mode: TransformationManager.Mode):
 		TransformationManager.Mode.NONE:
 			hide_transform_overlay()
 
-static func update_mode_display(mode_data: Dictionary):
-	"""Update all overlays based on current mode data"""
-	if not show_overlays:
-		return
-	
-	match current_mode:
-		TransformationManager.Mode.PLACEMENT:
-			if mode_data.has("position"):
-				show_position_overlay(mode_data.position, mode_data.get("height_offset", 0.0))
-			if mode_data.has("rotation"):
-				show_rotation_overlay(mode_data.rotation)
-			if mode_data.has("scale"):
-				show_scale_overlay(mode_data.scale)
-		
-		TransformationManager.Mode.TRANSFORM:
-			if mode_data.has("position"):
-				show_position_overlay(mode_data.position)
-			if mode_data.has("rotation"):
-				show_rotation_overlay(mode_data.rotation, "Transforming...")
-
 ## Overlay Utilities
 
 static func show_all_overlays():
 	"""Show all relevant overlays for current mode"""
 	show_overlays = true
 	
-	if rotation_overlay:
-		rotation_overlay.visible = (current_mode in [TransformationManager.Mode.PLACEMENT, TransformationManager.Mode.TRANSFORM])
-	if scale_overlay:
-		scale_overlay.visible = (current_mode == TransformationManager.Mode.PLACEMENT)
-	if position_overlay:
-		position_overlay.visible = (current_mode in [TransformationManager.Mode.PLACEMENT, TransformationManager.Mode.TRANSFORM])
 	if status_overlay:
 		status_overlay.visible = true
 
 static func hide_all_overlays():
 	"""Hide all overlays"""
 	show_overlays = false
-	
-	hide_rotation_overlay()
-	hide_scale_overlay()
-	hide_position_overlay()
 	hide_status_overlay()
 
 static func cleanup_all_overlays():
 	"""Clean up all overlay resources"""
-	if rotation_overlay and is_instance_valid(rotation_overlay):
-		rotation_overlay.queue_free()
-		rotation_overlay = null
-	
-	if scale_overlay and is_instance_valid(scale_overlay):
-		scale_overlay.queue_free()
-		scale_overlay = null
-	
-	if position_overlay and is_instance_valid(position_overlay):
-		position_overlay.queue_free()
-		position_overlay = null
-	
 	if status_overlay and is_instance_valid(status_overlay):
 		status_overlay.queue_free()
 		status_overlay = null
@@ -486,22 +292,7 @@ static func set_overlay_visibility(visible: bool):
 		hide_all_overlays()
 
 static func configure_overlay_positions(positions: Dictionary):
-	"""Configure overlay positions"""
-	if positions.has("rotation") and rotation_overlay:
-		var label = rotation_overlay.get_node("RotationLabel")
-		if label:
-			label.position = positions.rotation
-	
-	if positions.has("scale") and scale_overlay:
-		var label = scale_overlay.get_node("ScaleLabel")
-		if label:
-			label.position = positions.scale
-	
-	if positions.has("position") and position_overlay:
-		var label = position_overlay.get_node("PositionLabel")
-		if label:
-			label.position = positions.position
-	
+	"""Configure overlay positions"""	
 	if positions.has("status") and status_overlay:
 		var label = status_overlay.get_node("StatusLabel")
 		if label:
@@ -689,9 +480,6 @@ static func debug_print_overlay_state():
 	PluginLogger.debug("OverlayManager", "  Show Overlays: " + str(show_overlays))
 	PluginLogger.debug("OverlayManager", "  Current Mode: " + str(current_mode))
 	PluginLogger.debug("OverlayManager", "  Main Overlay Valid: " + str(main_overlay != null and is_instance_valid(main_overlay)))
-	PluginLogger.debug("OverlayManager", "  Rotation Overlay Valid: " + str(rotation_overlay != null and is_instance_valid(rotation_overlay)))
-	PluginLogger.debug("OverlayManager", "  Scale Overlay Valid: " + str(scale_overlay != null and is_instance_valid(scale_overlay)))
-	PluginLogger.debug("OverlayManager", "  Position Overlay Valid: " + str(position_overlay != null and is_instance_valid(position_overlay)))
 	PluginLogger.debug("OverlayManager", "  Status Overlay Valid: " + str(status_overlay != null and is_instance_valid(status_overlay)))
 	PluginLogger.debug("OverlayManager", "  Grid Overlay Valid: " + str(grid_overlay != null and is_instance_valid(grid_overlay)))
 	PluginLogger.debug("OverlayManager", "  Half-Step Grid Overlay Valid: " + str(half_step_grid_overlay != null and is_instance_valid(half_step_grid_overlay)))

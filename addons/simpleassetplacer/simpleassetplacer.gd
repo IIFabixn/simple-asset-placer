@@ -75,7 +75,7 @@ func _initialize_systems():
 	
 	# Initialize core systems
 	InputHandler.update_input_state({})  # Initialize with empty settings initially
-	PositionManager.configure({})
+	# Note: PositionManager.configure() is called when modes are started with transform_state
 	OverlayManager.initialize_overlays()
 	
 	# Initialize thumbnail system

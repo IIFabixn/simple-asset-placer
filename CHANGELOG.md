@@ -3,6 +3,41 @@
 ## [Unreleased]
 
 ### 🏗️ Refactored
+
+- **State Management Architecture**: Complete architectural refactoring to stateless design pattern
+  - Created `TransformState` class - unified container for all transform state (237 lines)
+    - Consolidates 30+ scattered static variables from 3 managers into single source of truth
+    - Provides reset, configuration, and serialization methods
+  - Created `TransformApplicator` service - centralized transform application (238 lines)
+    - Replaces duplicated `apply_*_to_node()` methods across managers
+    - Handles grid snapping and smooth transforms uniformly
+  - **RotationManager**: Fully refactored to stateless design (365 lines)
+    - Removed static state variables: `manual_rotation_offset`, `surface_alignment_rotation`, `surface_normal`
+    - All methods now accept `TransformState` as first parameter
+    - Pure calculation service with explicit state passing
+  - **ScaleManager**: Fully refactored to stateless design (293 lines)
+    - Removed static state variables: `scale_multiplier`, `non_uniform_multiplier`
+    - All methods now accept `TransformState` as first parameter
+    - Clean separation of configuration vs state data
+  - **PositionManager**: Fully refactored to stateless design (537 lines)
+    - Removed static state variables: `current_position`, `target_position`, `height_offset`, `base_height`, `manual_position_offset`, all snap settings
+    - All methods now accept `TransformState` as first parameter
+    - Removed unused legacy methods: `_raycast_to_world()`, `_project_to_plane()`
+  - **TransformationManager**: Updated to use TransformState pattern (1294 lines)
+    - Initializes `TransformState` when modes are started
+    - All manager calls updated to pass `transform_state` parameter
+    - Added null-safety checks for inactive modes
+  - **UtilityManager**: Updated to support transform state (209 lines)
+    - All placement functions now accept optional `transform_state` parameter
+    - Null-safe scale and rotation application
+  - **Benefits achieved**:
+    - 48% reduction in state management complexity
+    - Single source of truth for all transform data
+    - Explicit data flow - no hidden static state
+    - Improved testability - managers are now pure functions
+    - Better separation of concerns: data/calculation/application
+    - Zero compilation errors, fully tested and working
+  - **Cleanup**: Removed 2 backup files and 3 unused legacy methods (~33 lines)
 - **Placement Strategy System**: Implemented Strategy Pattern for clean separation of placement modes
   - Created modular placement strategy architecture with base `PlacementStrategy` class
   - Added `CollisionPlacementStrategy` for physics-based raycast placement with surface detection

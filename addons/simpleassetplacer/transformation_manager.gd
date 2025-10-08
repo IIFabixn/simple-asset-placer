@@ -42,6 +42,10 @@ const PreviewManager = preload("res://addons/simpleassetplacer/preview_manager.g
 const UtilityManager = preload("res://addons/simpleassetplacer/utility_manager.gd")
 const SmoothTransformManager = preload("res://addons/simpleassetplacer/smooth_transform_manager.gd")
 
+# Import unified state class
+const TransformState = preload("res://addons/simpleassetplacer/transform_state.gd")
+const TransformApplicator = preload("res://addons/simpleassetplacer/transform_applicator.gd")
+
 # === MODE ENUM ===
 
 enum Mode {
@@ -54,6 +58,9 @@ enum Mode {
 
 # Current operation mode
 static var current_mode: Mode = Mode.NONE
+
+# Unified transform state (NEW - replaces scattered state across managers)
+static var transform_state: TransformState = null
 
 # Mode-specific data
 static var placement_data: Dictionary = {}
@@ -88,6 +95,10 @@ static func start_placement_mode(mesh: Mesh = null, meshlib: MeshLibrary = null,
 	current_mode = Mode.PLACEMENT
 	settings = placement_settings
 	
+	# Initialize transform state (NEW)
+	transform_state = TransformState.new()
+	transform_state.configure_from_settings(placement_settings)
+	
 	# Store placement data
 	placement_data = {
 		"mesh": mesh,
@@ -112,8 +123,8 @@ static func start_placement_mode(mesh: Mesh = null, meshlib: MeshLibrary = null,
 	elif asset_path != "":
 		PreviewManager.start_preview_asset(asset_path, placement_settings)
 	
-	# Configure position manager for placement
-	PositionManager.configure(placement_settings)
+	# Configure position manager for placement (NEW - pass transform_state)
+	PositionManager.configure(transform_state, placement_settings)
 	
 	# Configure smooth transformations
 	var smooth_enabled = placement_settings.get("smooth_transforms", true)
@@ -123,16 +134,16 @@ static func start_placement_mode(mesh: Mesh = null, meshlib: MeshLibrary = null,
 	RotationManager.configure_smooth_transforms(smooth_enabled, smooth_speed)
 	ScaleManager.configure_smooth_transforms(smooth_enabled, smooth_speed)
 	
-	# Reset position manager for new placement
+	# Reset position manager for new placement (NEW - pass transform_state)
 	# The first mouse update will set the initial position from raycast
 	# Reset height and position offsets only if the corresponding settings are enabled
 	var reset_height = placement_settings.get("reset_height_on_exit", false)
 	var reset_position = placement_settings.get("reset_position_on_exit", false)
-	PositionManager.reset_for_new_placement(reset_height, reset_position)
+	PositionManager.reset_for_new_placement(transform_state, reset_height, reset_position)
 	
-	# Reset rotation for new placement (unless user wants to keep rotation)
+	# Reset rotation for new placement (unless user wants to keep rotation) (NEW - pass transform_state)
 	if not settings.get("keep_rotation_between_placements", false):
-		RotationManager.reset_all_rotation()
+		RotationManager.reset_all_rotation(transform_state)
 	
 	# Reset grid tracking for new placement
 	last_grid_center = Vector3.ZERO
@@ -171,6 +182,11 @@ static func start_transform_mode(target_nodes, dock_instance = null):
 	
 	# Set mode
 	current_mode = Mode.TRANSFORM
+	
+	# Initialize transform state (NEW)
+	transform_state = TransformState.new()
+	if not settings.is_empty():
+		transform_state.configure_from_settings(settings)
 	
 	# Store transform data for all nodes
 	var original_transforms = {}
@@ -230,9 +246,9 @@ static func start_transform_mode(target_nodes, dock_instance = null):
 				node.scale
 			)
 	
-	# Initialize position manager with center position
-	PositionManager.set_position(center_pos)
-	PositionManager.start_transform_positioning(valid_nodes[0])  # Use first node as reference
+	# Initialize position manager with center position (NEW - pass transform_state)
+	PositionManager.set_position(transform_state, center_pos)
+	PositionManager.start_transform_positioning(transform_state, valid_nodes[0])  # Use first node as reference
 	
 	# Reset grid tracking for new transform session
 	last_grid_center = Vector3.ZERO
@@ -331,7 +347,7 @@ static func _update_grid_overlay():
 		if current_mode == Mode.PLACEMENT:
 			# Use base position (without height offset) for grid placement
 			# No coordinate inversion needed - grid is now independent of scene root transform
-			center = PositionManager.get_base_position()
+			center = PositionManager.get_base_position(transform_state)
 		elif current_mode == Mode.TRANSFORM:
 			# Use center of selected nodes
 			# No coordinate inversion needed - grid is now independent of scene root transform
@@ -404,7 +420,9 @@ static func process_frame_input(camera: Camera3D, input_settings: Dictionary = {
 	# Configure managers with current settings (important for both modes)
 	# This ensures snap settings and other options are always up-to-date
 	# NOTE: This is AFTER navigation input so manual strategy changes take effect first
-	PositionManager.configure(settings)
+	# Only configure if we have an active transform_state (mode is active)
+	if transform_state:
+		PositionManager.configure(transform_state, settings)
 	_configure_smooth_transforms(settings)
 	
 	# Keep grabbing focus for the first few frames after mode starts
@@ -445,8 +463,8 @@ static func _process_placement_input(camera: Camera3D):
 	var height_step = PositionManager.height_step_size  # Base step
 	
 	# Apply Y snap step if Y snapping is enabled
-	if PositionManager.snap_y_enabled:
-		height_step = PositionManager.snap_y_step
+	if transform_state.snap_y_enabled:
+		height_step = transform_state.snap_y_step
 	
 	# Apply modifier keys for increment size
 	if position_input.fine_increment_modifier_held:
@@ -458,12 +476,12 @@ static func _process_placement_input(camera: Camera3D):
 	
 	if position_input.height_up_pressed:
 		var height_change = height_step if not reverse_height else -height_step
-		PositionManager.adjust_height(height_change)
+		PositionManager.adjust_height(transform_state, height_change)
 	elif position_input.height_down_pressed:
 		var height_change = -height_step if not reverse_height else height_step
-		PositionManager.adjust_height(height_change)
+		PositionManager.adjust_height(transform_state, height_change)
 	elif position_input.reset_height_pressed:
-		PositionManager.reset_height()
+		PositionManager.reset_height(transform_state)
 	
 	# Handle position adjustments (WASD-style movement - camera relative)
 	var position_delta = settings.get("position_increment", 0.1)
@@ -500,18 +518,18 @@ static func _process_placement_input(camera: Camera3D):
 	
 	# Handle position adjustments (WASD-style movement) - directly modify manual offset
 	if position_input.position_left_pressed:
-		PositionManager.manual_position_offset -= camera_right * position_delta
+		transform_state.manual_position_offset -= camera_right * position_delta
 	elif position_input.position_right_pressed:
-		PositionManager.manual_position_offset += camera_right * position_delta
+		transform_state.manual_position_offset += camera_right * position_delta
 	
 	if position_input.position_forward_pressed:
-		PositionManager.manual_position_offset += camera_forward * position_delta
+		transform_state.manual_position_offset += camera_forward * position_delta
 	elif position_input.position_backward_pressed:
-		PositionManager.manual_position_offset -= camera_forward * position_delta
+		transform_state.manual_position_offset -= camera_forward * position_delta
 	
 	# Handle position reset
 	if position_input.reset_position_pressed:
-		PositionManager.reset_position()
+		PositionManager.reset_position(transform_state)
 	
 	# Update position from mouse AFTER processing WASD input
 	# This ensures manual offsets are included in the same frame
@@ -524,19 +542,19 @@ static func _process_placement_input(camera: Camera3D):
 	if PreviewManager.preview_mesh and is_instance_valid(PreviewManager.preview_mesh):
 		exclude_nodes.append(PreviewManager.preview_mesh)
 	
-	var world_pos = PositionManager.update_position_from_mouse(camera, mouse_pos, 1, true, exclude_nodes)
+	var world_pos = PositionManager.update_position_from_mouse(transform_state, camera, mouse_pos, 1, true, exclude_nodes)
 	
 	# Get the updated position
-	var preview_pos = PositionManager.get_current_position()
+	var preview_pos = PositionManager.get_current_position(transform_state)
 	
 	# Update preview position
 	PreviewManager.update_preview_position(preview_pos)
 	
 	# Update surface normal alignment if enabled, otherwise reset it
 	if settings.get("align_with_normal", false):
-		RotationManager.align_with_surface_normal(PositionManager.get_surface_normal())
+		RotationManager.align_with_surface_normal(transform_state, PositionManager.get_surface_normal(transform_state))
 	else:
-		RotationManager.reset_surface_alignment()
+		RotationManager.reset_surface_alignment(transform_state)
 	
 	# Handle rotation input (this will be combined with surface alignment)
 	# Don't rotate position offset - this makes rotation behave like transform mode (in-place)
@@ -544,7 +562,7 @@ static func _process_placement_input(camera: Camera3D):
 	
 	# Apply the combined rotation (surface alignment + manual rotation) to the preview mesh
 	if PreviewManager.preview_mesh:
-		RotationManager.apply_rotation_to_node(PreviewManager.preview_mesh)
+		RotationManager.apply_rotation_to_node(transform_state, PreviewManager.preview_mesh)
 	
 	# Handle scale input
 	_process_scale_input(scale_input, PreviewManager.preview_mesh)
@@ -590,8 +608,8 @@ static func _process_transform_input(camera: Camera3D):
 	var height_step = PositionManager.height_step_size  # Base step
 	
 	# Apply Y snap step if Y snapping is enabled (same as placement mode)
-	if PositionManager.snap_y_enabled:
-		height_step = PositionManager.snap_y_step
+	if transform_state.snap_y_enabled:
+		height_step = transform_state.snap_y_step
 	
 	# Apply modifier keys for increment size
 	if position_input.fine_increment_modifier_held:
@@ -647,21 +665,21 @@ static func _process_transform_input(camera: Camera3D):
 		else:
 			camera_right = Vector3(0, 0, sign(cam_right.z))
 	
-	# Handle position adjustments (WASD-style movement) - use PositionManager.manual_position_offset
+	# Handle position adjustments (WASD-style movement) - use transform_state.manual_position_offset
 	# This ensures position offsets are shared between placement and transform modes
 	if position_input.position_left_pressed:
-		PositionManager.manual_position_offset -= camera_right * position_delta  # Left is negative right
+		transform_state.manual_position_offset -= camera_right * position_delta  # Left is negative right
 	elif position_input.position_right_pressed:
-		PositionManager.manual_position_offset += camera_right * position_delta
+		transform_state.manual_position_offset += camera_right * position_delta
 	
 	if position_input.position_forward_pressed:
-		PositionManager.manual_position_offset += camera_forward * position_delta
+		transform_state.manual_position_offset += camera_forward * position_delta
 	elif position_input.position_backward_pressed:
-		PositionManager.manual_position_offset -= camera_forward * position_delta  # Backward is negative forward
+		transform_state.manual_position_offset -= camera_forward * position_delta  # Backward is negative forward
 	
 	# Handle position reset
 	if position_input.reset_position_pressed:
-		PositionManager.reset_position()
+		PositionManager.reset_position(transform_state)
 	
 	# Calculate XZ position using offset-from-center approach for proper grid snapping
 	var mouse_pos = position_input.mouse_position
@@ -679,14 +697,14 @@ static func _process_transform_input(camera: Camera3D):
 	# 2. Apply grid snapping if enabled
 	# 3. Add manual_position_offset (WASD adjustments)
 	# IMPORTANT: Pass target_nodes as exclusions to prevent self-collision
-	PositionManager.update_position_from_mouse(camera, mouse_pos, 1, false, target_nodes)
-	var new_center = PositionManager.get_current_position()
+	PositionManager.update_position_from_mouse(transform_state, camera, mouse_pos, 1, false, target_nodes)
+	var new_center = PositionManager.get_current_position(transform_state)
 	
 	# Update surface normal alignment if enabled, otherwise reset it
 	if settings.get("align_with_normal", false):
-		RotationManager.align_with_surface_normal(PositionManager.get_surface_normal())
+		RotationManager.align_with_surface_normal(transform_state, PositionManager.get_surface_normal(transform_state))
 	else:
-		RotationManager.reset_surface_alignment()
+		RotationManager.reset_surface_alignment(transform_state)
 	
 	# Handle rotation input - process ONCE for all nodes to avoid accumulation
 	# Since RotationManager uses static state, we must not call it multiple times per frame
@@ -699,9 +717,9 @@ static func _process_transform_input(camera: Camera3D):
 			var first_original_rotation = original_transforms.get(first_node, Transform3D()).basis.get_euler()
 			_process_rotation_input(rotation_input, first_node, false, first_original_rotation)
 			rotation_applied = true
-	
+
 	# Get the current rotation offset for group rotation around center
-	var rotation_offset_euler = RotationManager.get_rotation_offset()
+	var rotation_offset_euler = RotationManager.get_rotation_offset(transform_state)
 	var rotation_basis = Basis.from_euler(rotation_offset_euler)
 	
 	# Check if smooth transforms are enabled
@@ -744,7 +762,7 @@ static func _process_transform_input(camera: Camera3D):
 		# Rotation offset is applied on top of the node's original rotation
 		if rotation_applied:
 			var node_original_rotation = original_transforms.get(node, Transform3D()).basis.get_euler()
-			RotationManager.apply_rotation_to_node(node, node_original_rotation)
+			RotationManager.apply_rotation_to_node(transform_state, node, node_original_rotation)
 	
 	# STEP 4: Scale - Apply scale multiplier to node's original scale
 	# final_scale = original_scale * scale_multiplier
@@ -787,11 +805,11 @@ static func _process_rotation_input(rotation_input: Dictionary, target_node: Nod
 		rotation_step = -rotation_step
 	
 	if rotation_input.x_pressed:
-		RotationManager.apply_rotation_step(target_node, "X", rotation_step, original_rotation, rotate_position_offset)
+		RotationManager.apply_rotation_step(transform_state, target_node, "X", rotation_step, original_rotation, rotate_position_offset)
 	elif rotation_input.y_pressed:
-		RotationManager.apply_rotation_step(target_node, "Y", rotation_step, original_rotation, rotate_position_offset)
+		RotationManager.apply_rotation_step(transform_state, target_node, "Y", rotation_step, original_rotation, rotate_position_offset)
 	elif rotation_input.z_pressed:
-		RotationManager.apply_rotation_step(target_node, "Z", rotation_step, original_rotation, rotate_position_offset)
+		RotationManager.apply_rotation_step(transform_state, target_node, "Z", rotation_step, original_rotation, rotate_position_offset)
 	elif rotation_input.reset_pressed:
 		RotationManager.reset_node_rotation(target_node)
 
@@ -816,14 +834,14 @@ static func _process_scale_input(scale_input: Dictionary, target_node: Node3D = 
 		scale_step = settings.get("scale_increment", 0.1)
 	
 	if scale_input.up_pressed:
-		ScaleManager.increase_scale(scale_step)
-		ScaleManager.apply_uniform_scale_to_node(target_node, original_scale)
+		ScaleManager.increase_scale(transform_state, scale_step)
+		ScaleManager.apply_uniform_scale_to_node(transform_state, target_node, original_scale)
 	elif scale_input.down_pressed:
-		ScaleManager.decrease_scale(scale_step)
-		ScaleManager.apply_uniform_scale_to_node(target_node, original_scale)
+		ScaleManager.decrease_scale(transform_state, scale_step)
+		ScaleManager.apply_uniform_scale_to_node(transform_state, target_node, original_scale)
 	elif scale_input.reset_pressed:
-		ScaleManager.reset_scale()
-		ScaleManager.apply_uniform_scale_to_node(target_node, original_scale)
+		ScaleManager.reset_scale(transform_state)
+		ScaleManager.apply_uniform_scale_to_node(transform_state, target_node, original_scale)
 
 static func _process_asset_cycling_input():
 	"""Process asset cycling input during placement mode"""
@@ -917,9 +935,9 @@ static func _apply_height_adjustment(wheel_input: Dictionary):
 	if current_mode == Mode.PLACEMENT:
 		# Apply fine increment for mouse wheel in placement mode
 		if direction > 0:
-			PositionManager.adjust_height(step)
+			PositionManager.adjust_height(transform_state, step)
 		else:
-			PositionManager.adjust_height(-step)
+			PositionManager.adjust_height(transform_state, -step)
 	elif current_mode == Mode.TRANSFORM:
 		# In transform mode, update the accumulated height delta
 		var accumulated_y_delta = transform_data.get("accumulated_y_delta", 0.0)
@@ -943,24 +961,24 @@ static func _apply_scale_adjustment(wheel_input: Dictionary):
 		var target_node = PreviewManager.preview_mesh
 		if target_node:
 			if direction > 0:
-				ScaleManager.increase_scale(step)
+				ScaleManager.increase_scale(transform_state, step)
 			else:
-				ScaleManager.decrease_scale(step)
-			ScaleManager.apply_uniform_scale_to_node(target_node, Vector3.ONE)  # Placement mode starts at scale 1.0
+				ScaleManager.decrease_scale(transform_state, step)
+			ScaleManager.apply_uniform_scale_to_node(transform_state, target_node, Vector3.ONE)  # Placement mode starts at scale 1.0
 	elif current_mode == Mode.TRANSFORM:
 		# Apply scale multiplier adjustment to ALL nodes in transform mode (using their original scales)
 		var target_nodes = transform_data.get("target_nodes", [])
 		var original_transforms = transform_data.get("original_transforms", {})
 		if not target_nodes.is_empty():
 			if direction > 0:
-				ScaleManager.increase_scale(step)
+				ScaleManager.increase_scale(transform_state, step)
 			else:
-				ScaleManager.decrease_scale(step)
+				ScaleManager.decrease_scale(transform_state, step)
 			# Apply to all nodes with their original scales
 			for node in target_nodes:
 				if node and node.is_inside_tree():
 					var node_original_scale = original_transforms.get(node, Transform3D()).basis.get_scale()
-					ScaleManager.apply_uniform_scale_to_node(node, node_original_scale)
+					ScaleManager.apply_uniform_scale_to_node(transform_state, node, node_original_scale)
 
 static func _apply_rotation_adjustment(wheel_input: Dictionary):
 	"""Apply rotation adjustment based on wheel input"""
@@ -987,7 +1005,7 @@ static func _apply_rotation_adjustment(wheel_input: Dictionary):
 	if current_mode == Mode.PLACEMENT:
 		var target_node = PreviewManager.preview_mesh
 		if target_node:
-			RotationManager.apply_rotation_step(target_node, axis, step * direction, Vector3.ZERO, false)
+			RotationManager.apply_rotation_step(transform_state, target_node, axis, step * direction, Vector3.ZERO, false)
 	elif current_mode == Mode.TRANSFORM:
 		# Apply rotation offset to ALL nodes in transform mode (using their original rotations)
 		var target_nodes = transform_data.get("target_nodes", [])
@@ -995,7 +1013,7 @@ static func _apply_rotation_adjustment(wheel_input: Dictionary):
 		for node in target_nodes:
 			if node and node.is_inside_tree():
 				var node_original_rotation = original_transforms.get(node, Transform3D()).basis.get_euler()
-				RotationManager.apply_rotation_step(node, axis, step * direction, node_original_rotation, false)
+				RotationManager.apply_rotation_step(transform_state, node, axis, step * direction, node_original_rotation, false)
 
 static func _apply_position_adjustment(wheel_input: Dictionary):
 	"""Apply position adjustment based on wheel input (currently not used for mouse wheel)"""
@@ -1142,10 +1160,10 @@ static func _update_placement_overlays():
 	OverlayManager.show_transform_overlay(
 		Mode.PLACEMENT,
 		current_asset_name,
-		PositionManager.get_current_position(),
+		PositionManager.get_current_position(transform_state),
 		PreviewManager.get_preview_rotation(),
-		ScaleManager.get_scale(),
-		PositionManager.get_height_offset()
+		ScaleManager.get_scale(transform_state),
+		PositionManager.get_height_offset(transform_state)
 	)
 
 static func _update_transform_overlays(target_node: Node3D):
@@ -1169,7 +1187,7 @@ static func place_at_preview_position():
 	if current_mode != Mode.PLACEMENT:
 		return
 	
-	var position = PositionManager.get_current_position()
+	var position = PositionManager.get_current_position(transform_state)
 	var placed_node = null
 	
 	# Use internal placement functions
@@ -1178,19 +1196,22 @@ static func place_at_preview_position():
 			placement_data.meshlib, 
 			placement_data.item_id, 
 			position, 
-			placement_data.get("settings", {})
+			placement_data.get("settings", {}),
+			transform_state
 		)
 	elif placement_data.get("asset_path", "") != "":
 		placed_node = UtilityManager.place_asset_in_scene(
 			placement_data.asset_path,
 			position,
-			placement_data.get("settings", {})
+			placement_data.get("settings", {}),
+			transform_state
 		)
 	elif placement_data.get("mesh"):
 		placed_node = UtilityManager.place_mesh_in_scene(
 			placement_data.mesh,
 			position,
-			placement_data.get("settings", {})
+			placement_data.get("settings", {}),
+			transform_state
 		)
 	
 	# Call placement callback
@@ -1233,7 +1254,7 @@ static func get_current_mode_string() -> String:
 
 static func get_current_scale() -> float:
 	"""Get current scale multiplier"""
-	return ScaleManager.get_scale()
+	return ScaleManager.get_scale(transform_state)
 
 ## CLEANUP
 
@@ -1253,20 +1274,20 @@ static func _reset_transforms_on_exit():
 	"""Reset transforms based on user settings when exiting modes"""
 	# Reset height offset if enabled
 	if settings.get("reset_height_on_exit", false):
-		PositionManager.reset_height()
+		PositionManager.reset_height(transform_state)
 	
 	# Reset position offset if enabled
 	if settings.get("reset_position_on_exit", false):
-		PositionManager.reset_position()
+		PositionManager.reset_position(transform_state)
 	
 	# Reset scale if enabled
 	if settings.get("reset_scale_on_exit", false):
-		ScaleManager.reset_scale()
+		ScaleManager.reset_scale(transform_state)
 	
 	# Reset rotation if enabled
 	if settings.get("reset_rotation_on_exit", false):
-		RotationManager.reset_rotation()
+		RotationManager.reset_rotation(transform_state)
 	
 	# Always reset surface alignment when exiting modes
-	RotationManager.reset_surface_alignment()
+	RotationManager.reset_surface_alignment(transform_state)
 

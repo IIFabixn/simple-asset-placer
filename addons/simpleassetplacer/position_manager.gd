@@ -4,69 +4,56 @@ extends RefCounted
 class_name PositionManager
 
 """
-3D POSITIONING AND COLLISION SYSTEM (REFACTORED WITH STRATEGY PATTERN)
-======================================================================
+3D POSITIONING AND COLLISION SYSTEM (REFACTORED - STATELESS)
+============================================================
 
-PURPOSE: Handles all 3D positioning logic using pluggable placement strategies.
+PURPOSE: Pure position calculation service working with TransformState.
 
 RESPONSIBILITIES:
-- Coordinate placement strategy selection and configuration
-- Manage height offset and manual position adjustments
-- Handle grid snapping and position constraints
-- Smooth interpolation between positions
-- Transform mode positioning
+- Position calculations using placement strategies
+- Height offset calculations
+- Grid snapping calculations
+- Position constraint validation
+- Camera-relative movement calculations
 
-STRATEGY PATTERN: Delegates position calculation to PlacementStrategyManager which
-selects between collision-based or plane-based placement strategies.
+ARCHITECTURE POSITION: Pure calculation service with NO state storage
+- Does NOT store position state (uses TransformState)
+- Does NOT handle input detection
+- Does NOT handle UI or overlays
+- Delegates actual raycasting to PlacementStrategyManager
+- Focused solely on position math
 
-ARCHITECTURE POSITION: Position coordinator that delegates to strategies
-- Does NOT handle input detection (receives requests from TransformationManager)
-- Does NOT handle UI or overlays  
-- Does NOT directly perform raycasting (delegates to strategies)
+REFACTORED: State moved to TransformState
 
-USED BY: TransformationManager for all positioning operations
-DEPENDS ON: PlacementStrategyManager, camera for raycasting
+USED BY: TransformationManager for positioning calculations
+DEPENDS ON: TransformState, PlacementStrategyManager, IncrementCalculator
 """
 
-# Import strategy manager
+# Import dependencies
+const TransformState = preload("res://addons/simpleassetplacer/transform_state.gd")
 const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placement_strategy_manager.gd")
 const PlacementStrategy = preload("res://addons/simpleassetplacer/placement_strategy.gd")
 const IncrementCalculator = preload("res://addons/simpleassetplacer/increment_calculator.gd")
 const PluginLogger = preload("res://addons/simpleassetplacer/plugin_logger.gd")
 
-# Current position state
-static var current_position: Vector3 = Vector3.ZERO
-static var target_position: Vector3 = Vector3.ZERO
-static var height_offset: float = 0.0
-static var base_height: float = 0.0
-static var surface_normal: Vector3 = Vector3.UP  # Normal of the surface at current position
-static var is_initial_position: bool = true  # Track if this is the first position update
-static var manual_position_offset: Vector3 = Vector3.ZERO  # Accumulated WASD position adjustments
-static var last_raycast_xz: Vector2 = Vector2.ZERO  # Track last raycast XZ position (without offsets) for change detection
-
-# Position calculation settings
+# Configuration settings (not state - these are configuration values)
 static var height_step_size: float = 0.1
-static var collision_mask: int = 1  # Default collision layer
-static var snap_enabled: bool = false  # Grid snapping enabled
-static var snap_step: float = 1.0  # Grid size for snapping
-static var snap_offset: Vector3 = Vector3.ZERO  # Grid offset from world origin
-static var snap_y_enabled: bool = false  # Enable Y-axis snapping
-static var snap_y_step: float = 1.0  # Grid size for Y-axis snapping
-static var snap_center_x: bool = false  # Snap to grid using center position on X-axis
-static var snap_center_y: bool = false  # Snap to grid using center position on Y-axis
-static var snap_center_z: bool = false  # Snap to grid using center position on Z-axis
-static var use_half_step: bool = false  # Use half-step snapping (for CTRL modifier)
+static var collision_mask: int = 1
+static var use_half_step: bool = false
+static var align_with_normal: bool = false
+static var snap_to_ground: bool = true
 
-# Legacy settings (now handled by placement strategies)
-static var align_with_normal: bool = false  # Align rotation with surface normal
-static var snap_to_ground: bool = true  # Legacy: maps to collision strategy
+# Position interpolation settings (not state)
+static var interpolation_enabled: bool = false
+static var interpolation_speed: float = 10.0
 
 ## Core Position Management (REFACTORED)
 
-static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, collision_layer: int = 1, lock_y_axis: bool = false, exclude_nodes: Array = []) -> Vector3:
+static func update_position_from_mouse(state: TransformState, camera: Camera3D, mouse_pos: Vector2, collision_layer: int = 1, lock_y_axis: bool = false, exclude_nodes: Array = []) -> Vector3:
 	"""Update target position based on mouse position using placement strategy
 	
 	Args:
+		state: TransformState to update
 		camera: Camera3D for ray projection
 		mouse_pos: Mouse position in viewport coordinates
 		collision_layer: Physics collision layer (legacy, now in config)
@@ -77,7 +64,7 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 		Calculated world position
 	"""
 	if not camera:
-		return current_position
+		return state.position
 	
 	# Create ray from camera through mouse position
 	var from = camera.project_ray_origin(mouse_pos)
@@ -92,92 +79,77 @@ static func update_position_from_mouse(camera: Camera3D, mouse_pos: Vector2, col
 	# Check if we got a valid result
 	if result.position == Vector3.INF:
 		# Invalid result - keep current position
-		return current_position
+		return state.position
 	
 	var new_pos = result.position
 	
 	# Update surface normal for rotation alignment
-	surface_normal = result.normal
+	state.surface_normal = result.normal
 	
 	# Determine Y position based on lock_y_axis flag, alignment mode, and whether this is initial positioning
 	var should_update_base_height = false
 	
-	if align_with_normal or not lock_y_axis or is_initial_position:
+	if align_with_normal or not lock_y_axis or state.is_initial_position:
 		should_update_base_height = true
 	elif lock_y_axis:
 		# Only update base height if XZ position changed significantly
 		var new_xz = Vector2(new_pos.x, new_pos.z)
-		var xz_distance = new_xz.distance_to(last_raycast_xz)
+		var xz_distance = new_xz.distance_to(state.last_raycast_xz)
 		should_update_base_height = xz_distance > 0.1
 	
 	if should_update_base_height:
 		# Update base_height from strategy result
-		base_height = new_pos.y
-		last_raycast_xz = Vector2(new_pos.x, new_pos.z)
+		state.base_height = new_pos.y
+		state.last_raycast_xz = Vector2(new_pos.x, new_pos.z)
 		
 		# When aligning with normal, apply height offset along the surface normal direction
-		if align_with_normal and height_offset != 0.0:
-			var offset_vector = surface_normal.normalized() * height_offset
-			target_position = new_pos + offset_vector
+		if align_with_normal and state.height_offset != 0.0:
+			var offset_vector = state.surface_normal.normalized() * state.height_offset
+			state.target_position = new_pos + offset_vector
 		else:
 			# Standard: just offset Y-axis
-			target_position.x = new_pos.x
-			target_position.z = new_pos.z
-			target_position.y = base_height + height_offset
+			state.target_position.x = new_pos.x
+			state.target_position.z = new_pos.z
+			state.target_position.y = state.base_height + state.height_offset
 		
-		is_initial_position = false
+		state.is_initial_position = false
 	else:
 		# Use base_height + height_offset (manual control only)
-		target_position.x = new_pos.x
-		target_position.z = new_pos.z
-		target_position.y = base_height + height_offset
+		state.target_position.x = new_pos.x
+		state.target_position.z = new_pos.z
+		state.target_position.y = state.base_height + state.height_offset
 	
 	# Apply grid snapping if enabled (to base position only)
-	if snap_enabled:
-		target_position = _apply_grid_snap(target_position)
+	if state.snap_enabled:
+		state.target_position = _apply_grid_snap(state, state.target_position)
 	
 	# Apply manual position offset (from WASD keys) AFTER snapping
-	target_position += manual_position_offset
+	state.target_position += state.manual_position_offset
 	
 	# Update current position
-	current_position = target_position
+	state.position = state.target_position
 	
-	return current_position
+	return state.position
 
-## Legacy Methods (Deprecated - kept for compatibility)
-# These methods are no longer used internally but kept in case external code references them
-
-static func _raycast_to_world(from: Vector3, to: Vector3, collision_layer: int) -> Vector3:
-	"""DEPRECATED: Use PlacementStrategyManager instead
-	Legacy raycast method kept for compatibility"""
-	var result = PlacementStrategyManager.calculate_position_with_strategy(from, to, "collision")
-	return result.position if result.position != Vector3.INF else Vector3.INF
-
-static func _project_to_plane(from: Vector3, to: Vector3, plane_y: float = 0.0) -> Vector3:
-	"""DEPRECATED: Use PlacementStrategyManager instead
-	Legacy plane projection kept for compatibility"""
-	var result = PlacementStrategyManager.calculate_position_with_strategy(from, to, "plane")
-	return result.position if result.position != Vector3.INF else Vector3(from.x, base_height, from.z)
-
-static func _apply_grid_snap(pos: Vector3) -> Vector3:
+static func _apply_grid_snap(state: TransformState, pos: Vector3) -> Vector3:
 	"""Apply grid snapping to a position (pivot-based with optional center snapping)"""
-	if not snap_enabled or snap_step <= 0.0:
+	if not state.snap_enabled or state.snap_step <= 0.0:
 		return pos
 	
 	# Determine effective snap step (half if modifier active)
-	var effective_step_x = snap_step if not use_half_step else snap_step * 0.5
-	var effective_step_z = snap_step if not use_half_step else snap_step * 0.5
-	var effective_step_y = snap_y_step if not use_half_step else snap_y_step * 0.5
+	var effective_step_x = state.snap_step if not use_half_step else state.snap_step * 0.5
+	var effective_step_z = state.snap_step if not use_half_step else state.snap_step * 0.5
+	var effective_step_y = state.snap_y_step if not use_half_step else state.snap_y_step * 0.5
 	
 	var snapped_pos = pos
 	
 	# Snap the position directly (no AABB center offset)
-	snapped_pos.x = snappedf(pos.x - snap_offset.x, effective_step_x) + snap_offset.x
-	snapped_pos.z = snappedf(pos.z - snap_offset.z, effective_step_z) + snap_offset.z
+	snapped_pos.x = snappedf(pos.x - state.snap_offset.x, effective_step_x) + state.snap_offset.x
+	snapped_pos.z = snappedf(pos.z - state.snap_offset.z, effective_step_z) + state.snap_offset.z
 	
 	# Handle Y-axis if enabled
-	if snap_y_enabled:
-		snapped_pos.y = snappedf(pos.y - snap_offset.y, effective_step_y) + snap_offset.y
+	if state.snap_y_enabled:
+		snapped_pos.y = snappedf(pos.y - state.snap_offset.y, effective_step_y) + state.snap_offset.y
 	else:
 		snapped_pos.y = pos.y  # Keep original Y
 	
@@ -185,73 +157,75 @@ static func _apply_grid_snap(pos: Vector3) -> Vector3:
 
 ## Height Management
 
-static func update_base_height_from_raycast(y_position: float):
+static func update_base_height_from_raycast(state: TransformState, y_position: float):
 	"""Update base height when a new raycast hit is detected (for initial placement)"""
-	base_height = y_position
-	target_position.y = base_height + height_offset
-	current_position.y = target_position.y
+	state.base_height = y_position
+	state.target_position.y = state.base_height + state.height_offset
+	state.position.y = state.target_position.y
 
-static func adjust_height(delta: float):
+static func adjust_height(state: TransformState, delta: float):
 	"""Adjust the current height offset (state only - position will be updated on next mouse update)"""
-	height_offset += delta
+	state.height_offset += delta
 
-static func adjust_height_with_modifiers(base_delta: float, modifiers: Dictionary):
+static func adjust_height_with_modifiers(state: TransformState, base_delta: float, modifiers: Dictionary):
 	"""Adjust height with modifier-calculated step
 	
 	Args:
+		state: TransformState to modify
 		base_delta: Base height step (e.g., 0.1)
 		modifiers: Modifier state from InputHandler.get_modifier_state()
 	"""
 	var step = IncrementCalculator.calculate_height_step(base_delta, modifiers)
-	adjust_height(step)
+	adjust_height(state, step)
 
-static func increase_height():
+static func increase_height(state: TransformState):
 	"""Increase height by one step"""
 	# Use Y snap step if Y snapping is enabled, otherwise use height step size
-	var step = snap_y_step if snap_y_enabled else height_step_size
-	adjust_height(step)
+	var step = state.snap_y_step if state.snap_y_enabled else height_step_size
+	adjust_height(state, step)
 
-static func decrease_height():
+static func decrease_height(state: TransformState):
 	"""Decrease height by one step"""
 	# Use Y snap step if Y snapping is enabled, otherwise use height step size
-	var step = snap_y_step if snap_y_enabled else height_step_size
-	adjust_height(-step)
+	var step = state.snap_y_step if state.snap_y_enabled else height_step_size
+	adjust_height(state, -step)
 
-static func reset_height():
+static func reset_height(state: TransformState):
 	"""Reset height offset to zero"""
-	height_offset = 0.0
-	target_position.y = base_height
-	current_position = target_position
+	state.height_offset = 0.0
+	state.target_position.y = state.base_height
+	state.position = state.target_position
 
 # Position adjustment functions (camera-relative)
-static func move_left(delta: float, camera: Camera3D = null):
+static func move_left(state: TransformState, delta: float, camera: Camera3D = null):
 	"""Move the position left relative to camera view (state only - position will be updated on next mouse update)"""
 	var move_dir = _get_camera_right_direction(camera) * -1.0  # Left is negative right
 	var movement = move_dir * delta
-	manual_position_offset += movement
+	state.manual_position_offset += movement
 
-static func move_right(delta: float, camera: Camera3D = null):
+static func move_right(state: TransformState, delta: float, camera: Camera3D = null):
 	"""Move the position right relative to camera view (state only - position will be updated on next mouse update)"""
 	var move_dir = _get_camera_right_direction(camera)
 	var movement = move_dir * delta
-	manual_position_offset += movement
+	state.manual_position_offset += movement
 
-static func move_forward(delta: float, camera: Camera3D = null):
+static func move_forward(state: TransformState, delta: float, camera: Camera3D = null):
 	"""Move the position forward relative to camera view (state only - position will be updated on next mouse update)"""
 	var move_dir = _get_camera_forward_direction(camera)
 	var movement = move_dir * delta
-	manual_position_offset += movement
+	state.manual_position_offset += movement
 
-static func move_backward(delta: float, camera: Camera3D = null):
+static func move_backward(state: TransformState, delta: float, camera: Camera3D = null):
 	"""Move the position backward relative to camera view (state only - position will be updated on next mouse update)"""
 	var move_dir = _get_camera_forward_direction(camera) * -1.0  # Backward is negative forward
 	var movement = move_dir * delta
-	manual_position_offset += movement
+	state.manual_position_offset += movement
 
-static func move_direction_with_modifiers(direction: String, base_delta: float, modifiers: Dictionary, camera: Camera3D = null):
+static func move_direction_with_modifiers(state: TransformState, direction: String, base_delta: float, modifiers: Dictionary, camera: Camera3D = null):
 	"""Move in a direction with modifier-calculated step
 	
 	Args:
+		state: TransformState to modify
 		direction: Movement direction ("left", "right", "forward", "backward")
 		base_delta: Base movement step (e.g., 0.5 units)
 		modifiers: Modifier state from InputHandler.get_modifier_state()
@@ -261,13 +235,13 @@ static func move_direction_with_modifiers(direction: String, base_delta: float, 
 	
 	match direction.to_lower():
 		"left":
-			move_left(step, camera)
+			move_left(state, step, camera)
 		"right":
-			move_right(step, camera)
+			move_right(state, step, camera)
 		"forward":
-			move_forward(step, camera)
+			move_forward(state, step, camera)
 		"backward":
-			move_backward(step, camera)
+			move_backward(state, step, camera)
 		_:
 			PluginLogger.warning("PositionManager", "Invalid direction: " + direction)
 
@@ -307,18 +281,18 @@ static func _get_camera_right_direction(camera: Camera3D) -> Vector3:
 		# Primarily Z-axis movement
 		return Vector3(0, 0, sign(right.z))
 
-static func reset_position():
+static func reset_position(state: TransformState):
 	"""Reset manual position offset to zero"""
 	# Remove the current offset from positions
-	current_position -= manual_position_offset
-	target_position -= manual_position_offset
+	state.position -= state.manual_position_offset
+	state.target_position -= state.manual_position_offset
 	# Clear the offset
-	manual_position_offset = Vector3.ZERO
+	state.manual_position_offset = Vector3.ZERO
 
-static func rotate_manual_offset(axis: String, angle_degrees: float):
+static func rotate_manual_offset(state: TransformState, axis: String, angle_degrees: float):
 	"""Rotate the manual position offset around the specified axis
 	This is called when the preview mesh rotates so the offset rotates with it"""
-	if manual_position_offset.length_squared() < 0.0001:
+	if state.manual_position_offset.length_squared() < 0.0001:
 		# No offset to rotate
 		return
 	
@@ -334,91 +308,91 @@ static func rotate_manual_offset(axis: String, angle_degrees: float):
 			var cos_angle = cos(angle_rad)
 			var sin_angle = sin(angle_rad)
 			rotated_offset = Vector3(
-				manual_position_offset.x,  # X doesn't change
-				manual_position_offset.y * cos_angle - manual_position_offset.z * sin_angle,
-				manual_position_offset.y * sin_angle + manual_position_offset.z * cos_angle
+				state.manual_position_offset.x,  # X doesn't change
+				state.manual_position_offset.y * cos_angle - state.manual_position_offset.z * sin_angle,
+				state.manual_position_offset.y * sin_angle + state.manual_position_offset.z * cos_angle
 			)
 		"Y":
 			# Rotate around Y axis (affects X and Z)
 			var cos_angle = cos(angle_rad)
 			var sin_angle = sin(angle_rad)
 			rotated_offset = Vector3(
-				manual_position_offset.x * cos_angle - manual_position_offset.z * sin_angle,
-				manual_position_offset.y,  # Y doesn't change
-				manual_position_offset.x * sin_angle + manual_position_offset.z * cos_angle
+				state.manual_position_offset.x * cos_angle - state.manual_position_offset.z * sin_angle,
+				state.manual_position_offset.y,  # Y doesn't change
+				state.manual_position_offset.x * sin_angle + state.manual_position_offset.z * cos_angle
 			)
 		"Z":
 			# Rotate around Z axis (affects X and Y)
 			var cos_angle = cos(angle_rad)
 			var sin_angle = sin(angle_rad)
 			rotated_offset = Vector3(
-				manual_position_offset.x * cos_angle - manual_position_offset.y * sin_angle,
-				manual_position_offset.x * sin_angle + manual_position_offset.y * cos_angle,
-				manual_position_offset.z  # Z doesn't change
+				state.manual_position_offset.x * cos_angle - state.manual_position_offset.y * sin_angle,
+				state.manual_position_offset.x * sin_angle + state.manual_position_offset.y * cos_angle,
+				state.manual_position_offset.z  # Z doesn't change
 			)
 		_:
 			return
 	
 	# Update positions to account for the rotated offset
-	current_position -= manual_position_offset  # Remove old offset
-	manual_position_offset = rotated_offset  # Update to rotated offset
-	current_position += manual_position_offset  # Apply new offset
-	target_position = current_position
+	state.position -= state.manual_position_offset  # Remove old offset
+	state.manual_position_offset = rotated_offset  # Update to rotated offset
+	state.position += state.manual_position_offset  # Apply new offset
+	state.target_position = state.position
 
-static func set_base_height(y: float):
+static func set_base_height(state: TransformState, y: float):
 	"""Set the base height reference point"""
-	base_height = y
-	target_position.y = base_height + height_offset
-	current_position = target_position
+	state.base_height = y
+	state.target_position.y = state.base_height + state.height_offset
+	state.position = state.target_position
 
-static func reset_for_new_placement(reset_height_offset: bool = true, reset_position_offset: bool = true):
+static func reset_for_new_placement(state: TransformState, reset_height_offset: bool = true, reset_position_offset: bool = true):
 	"""Reset position manager state for a new placement session
 	
 	reset_height_offset: If true, reset height_offset to 0. If false, preserve current height.
 	reset_position_offset: If true, reset manual_position_offset to 0. If false, preserve current position offset."""
-	is_initial_position = true
+	state.is_initial_position = true
 	if reset_height_offset:
-		height_offset = 0.0
+		state.height_offset = 0.0
 	
-	current_position = Vector3.ZERO
-	target_position = Vector3.ZERO
-	base_height = 0.0
-	surface_normal = Vector3.UP
-	last_raycast_xz = Vector2.ZERO
+	state.position = Vector3.ZERO
+	state.target_position = Vector3.ZERO
+	state.base_height = 0.0
+	state.surface_normal = Vector3.UP
+	state.last_raycast_xz = Vector2.ZERO
 	if reset_position_offset:
-		manual_position_offset = Vector3.ZERO  # Reset WASD offset for new placement
+		state.manual_position_offset = Vector3.ZERO  # Reset WASD offset for new placement
 
 ## Position Getters and Setters
 
-static func get_current_position() -> Vector3:
+static func get_current_position(state: TransformState) -> Vector3:
 	"""Get the current calculated position"""
-	return current_position
+	return state.position
 
-static func get_target_position() -> Vector3:
+static func get_target_position(state: TransformState) -> Vector3:
 	"""Get the target position (may be different during interpolation)"""
-	return target_position
+	return state.target_position
 
-static func set_position(pos: Vector3):
+static func set_position(state: TransformState, pos: Vector3):
 	"""Directly set the current position"""
-	current_position = pos
-	target_position = pos
-	base_height = pos.y
-	height_offset = 0.0
+	state.position = pos
+	state.target_position = pos
+	state.base_height = pos.y
+	state.height_offset = 0.0
 
-static func get_height_offset() -> float:
+static func get_height_offset(state: TransformState) -> float:
 	"""Get the current height offset from base"""
-	return height_offset
+	return state.height_offset
 
-static func get_base_position() -> Vector3:
+static func get_base_position(state: TransformState) -> Vector3:
 	"""Get the base position (current position without height offset applied)
 	This is useful for positioning the grid overlay at ground level"""
-	var base_pos = current_position
-	base_pos.y = base_height
+	var base_pos = state.position
+	base_pos.y = state.base_height
 	return base_pos
 
-static func get_surface_normal() -> Vector3:
+static func get_surface_normal(state: TransformState) -> Vector3:
 	"""Get the surface normal at the current position"""
-	return surface_normal
+	return state.surface_normal
 
 ## Position Validation and Constraints
 
@@ -448,9 +422,6 @@ static func clamp_position_to_bounds(pos: Vector3, bounds: AABB = AABB()) -> Vec
 
 ## Position Interpolation and Smoothing
 
-static var interpolation_enabled: bool = false
-static var interpolation_speed: float = 10.0
-
 static func enable_smooth_positioning(speed: float = 10.0):
 	"""Enable smooth position interpolation"""
 	interpolation_enabled = true
@@ -460,46 +431,48 @@ static func disable_smooth_positioning():
 	"""Disable position interpolation"""
 	interpolation_enabled = false
 
-static func update_smooth_position(delta: float):
+static func update_smooth_position(state: TransformState, delta: float):
 	"""Update position with smooth interpolation (call from _process)"""
 	if not interpolation_enabled:
 		return
 	
-	if current_position.distance_to(target_position) > 0.01:
-		current_position = current_position.lerp(target_position, interpolation_speed * delta)
+	if state.position.distance_to(state.target_position) > 0.01:
+		state.position = state.position.lerp(state.target_position, interpolation_speed * delta)
 
 ## Configuration
 
-static func configure(config: Dictionary):
+static func configure(state: TransformState, config: Dictionary):
 	"""Configure position manager settings and placement strategies"""
-	# Configure legacy settings
+	# Configure global settings
 	snap_to_ground = config.get("snap_to_ground", true)
 	height_step_size = config.get("height_step_size", 0.1)
 	collision_mask = config.get("collision_mask", 1)
 	interpolation_enabled = config.get("interpolation_enabled", false)
 	interpolation_speed = config.get("interpolation_speed", 10.0)
-	snap_enabled = config.get("snap_enabled", false)
-	snap_step = config.get("snap_step", 1.0)
-	snap_offset = config.get("snap_offset", Vector3.ZERO)
-	snap_y_enabled = config.get("snap_y_enabled", false)
-	snap_y_step = config.get("snap_y_step", 1.0)
-	snap_center_x = config.get("snap_center_x", false)
-	snap_center_y = config.get("snap_center_y", false)
-	snap_center_z = config.get("snap_center_z", false)
 	align_with_normal = config.get("align_with_normal", false)
+	
+	# Configure state-specific settings
+	state.snap_enabled = config.get("snap_enabled", false)
+	state.snap_step = config.get("snap_step", 1.0)
+	state.snap_offset = config.get("snap_offset", Vector3.ZERO)
+	state.snap_y_enabled = config.get("snap_y_enabled", false)
+	state.snap_y_step = config.get("snap_y_step", 1.0)
+	state.snap_center_x = config.get("snap_center_x", false)
+	state.snap_center_y = config.get("snap_center_y", false)
+	state.snap_center_z = config.get("snap_center_z", false)
 	
 	# Configure placement strategy manager
 	PlacementStrategyManager.configure(config)
 
-static func get_configuration() -> Dictionary:
+static func get_configuration(state: TransformState) -> Dictionary:
 	"""Get current configuration"""
 	return {
 		"snap_to_ground": snap_to_ground,
 		"height_step_size": height_step_size,
 		"collision_mask": collision_mask,
 		"interpolation_enabled": interpolation_enabled,
-		"snap_enabled": snap_enabled,
-		"snap_step": snap_step,
+		"snap_enabled": state.snap_enabled,
+		"snap_step": state.snap_step,
 		"interpolation_speed": interpolation_speed,
 		"align_with_normal": align_with_normal,
 		"placement_strategy": PlacementStrategyManager.get_active_strategy_type()
@@ -507,13 +480,13 @@ static func get_configuration() -> Dictionary:
 
 ## Transform Node Positioning (for Transform Mode)
 
-static func update_transform_node_position(transform_node: Node3D, camera: Camera3D, mouse_pos: Vector2):
+static func update_transform_node_position(state: TransformState, transform_node: Node3D, camera: Camera3D, mouse_pos: Vector2):
 	"""Update position of a transform mode node based on mouse input"""
 	if not transform_node or not camera:
 		return
 	
 	# Calculate world position from mouse
-	var world_pos = update_position_from_mouse(camera, mouse_pos)
+	var world_pos = update_position_from_mouse(state, camera, mouse_pos)
 	
 	# Position is already calculated with proper height offset in update_position_from_mouse
 	# Just apply it directly (no need to recalculate)
@@ -521,28 +494,28 @@ static func update_transform_node_position(transform_node: Node3D, camera: Camer
 	if transform_node.is_inside_tree():
 		transform_node.global_position = world_pos
 
-static func start_transform_positioning(node: Node3D):
+static func start_transform_positioning(state: TransformState, node: Node3D):
 	"""Initialize positioning for transform mode"""
 	if node and node.is_inside_tree():
-		set_position(node.global_position)
-		base_height = node.global_position.y
-		height_offset = 0.0  # Reset height offset for transform mode
+		set_position(state, node.global_position)
+		state.base_height = node.global_position.y
+		state.height_offset = 0.0  # Reset height offset for transform mode
 
 ## Utility Functions
 
-static func get_distance_to_camera(camera: Camera3D) -> float:
+static func get_distance_to_camera(state: TransformState, camera: Camera3D) -> float:
 	"""Get distance from current position to camera"""
 	if camera:
-		return current_position.distance_to(camera.global_position)
+		return state.position.distance_to(camera.global_position)
 	return 0.0
 
-static func is_position_in_camera_view(camera: Camera3D) -> bool:
+static func is_position_in_camera_view(state: TransformState, camera: Camera3D) -> bool:
 	"""Check if current position is within camera view frustum"""
 	if not camera:
 		return false
 	
 	# Simple distance-based check
-	var distance = get_distance_to_camera(camera)
+	var distance = get_distance_to_camera(state, camera)
 	return distance > 0.1 and distance < 1000.0
 
 static func get_surface_normal_at_position(pos: Vector3) -> Vector3:
@@ -553,17 +526,17 @@ static func get_surface_normal_at_position(pos: Vector3) -> Vector3:
 
 ## Debug and Visualization
 
-static func debug_print_position_state():
+static func debug_print_position_state(state: TransformState):
 	"""Print current position state for debugging"""
-	pass
+	PluginLogger.debug("PositionManager", "Position: %v, Height: %.2f" % [state.position, state.height_offset])
 
-static func get_position_info() -> Dictionary:
+static func get_position_info(state: TransformState) -> Dictionary:
 	"""Get comprehensive position information"""
 	return {
-		"current_position": current_position,
-		"target_position": target_position,
-		"base_height": base_height,
-		"height_offset": height_offset,
-		"total_height": base_height + height_offset,
-		"is_interpolating": interpolation_enabled and current_position.distance_to(target_position) > 0.01
+		"current_position": state.position,
+		"target_position": state.target_position,
+		"base_height": state.base_height,
+		"height_offset": state.height_offset,
+		"total_height": state.base_height + state.height_offset,
+		"is_interpolating": interpolation_enabled and state.position.distance_to(state.target_position) > 0.01
 	}

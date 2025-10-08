@@ -28,6 +28,7 @@ DELEGATES TO: EditorInterface for undo/redo and scene access
 # Import focused managers for transformation application
 const RotationManager = preload("res://addons/simpleassetplacer/rotation_manager.gd")
 const ScaleManager = preload("res://addons/simpleassetplacer/scale_manager.gd")
+const TransformState = preload("res://addons/simpleassetplacer/transform_state.gd")
 
 ## UTILITY FUNCTIONS
 
@@ -82,7 +83,7 @@ static func extract_mesh_from_children(node: Node3D) -> Mesh:
 				return child_mesh
 	return null
 
-static func place_asset_in_scene(asset_path: String, position: Vector3 = Vector3.ZERO, settings: Dictionary = {}) -> Node:
+static func place_asset_in_scene(asset_path: String, position: Vector3 = Vector3.ZERO, settings: Dictionary = {}, transform_state: TransformState = null) -> Node:
 	"""Place an asset file in the scene with applied transformations"""
 	PluginLogger.info("UtilityManager", "Placing asset: " + asset_path + " at position: " + str(position))
 	
@@ -122,7 +123,8 @@ static func place_asset_in_scene(asset_path: String, position: Vector3 = Vector3
 		scene_instance.global_position = position
 		
 		# Apply rotation from RotationManager
-		RotationManager.apply_rotation_to_node(scene_instance)
+		if transform_state:
+			RotationManager.apply_rotation_to_node(transform_state, scene_instance)
 		
 		# Apply random Y rotation if enabled
 		if settings.get("random_rotation", false):
@@ -130,7 +132,7 @@ static func place_asset_in_scene(asset_path: String, position: Vector3 = Vector3
 			scene_instance.rotate_y(random_y_rotation)
 		
 		# Apply scale (assume uniform scale from ScaleManager)
-		var scale_multiplier = ScaleManager.get_scale()
+		var scale_multiplier = ScaleManager.get_scale(transform_state) if transform_state else 1.0
 		scene_instance.scale *= scale_multiplier
 		
 		PluginLogger.info("UtilityManager", "Successfully placed asset as: " + unique_name)
@@ -140,7 +142,7 @@ static func place_asset_in_scene(asset_path: String, position: Vector3 = Vector3
 		scene_instance.queue_free()
 		return null
 
-static func place_meshlib_item_in_scene(meshlib: MeshLibrary, item_id: int, position: Vector3, settings: Dictionary = {}) -> MeshInstance3D:
+static func place_meshlib_item_in_scene(meshlib: MeshLibrary, item_id: int, position: Vector3, settings: Dictionary = {}, transform_state: TransformState = null) -> MeshInstance3D:
 	"""Place a MeshLibrary item in the scene with applied transformations"""
 	var mesh = meshlib.get_item_mesh(item_id)
 	if not mesh:
@@ -166,7 +168,8 @@ static func place_meshlib_item_in_scene(meshlib: MeshLibrary, item_id: int, posi
 		mesh_instance.global_position = position
 		
 		# Apply rotation from RotationManager
-		RotationManager.apply_rotation_to_node(mesh_instance)
+		if transform_state:
+			RotationManager.apply_rotation_to_node(transform_state, mesh_instance)
 		
 		# Apply random Y rotation if enabled
 		if settings.get("random_rotation", false):
@@ -175,7 +178,7 @@ static func place_meshlib_item_in_scene(meshlib: MeshLibrary, item_id: int, posi
 			PluginLogger.debug("UtilityManager", "Applied random Y rotation: " + str(rad_to_deg(random_y_rotation)) + " degrees")
 		
 		# Apply scale (assume uniform scale from ScaleManager)
-		var scale_multiplier = ScaleManager.get_scale()
+		var scale_multiplier = ScaleManager.get_scale(transform_state) if transform_state else 1.0
 		mesh_instance.scale *= scale_multiplier
 		
 		PluginLogger.info("UtilityManager", "Successfully placed meshlib item as: " + unique_name)
@@ -185,7 +188,7 @@ static func place_meshlib_item_in_scene(meshlib: MeshLibrary, item_id: int, posi
 		mesh_instance.queue_free()
 		return null
 
-static func place_mesh_in_scene(mesh: Mesh, position: Vector3, settings: Dictionary = {}) -> MeshInstance3D:
+static func place_mesh_in_scene(mesh: Mesh, position: Vector3, settings: Dictionary = {}, transform_state: TransformState = null) -> MeshInstance3D:
 	"""Place a mesh in the scene with applied transformations"""
 	if not mesh:
 		PluginLogger.error("UtilityManager", "No mesh provided")
@@ -208,7 +211,8 @@ static func place_mesh_in_scene(mesh: Mesh, position: Vector3, settings: Diction
 		mesh_instance.global_position = position
 		
 		# Apply rotation from RotationManager
-		RotationManager.apply_rotation_to_node(mesh_instance)
+		if transform_state:
+			RotationManager.apply_rotation_to_node(transform_state, mesh_instance)
 		
 		# Apply random Y rotation if enabled
 		if settings.get("random_rotation", false):
@@ -217,7 +221,7 @@ static func place_mesh_in_scene(mesh: Mesh, position: Vector3, settings: Diction
 			PluginLogger.debug("UtilityManager", "Applied random Y rotation: " + str(rad_to_deg(random_y_rotation)) + " degrees")
 		
 		# Apply scale (assume uniform scale from ScaleManager)
-		var scale_multiplier = ScaleManager.get_scale()
+		var scale_multiplier = ScaleManager.get_scale(transform_state) if transform_state else 1.0
 		mesh_instance.scale *= scale_multiplier
 		
 		return mesh_instance

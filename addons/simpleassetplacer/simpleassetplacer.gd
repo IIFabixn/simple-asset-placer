@@ -5,27 +5,27 @@ extends EditorPlugin
 # Only handles editor integration and delegates everything to TransformationManager
 
 # Import utilities
-const PluginLogger = preload("res://addons/simpleassetplacer/plugin_logger.gd")
-const PluginConstants = preload("res://addons/simpleassetplacer/plugin_constants.gd")
-const SettingsManager = preload("res://addons/simpleassetplacer/settings_manager.gd")
-const ErrorHandler = preload("res://addons/simpleassetplacer/error_handler.gd")
+const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
+const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
+const SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
+const ErrorHandler = preload("res://addons/simpleassetplacer/utils/error_handler.gd")
 
 # Import specialized managers
-const InputHandler = preload("res://addons/simpleassetplacer/input_handler.gd")
-const PositionManager = preload("res://addons/simpleassetplacer/position_manager.gd")
-const OverlayManager = preload("res://addons/simpleassetplacer/overlay_manager.gd")
-const RotationManager = preload("res://addons/simpleassetplacer/rotation_manager.gd")
-const ScaleManager = preload("res://addons/simpleassetplacer/scale_manager.gd")
-const PreviewManager = preload("res://addons/simpleassetplacer/preview_manager.gd")
-const TransformationManager = preload("res://addons/simpleassetplacer/transformation_manager.gd")
+const InputHandler = preload("res://addons/simpleassetplacer/managers/input_handler.gd")
+const PositionManager = preload("res://addons/simpleassetplacer/core/position_manager.gd")
+const OverlayManager = preload("res://addons/simpleassetplacer/managers/overlay_manager.gd")
+const RotationManager = preload("res://addons/simpleassetplacer/core/rotation_manager.gd")
+const ScaleManager = preload("res://addons/simpleassetplacer/core/scale_manager.gd")
+const PreviewManager = preload("res://addons/simpleassetplacer/managers/preview_manager.gd")
+const TransformationManager = preload("res://addons/simpleassetplacer/core/transformation_manager.gd")
 
 # Import placement strategy system
-const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placement_strategy_manager.gd")
+const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placement/placement_strategy_manager.gd")
 
 # Import dock and utilities (keep existing)
-const AssetPlacerDock = preload("res://addons/simpleassetplacer/asset_placer_dock.gd")
-const ThumbnailGenerator = preload("res://addons/simpleassetplacer/thumbnail_generator.gd")
-const ThumbnailQueueManager = preload("res://addons/simpleassetplacer/thumbnail_queue_manager.gd")
+const AssetPlacerDock = preload("res://addons/simpleassetplacer/ui/asset_placer_dock.gd")
+const ThumbnailGenerator = preload("res://addons/simpleassetplacer/thumbnails/thumbnail_generator.gd")
+const ThumbnailQueueManager = preload("res://addons/simpleassetplacer/thumbnails/thumbnail_queue_manager.gd")
 
 # Plugin state
 var dock: AssetPlacerDock
@@ -405,3 +405,10 @@ func debug_print_status():
 	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "System Status:")
 	for key in status:
 		PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "  " + key + ": " + str(status[key]))
+
+
+
+
+
+
+

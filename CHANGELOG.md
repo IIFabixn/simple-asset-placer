@@ -4,6 +4,19 @@
 
 ### 🏗️ Refactored
 
+- **Directory Structure**: Reorganized plugin files into logical folder hierarchy for better maintainability
+  - Created 7 organized subdirectories: `core/`, `placement/`, `ui/`, `settings/`, `managers/`, `thumbnails/`, `utils/`
+  - Moved 33 .gd files from flat structure into appropriate folders
+  - **core/** (7 files): Transform & state management system
+  - **placement/** (4 files): Strategy pattern placement system
+  - **ui/** (6 files): User interface components
+  - **settings/** (4 files): Settings management system
+  - **managers/** (5 files): Supporting managers (overlay, preview, category, input, utility)
+  - **thumbnails/** (3 files): Thumbnail generation system
+  - **utils/** (4 files): Utilities & helpers (logger, constants, error handler, increment calculator)
+  - Updated 100+ import paths across entire codebase
+  - Improved navigation and logical organization of 1,500+ lines of code
+
 - **State Management Architecture**: Complete architectural refactoring to stateless design pattern
   - Created `TransformState` class - unified container for all transform state (237 lines)
     - Consolidates 30+ scattered static variables from 3 managers into single source of truth

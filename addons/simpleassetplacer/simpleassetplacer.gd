@@ -152,7 +152,7 @@ func _process(delta: float) -> void:
 		SettingsManager.set_dock_settings(dock_settings)
 	
 	# Delegate frame processing to coordinator with combined settings
-	TransformationManager.process_frame_input(camera, SettingsManager.get_combined_settings())
+	TransformationManager.process_frame_input(camera, SettingsManager.get_combined_settings(), delta)
 
 func _is_plugin_ready() -> bool:
 	"""Check if plugin is ready for processing"""

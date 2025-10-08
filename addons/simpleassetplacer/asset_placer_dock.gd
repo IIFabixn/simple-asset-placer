@@ -157,6 +157,7 @@ func setup_ui():
 	search_line_edit.text_changed.connect(_on_search_changed)
 	meshlib_browser.meshlib_item_selected.connect(_on_meshlib_item_selected)
 	placement_settings.cache_cleared.connect(_on_cache_cleared)
+	placement_settings.settings_changed.connect(_on_settings_changed)
 	
 	# Connect to resize events to adjust layout dynamically
 	resized.connect(_on_dock_resized)
@@ -309,6 +310,12 @@ func _on_cache_cleared():
 	"""Handle cache clear event - refresh browsers to regenerate thumbnails"""
 	if modellib_browser:
 		modellib_browser.update_asset_grid()
+
+func _on_settings_changed():
+	"""Handle settings change event - reload SettingsManager from EditorSettings"""
+	# Reload SettingsManager from EditorSettings to sync with UI changes
+	var SettingsManager = preload("res://addons/simpleassetplacer/settings_manager.gd")
+	SettingsManager.reload_from_editor_settings()
 
 func _ensure_settings_loaded():
 	"""Ensure settings are properly loaded and applied to UI after initialization"""

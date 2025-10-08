@@ -40,6 +40,7 @@ const RotationManager = preload("res://addons/simpleassetplacer/rotation_manager
 const ScaleManager = preload("res://addons/simpleassetplacer/scale_manager.gd")
 const PreviewManager = preload("res://addons/simpleassetplacer/preview_manager.gd")
 const UtilityManager = preload("res://addons/simpleassetplacer/utility_manager.gd")
+const SmoothTransformManager = preload("res://addons/simpleassetplacer/smooth_transform_manager.gd")
 
 # === MODE ENUM ===
 
@@ -113,6 +114,14 @@ static func start_placement_mode(mesh: Mesh = null, meshlib: MeshLibrary = null,
 	
 	# Configure position manager for placement
 	PositionManager.configure(placement_settings)
+	
+	# Configure smooth transformations
+	var smooth_enabled = placement_settings.get("smooth_transforms", true)
+	var smooth_speed = placement_settings.get("smooth_transform_speed", 8.0)
+	PreviewManager.configure_smooth_transforms(smooth_enabled, smooth_speed)
+	SmoothTransformManager.configure(smooth_enabled, smooth_speed)
+	RotationManager.configure_smooth_transforms(smooth_enabled, smooth_speed)
+	ScaleManager.configure_smooth_transforms(smooth_enabled, smooth_speed)
 	
 	# Reset position manager for new placement
 	# The first mouse update will set the initial position from raycast
@@ -197,6 +206,30 @@ static func start_transform_mode(target_nodes, dock_instance = null):
 	OverlayManager.initialize_overlays()
 	OverlayManager.set_mode(Mode.TRANSFORM)
 	
+	# Configure smooth transformations (get current settings)
+	var current_settings = settings
+	if current_settings.is_empty():
+		# Fall back to getting settings if none cached
+		current_settings = SettingsManager.get_combined_settings() if SettingsManager else {}
+	var smooth_enabled = current_settings.get("smooth_transforms", true)
+	var smooth_speed = current_settings.get("smooth_transform_speed", 8.0)
+	PreviewManager.configure_smooth_transforms(smooth_enabled, smooth_speed)
+	SmoothTransformManager.configure(smooth_enabled, smooth_speed)
+	RotationManager.configure_smooth_transforms(smooth_enabled, smooth_speed)
+	ScaleManager.configure_smooth_transforms(smooth_enabled, smooth_speed)
+	
+	# Register all target nodes for smooth transforms
+	for node in valid_nodes:
+		if node and node.is_inside_tree():
+			SmoothTransformManager.register_object(node)
+			# Ensure smooth transform targets are initialized to current transform
+			SmoothTransformManager.apply_transform_immediately(
+				node, 
+				node.global_position, 
+				node.rotation, 
+				node.scale
+			)
+	
 	# Initialize position manager with center position
 	PositionManager.set_position(center_pos)
 	PositionManager.start_transform_positioning(valid_nodes[0])  # Use first node as reference
@@ -214,7 +247,7 @@ static func exit_placement_mode():
 	if current_mode != Mode.PLACEMENT:
 		return
 	
-	# Clean up preview
+	# Clean up preview (this also unregisters from smooth transforms)
 	PreviewManager.cleanup_preview()
 	
 	# Call end callback if set
@@ -250,6 +283,11 @@ static func exit_transform_mode(confirm_changes: bool = true):
 		for node in target_nodes:
 			if node and original_transforms.has(node):
 				node.transform = original_transforms[node]
+	
+	# Unregister all target nodes from smooth transforms
+	for node in target_nodes:
+		if node and node.is_inside_tree():
+			SmoothTransformManager.unregister_object(node)
 	
 	# Reset transforms based on user settings
 	_reset_transforms_on_exit()
@@ -336,7 +374,17 @@ static func _update_grid_overlay():
 
 ## INPUT PROCESSING COORDINATION
 
-static func process_frame_input(camera: Camera3D, input_settings: Dictionary = {}):
+static func _configure_smooth_transforms(settings_dict: Dictionary):
+	"""Configure smooth transforms for all managers with current settings"""
+	var smooth_enabled = settings_dict.get("smooth_transforms", true)
+	var smooth_speed = settings_dict.get("smooth_transform_speed", 8.0)
+	
+	PreviewManager.configure_smooth_transforms(smooth_enabled, smooth_speed)
+	SmoothTransformManager.configure(smooth_enabled, smooth_speed)
+	RotationManager.configure_smooth_transforms(smooth_enabled, smooth_speed)
+	ScaleManager.configure_smooth_transforms(smooth_enabled, smooth_speed)
+
+static func process_frame_input(camera: Camera3D, input_settings: Dictionary = {}, delta: float = 1.0/60.0):
 	"""Process input for the current frame - coordinate with InputHandler"""
 	# Store current settings for TAB key and other operations
 	settings = input_settings
@@ -357,6 +405,7 @@ static func process_frame_input(camera: Camera3D, input_settings: Dictionary = {
 	# This ensures snap settings and other options are always up-to-date
 	# NOTE: This is AFTER navigation input so manual strategy changes take effect first
 	PositionManager.configure(settings)
+	_configure_smooth_transforms(settings)
 	
 	# Keep grabbing focus for the first few frames after mode starts
 	if focus_grab_counter > 0:
@@ -369,6 +418,10 @@ static func process_frame_input(camera: Camera3D, input_settings: Dictionary = {
 			_process_placement_input(camera)
 		Mode.TRANSFORM:
 			_process_transform_input(camera)
+	
+	# Update smooth transformations
+	PreviewManager.update_smooth_transforms(delta)
+	SmoothTransformManager.update_smooth_transforms(delta)
 	
 	# Update grid overlay AFTER position updates (so it follows the object)
 	_update_grid_overlay()
@@ -651,6 +704,9 @@ static func _process_transform_input(camera: Camera3D):
 	var rotation_offset_euler = RotationManager.get_rotation_offset()
 	var rotation_basis = Basis.from_euler(rotation_offset_euler)
 	
+	# Check if smooth transforms are enabled
+	var smooth_enabled = settings.get("smooth_transforms", true)
+	
 	# Apply transformations to ALL nodes using offset-based system
 	# Flow: base_position (mouse + snap) → apply rotation orbit → apply offsets (rotation, scale)
 	for node in target_nodes:
@@ -666,16 +722,23 @@ static func _process_transform_input(camera: Camera3D):
 		
 		# STEP 2: Position - Base position (new_center) + rotation orbit offset
 		# new_center = mouse_position (snapped) + snap_offset + accumulated_delta (WASD)
-		node.global_position.x = new_center.x + rotated_offset.x
-		node.global_position.z = new_center.z + rotated_offset.z
+		var target_position = Vector3()
+		target_position.x = new_center.x + rotated_offset.x
+		target_position.z = new_center.z + rotated_offset.z
 		
 		# Y position: follows ground or maintains original height
 		if settings.get("snap_to_ground", false):
 			# Follow surface height from raycast + height offset
-			node.global_position.y = new_center.y + rotated_offset.y + accumulated_y_delta
+			target_position.y = new_center.y + rotated_offset.y + accumulated_y_delta
 		else:
 			# Maintain original Y + height offset
-			node.global_position.y = original_center.y + rotated_offset.y + accumulated_y_delta
+			target_position.y = original_center.y + rotated_offset.y + accumulated_y_delta
+		
+		# Apply position with or without smoothing
+		if smooth_enabled:
+			SmoothTransformManager.set_target_position(node, target_position)
+		else:
+			node.global_position = target_position
 		
 		# STEP 3: Individual Rotation - Apply rotation offset to node's original rotation
 		# Rotation offset is applied on top of the node's original rotation

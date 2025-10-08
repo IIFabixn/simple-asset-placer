@@ -36,6 +36,8 @@ var random_rotation: bool = false
 var scale_multiplier: float = 1.0
 var add_collision: bool = false
 var group_instances: bool = false
+var smooth_transforms: bool = true
+var smooth_transform_speed: float = 8.0
 
 # Advanced Grid Settings
 var snap_offset: Vector3 = Vector3.ZERO

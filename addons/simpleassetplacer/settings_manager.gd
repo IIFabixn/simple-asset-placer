@@ -8,6 +8,7 @@ class_name SettingsManager
 # Import utilities
 const PluginLogger = preload("res://addons/simpleassetplacer/plugin_logger.gd")
 const PluginConstants = preload("res://addons/simpleassetplacer/plugin_constants.gd")
+const SmoothTransformManager = preload("res://addons/simpleassetplacer/smooth_transform_manager.gd")
 
 ## Settings Storage
 
@@ -92,9 +93,39 @@ static func initialize() -> void:
 	"""Initialize settings manager with defaults"""
 	_plugin_settings = get_default_settings()
 	_dock_settings = {}
+	_load_from_editor_settings()  # Load from EditorSettings to sync with UI
 	_cache_dirty = true
 	
 	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "SettingsManager initialized")
+
+static func _load_from_editor_settings():
+	"""Load plugin settings from Godot's EditorSettings (same source as UI)"""
+	var editor_settings = EditorInterface.get_editor_settings()
+	
+	# Import from settings definitions to ensure we get all UI-configurable settings
+	const SettingsDefinition = preload("res://addons/simpleassetplacer/settings_definition.gd")
+	var all_settings = SettingsDefinition.get_all_settings()
+	
+	for setting_meta in all_settings:
+		if editor_settings.has_setting(setting_meta.editor_key):
+			var value = editor_settings.get_setting(setting_meta.editor_key)
+			_plugin_settings[setting_meta.id] = value
+		# If not found in EditorSettings, keep the default value
+	
+	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Settings loaded from EditorSettings")
+	
+	# Also load SmoothTransformManager settings
+	SmoothTransformManager.load_from_editor_settings()
+
+static func reload_from_editor_settings():
+	"""Reload settings from EditorSettings and invalidate cache (for real-time updates)"""
+	_load_from_editor_settings()
+	_cache_dirty = true
+	
+	# Also reload SmoothTransformManager settings
+	SmoothTransformManager.load_from_editor_settings()
+	
+	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Settings reloaded from EditorSettings")
 
 static func load_from_file(config_path: String = "user://simpleassetplacer_settings.cfg") -> bool:
 	"""Load settings from ConfigFile"""

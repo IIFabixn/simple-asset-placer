@@ -12,7 +12,7 @@ PURPOSE: Handles creation, styling, and lifecycle management of preview meshes d
 RESPONSIBILITIES:  
 - Preview mesh creation from various asset types (Mesh, PackedScene, asset paths)
 - Preview material application (semi-transparent, no shadows)
-- Preview position updates and synchronization
+- Preview position updates and synchronization (with optional smooth interpolation)
 - Asset loading and instantiation for previews
 - Preview cleanup and memory management
 - Material application to complex node hierarchies
@@ -24,8 +24,11 @@ ARCHITECTURE POSITION: Pure preview mesh logic with no dependencies
 - Focused solely on preview mesh lifecycle
 
 USED BY: TransformationManager for placement mode preview operations  
-DEPENDS ON: Godot scene system, material system, resource loading
+DEPENDS ON: Godot scene system, material system, resource loading, SmoothTransformManager
 """
+
+# Import smooth transform system
+const SmoothTransformManager = preload("res://addons/simpleassetplacer/smooth_transform_manager.gd")
 
 # Preview state
 static var preview_mesh: Node3D = null
@@ -37,6 +40,18 @@ static var current_scale: Vector3 = Vector3.ONE
 # Preview configuration
 static var preview_opacity: float = 0.6
 static var preview_color: Color = Color.WHITE
+
+## Configuration
+
+static func configure_smooth_transforms(enabled: bool, speed: float):
+	"""Configure smooth transform settings"""
+	# Pass through to SmoothTransformManager - no local caching
+	SmoothTransformManager.configure(enabled, speed)
+
+static func update_smooth_transforms(delta: float):
+	"""Update smooth transformations - call every frame"""
+	# Always delegate to SmoothTransformManager - it handles enabled state internally
+	SmoothTransformManager.update_smooth_transforms(delta)
 
 ## Preview Creation
 
@@ -70,6 +85,9 @@ static func start_preview_mesh(mesh: Mesh, settings: Dictionary = {}):
 	preview_mesh.global_position = current_position
 	preview_mesh.rotation = current_rotation
 	preview_mesh.scale = current_scale
+	
+	# Register with smooth transform manager
+	SmoothTransformManager.register_object(preview_mesh)
 	
 	PluginLogger.info("PreviewManager", "Started mesh preview")
 
@@ -125,6 +143,9 @@ static func start_preview_asset(asset_path: String, settings: Dictionary = {}):
 	preview_mesh.rotation = current_rotation
 	preview_mesh.scale = current_scale
 	
+	# Register with smooth transform manager
+	SmoothTransformManager.register_object(preview_mesh)
+	
 	PluginLogger.info("PreviewManager", "Started asset preview for: " + asset_path)
 
 static func _apply_preview_transparency_to_children(node: Node):
@@ -140,33 +161,35 @@ static func _apply_preview_transparency_to_children(node: Node):
 ## Preview Updates
 
 static func update_preview_position(position: Vector3):
-	"""Update preview position"""
+	"""Update preview position (with optional smoothing)"""
 	current_position = position
 	if preview_mesh and is_instance_valid(preview_mesh) and preview_mesh.is_inside_tree():
-		preview_mesh.global_position = position
+		# Always delegate to SmoothTransformManager - it handles enabled/disabled state
+		SmoothTransformManager.set_target_position(preview_mesh, position)
 
 static func update_preview_rotation(rotation: Vector3):
-	"""Update preview rotation"""
+	"""Update preview rotation (with optional smoothing)"""
 	current_rotation = rotation
 	if preview_mesh and is_instance_valid(preview_mesh) and preview_mesh.is_inside_tree():
-		preview_mesh.rotation = rotation
+		# Always delegate to SmoothTransformManager - it handles enabled/disabled state
+		SmoothTransformManager.set_target_rotation(preview_mesh, rotation)
 
 static func update_preview_scale(scale: Vector3):
-	"""Update preview scale"""
+	"""Update preview scale (with optional smoothing)"""
 	current_scale = scale
 	if preview_mesh and is_instance_valid(preview_mesh) and preview_mesh.is_inside_tree():
-		preview_mesh.scale = scale
+		# Always delegate to SmoothTransformManager - it handles enabled/disabled state
+		SmoothTransformManager.set_target_scale(preview_mesh, scale)
 
 static func update_preview_transform(position: Vector3, rotation: Vector3, scale: Vector3):
-	"""Update all preview transform components at once"""
+	"""Update all preview transform components at once (with optional smoothing)"""
 	current_position = position
 	current_rotation = rotation
 	current_scale = scale
 	
 	if preview_mesh and is_instance_valid(preview_mesh) and preview_mesh.is_inside_tree():
-		preview_mesh.global_position = position
-		preview_mesh.rotation = rotation
-		preview_mesh.scale = scale
+		# Always delegate to SmoothTransformManager - it handles enabled/disabled state
+		SmoothTransformManager.set_target_transform(preview_mesh, position, rotation, scale)
 
 ## Preview State Queries
 
@@ -228,6 +251,8 @@ static func set_preview_color(color: Color):
 static func cleanup_preview():
 	"""Clean up the current preview"""
 	if preview_mesh and is_instance_valid(preview_mesh):
+		# Unregister from smooth transform manager
+		SmoothTransformManager.unregister_object(preview_mesh)
 		preview_mesh.queue_free()
 		preview_mesh = null
 		PluginLogger.debug("PreviewManager", "Cleaned up preview")

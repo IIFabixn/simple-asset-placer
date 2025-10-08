@@ -7,29 +7,38 @@ class_name ScaleManager
 3D SCALING MATHEMATICS SYSTEM (MULTIPLIER-BASED OFFSET)
 =======================================================
 
-PURPOSE: Handles all scaling calculations using a multiplier-based offset system.
+PURPOSE: Handles all scaling calculations using a multiplier-based offset system with optional smooth interpolation.
 
 RESPONSIBILITIES:
 - Scale multiplier management (1.0 = no change, 2.0 = double size, 0.5 = half size)
 - Scale step application (increase/decrease by configurable amounts)
 - Scale bounds enforcement (prevents zero/negative scaling)
-- Node scale application (original_scale * multiplier = final_scale)
+- Node scale application (original_scale * multiplier = final_scale) with optional smoothing
 - Scale reset functionality
 - Conversion between uniform and Vector3 multipliers
 
-ARCHITECTURE POSITION: Pure scaling math with no dependencies, matches PositionManager/RotationManager pattern
+ARCHITECTURE POSITION: Pure scaling math with optional smooth transform integration
 - Does NOT handle input detection (receives scale commands)
 - Does NOT handle UI or feedback
 - Does NOT know about placement/transform modes
 - Works with any Node3D object
 
 USED BY: TransformationManager for all scaling operations
-DEPENDS ON: Only Godot math system (Vector3, scale properties)
+DEPENDS ON: Godot math system (Vector3, scale properties), SmoothTransformManager (optional)
 """
+
+# Import smooth transform system for optional smooth scaling
+const SmoothTransformManager = preload("res://addons/simpleassetplacer/smooth_transform_manager.gd")
 
 # Current scale state (multiplier-based offset system - like rotation offsets)
 static var scale_multiplier: float = 1.0  # Uniform scale multiplier (1.0 = no change, applied to original scale)
 static var non_uniform_multiplier: Vector3 = Vector3.ONE  # For non-uniform scaling multipliers
+
+## Configuration
+
+static func configure_smooth_transforms(enabled: bool, speed: float = 8.0):
+	"""Configure smooth transform settings for scaling"""
+	# No local caching - SmoothTransformManager handles the settings
 
 ## Core Scale Functions
 
@@ -166,9 +175,15 @@ static func apply_uniform_scale_to_node(node: Node3D, original_scale: Vector3 = 
 		node: The Node3D to apply scale to
 		original_scale: The node's original scale (from transform mode) or Vector3.ONE for placement mode
 	"""
-	if node:
+	if node and node.is_inside_tree():
 		# Final scale = original_scale * uniform_multiplier
-		node.scale = original_scale * scale_multiplier
+		var target_scale = original_scale * scale_multiplier
+		
+		# Apply scale with or without smoothing
+		if SmoothTransformManager._smooth_enabled:
+			SmoothTransformManager.set_target_scale(node, target_scale)
+		else:
+			node.scale = target_scale
 
 ## Scale Constraints and Validation
 

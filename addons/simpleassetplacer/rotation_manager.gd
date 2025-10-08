@@ -7,30 +7,39 @@ class_name RotationManager
 3D ROTATION MATHEMATICS SYSTEM
 ==============================
 
-PURPOSE: Handles all rotation calculations and transformations with no external dependencies.
+PURPOSE: Handles all rotation calculations and transformations with optional smooth interpolation.
 
 RESPONSIBILITIES:
 - Rotation state management (current rotation in radians/degrees)
 - Rotation step application (X, Y, Z axis rotations)
 - Rotation normalization (keeping angles in valid ranges)
-- Node rotation application and copying
+- Node rotation application and copying (with optional smooth transforms)
 - Rotation reset functionality
 - Conversion between radians and degrees
 - Surface alignment rotation (base rotation from surface normal)
 
-ARCHITECTURE POSITION: Pure rotation math with no dependencies
+ARCHITECTURE POSITION: Pure rotation math with optional smooth transform integration
 - Does NOT handle input detection (receives rotation commands)
 - Does NOT handle UI or feedback
 - Does NOT know about placement/transform modes
 - Works with any Node3D object
 
 USED BY: TransformationManager for all rotation operations
-DEPENDS ON: Only Godot math system (Vector3, Transform3D)
+DEPENDS ON: Godot math system (Vector3, Transform3D), SmoothTransformManager (optional)
 """
+
+# Import smooth transform system for optional smooth rotation
+const SmoothTransformManager = preload("res://addons/simpleassetplacer/smooth_transform_manager.gd")
 
 # Current rotation state
 static var manual_rotation_offset: Vector3 = Vector3.ZERO  # Manual rotation offset in radians (user input)
 static var surface_alignment_rotation: Vector3 = Vector3.ZERO  # Base rotation from surface normal
+
+## Configuration
+
+static func configure_smooth_transforms(enabled: bool, speed: float = 8.0):
+	"""Configure smooth transform settings for rotation"""
+	# No local caching - SmoothTransformManager handles the settings
 
 ## Core Rotation Functions
 
@@ -151,8 +160,14 @@ static func apply_rotation_to_node(node: Node3D, original_rotation: Vector3 = Ve
 		# Combine: original -> surface alignment -> manual offset
 		var combined_transform = original_transform * surface_transform * manual_transform
 		
-		# Extract the combined rotation and apply to node
-		node.rotation = combined_transform.basis.get_euler()
+		# Extract the combined rotation
+		var target_rotation = combined_transform.basis.get_euler()
+		
+		# Apply to node with or without smoothing
+		if SmoothTransformManager._smooth_enabled:
+			SmoothTransformManager.set_target_rotation(node, target_rotation)
+		else:
+			node.rotation = target_rotation
 
 static func align_with_surface_normal(surface_normal: Vector3):
 	"""Calculate rotation to align object's up vector with surface normal

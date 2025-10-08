@@ -107,6 +107,19 @@ static func get_all_settings() -> Array:
 	group_instances.ui_tooltip = "Group all placed instances under a parent node"
 	settings.append(group_instances)
 	
+	var smooth_transforms = SettingMeta.new("smooth_transforms", "simple_asset_placer/smooth_transforms", true, SettingType.BOOL, "Smooth Transformations")
+	smooth_transforms.section = "basic"
+	smooth_transforms.ui_tooltip = "Smoothly animate transformations with lerping/easing"
+	settings.append(smooth_transforms)
+	
+	var smooth_transform_speed = SettingMeta.new("smooth_transform_speed", "simple_asset_placer/smooth_transform_speed", 8.0, SettingType.FLOAT, "Smooth Speed")
+	smooth_transform_speed.section = "basic"
+	smooth_transform_speed.min_value = 1.0
+	smooth_transform_speed.max_value = 20.0
+	smooth_transform_speed.step = 0.5
+	smooth_transform_speed.ui_tooltip = "Speed of smooth transformations (higher = faster)"
+	settings.append(smooth_transform_speed)
+	
 	# Advanced Grid Settings
 	var snap_offset = SettingMeta.new("snap_offset", "simple_asset_placer/snap_offset", Vector3.ZERO, SettingType.VECTOR3, "Grid Offset")
 	snap_offset.section = "advanced_grid"

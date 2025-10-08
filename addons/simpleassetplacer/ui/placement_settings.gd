@@ -329,6 +329,56 @@ func load_settings():
 	if ui_controls.size() > 0:
 		SettingsPersistence.update_ui_from_settings(ui_controls, self)
 
+## Public toggle methods for external controls (e.g., status overlay buttons)
+
+func toggle_grid_snap(enabled: bool) -> void:
+	"""Toggle grid snapping on/off"""
+	snap_enabled = enabled
+	if ui_controls.has("snap_enabled"):
+		ui_controls["snap_enabled"].set_pressed_no_signal(enabled)
+	save_settings()
+	settings_changed.emit()
+
+func toggle_grid_overlay(enabled: bool) -> void:
+	"""Toggle grid overlay visibility"""
+	show_grid = enabled
+	if ui_controls.has("show_grid"):
+		ui_controls["show_grid"].set_pressed_no_signal(enabled)
+	save_settings()
+	settings_changed.emit()
+
+func toggle_random_rotation(enabled: bool) -> void:
+	"""Toggle random rotation on placement"""
+	random_rotation = enabled
+	if ui_controls.has("random_rotation"):
+		ui_controls["random_rotation"].set_pressed_no_signal(enabled)
+	save_settings()
+	settings_changed.emit()
+
+func cycle_placement_strategy() -> String:
+	"""Cycle through placement strategies (collision/plane)"""
+	# Cycle the strategy
+	var new_strategy = PlacementStrategyManager.cycle_strategy()
+	
+	# Update our property to match
+	placement_strategy = new_strategy
+	
+	# Update the UI control if it exists
+	if ui_controls.has("placement_strategy"):
+		var option_button = ui_controls["placement_strategy"] as OptionButton
+		if option_button:
+			# Find the index of the new strategy
+			var strategies = ["auto", "collision", "plane"]
+			var index = strategies.find(new_strategy)
+			if index >= 0:
+				option_button.selected = index
+	
+	# Save and notify
+	save_settings()
+	settings_changed.emit()
+	
+	return new_strategy
+
 
 
 

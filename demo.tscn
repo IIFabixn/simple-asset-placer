@@ -43,7 +43,7 @@ transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 3, -
 transform = Transform3D(7.549784e-08, 0, -0.9999991, 0, 1, 0, 0.9999991, 0, 7.549784e-08, 3, 1.4305115e-06, 1)
 
 [node name="tower-top" parent="." instance=ExtResource("4_c6xj6")]
-transform = Transform3D(-1.6292067e-07, 1.8213079e-07, 1, 8.1460335e-08, 1, -1.8213078e-07, -1, 8.146031e-08, -1.6292068e-07, 0, -1.4901161e-09, -2)
+transform = Transform3D(-1.6292067e-07, 1.8213079e-07, 1, 8.1460335e-08, 1, -1.8213078e-07, -1, 8.146031e-08, -1.6292068e-07, -1, -0.039298058, -2)
 
 [node name="building_d" parent="." instance=ExtResource("6_kem5a")]
 transform = Transform3D(-1, 0, -1.509958e-07, 0, 1, 0, 1.509958e-07, 0, -1, -4, -0.10000048, -2)
@@ -53,3 +53,9 @@ transform = Transform3D(0.9659257, 0, -0.25881898, 0, 1, 0, 0.25881898, 0, 0.965
 
 [node name="barrels_2_2" parent="." instance=ExtResource("7_gxmxl")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.039298296, -5.5)
+
+[node name="barrels_2_3" parent="." instance=ExtResource("7_gxmxl")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, -0.03929639, -5)
+
+[node name="barrels_2_4" parent="." instance=ExtResource("7_gxmxl")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.039298296, -4)

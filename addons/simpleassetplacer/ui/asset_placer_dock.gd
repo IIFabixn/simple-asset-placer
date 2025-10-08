@@ -328,6 +328,10 @@ func get_placement_settings() -> Dictionary:
 		return placement_settings.get_placement_settings()
 	return {}
 
+func get_placement_settings_instance() -> PlacementSettings:
+	"""Get the PlacementSettings instance (for passing to other components)"""
+	return placement_settings
+
 func refresh_placement_settings_ui():
 	"""Reload placement settings UI from saved values (useful after programmatic changes)"""
 	if placement_settings and placement_settings.has_method("load_settings"):

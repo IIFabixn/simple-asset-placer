@@ -2,7 +2,91 @@
 
 ## [Unreleased]
 
-### 🏗️ Refactored
+### � UI/UX Improvements
+
+#### Toolbar Button Migration
+- **Moved Quick Action Buttons to 3D Viewport Toolbar**: Relocated 4 interactive buttons from status overlay to viewport menu bar
+  - Buttons now appear in `CONTAINER_SPATIAL_EDITOR_MENU` next to Transform/View tools
+  - Eliminated input handling conflicts with 3D viewport
+  - Removed hacky overlay collision detection from `input_handler.gd`
+  - **Buttons**:
+    - 🎯 **Placement Mode** - Cycles between collision/plane placement strategies
+    - 📏 **Grid Snap** - Toggles grid snapping on/off
+    - 🔲 **Grid Overlay** - Toggles grid visualization
+    - 🔄 **Random Rotation** - Toggles random Y rotation on placement
+  - Flat button style matches Godot's native toolbar aesthetic
+  - Icon-only format with detailed tooltips on hover (71% space reduction: 440px → 128px)
+  - Toggle buttons show visual pressed/unpressed state
+  - Placement mode button icon changes (🎯 ↔ 📐) based on active strategy
+  - Two-way sync with settings panel maintained via dependency injection
+  - Settings persist across Godot sessions
+
+#### Status Overlay Restructure
+- **Flexible VBox Layout**: Completely restructured overlay with organized information hierarchy
+  - **Title Row** (HBoxContainer):
+    - Mode label (left): "🎯 PLACEMENT MODE" / "⚙️ TRANSFORM MODE"
+    - Node name (left): "- [node_name]" (hidden when no node selected)
+    - Spacer (flexible): Pushes strategy label to right
+    - Strategy label (right): "🎯 Collision" / "📐 Plane"
+  - **Transform Row** (HBoxContainer with VSeparators):
+    - Position: "Pos: X: 0.00  Y: 0.00  Z: 0.00" (orange/yellow color)
+    - VSeparator │ (visual divider)
+    - Rotation: "Rot: X: 0.0°  Y: 0.0°  Z: 0.0°" (light green color)
+    - VSeparator │ (visual divider)
+    - Scale: "Scale: 100.0%" (light purple color)
+  - **Keybinds Row**: Context-sensitive controls (gray, smaller text)
+  - **Size Optimization**: Reduced from 800×120px to 700×100px (27% smaller)
+  - **Color-coded sections** for quick visual scanning
+  - **Better readability** with transform values spread horizontally
+  - Mouse filter set to `IGNORE` (no interaction, pure display)
+
+#### Visual Improvements
+- **Compact Design**: Overlay reduced padding (10px → 8px), spacing (8px → 6px)
+- **Font Sizes**: Optimized for readability - Mode (13), Transforms (10), Keybinds (9)
+- **Clean Separation**: VSeparators between position/rotation/scale for clear visual grouping
+- **Professional Look**: Matches Godot editor panel aesthetics
+
+### ✨ New Features
+- **Created toolbar_buttons.tscn**: New scene with 4 quick action buttons
+- **Created toolbar_buttons.gd**: Controller script with button handlers and state management
+- **Icon-Only Buttons**: Compact 32px buttons with emoji icons and tooltips
+- **Visual State Indicators**: Toggle buttons show ON/OFF via pressed/flat appearance
+
+### 🐛 Fixed
+- **Input Handling Conflicts**: Removed overlay from blocking viewport clicks
+  - Simplified `is_mouse_in_viewport()` in `input_handler.gd` (removed 15+ lines of overlay collision detection)
+  - Eliminated false click confirmations during placement
+- **Toolbar Button Initial State**: Fixed buttons not reflecting saved settings on load
+  - Removed hardcoded `button_pressed = true` from scene file
+  - Added deferred state update in `_ready()` to wait for managers initialization
+  - Buttons now correctly show actual settings state (not hardcoded values)
+- **Button State Sync**: Toggle buttons properly sync with settings panel changes
+
+### 🔧 Improved
+- **Cleaner Architecture**: Clear separation between status display (overlay) and interactive controls (toolbar)
+- **Better User Experience**: Buttons in familiar toolbar location with native Godot feel
+- **More Viewport Space**: Smaller overlay leaves more room for 3D work
+- **Reduced Code Complexity**: Removed ~100 lines of button logic from overlay script
+
+### 📁 Files Added
+- `addons/simpleassetplacer/ui/toolbar_buttons.tscn` - Toolbar button scene
+- `addons/simpleassetplacer/ui/toolbar_buttons.gd` - Toolbar controller script
+- `TOOLBAR_MIGRATION_SUMMARY.md` - Complete migration documentation
+- `TOOLBAR_MIGRATION_QUICK_REF.md` - Visual reference guide
+- `STATUS_OVERLAY_FLEXIBLE_LAYOUT.md` - Layout restructure documentation
+- `STATUS_OVERLAY_VSEPARATORS.md` - VSeparator addition notes
+- `UI_REFINEMENTS_COMPACT.md` - Size optimization documentation
+- `TOOLBAR_ICON_ONLY_BUTTONS.md` - Icon-only conversion guide
+- `TOOLBAR_BUTTON_INITIAL_STATE_FIX.md` - State initialization fix documentation
+
+### 📝 Files Modified
+- `addons/simpleassetplacer/simpleassetplacer.gd` - Added toolbar setup/cleanup, container integration
+- `addons/simpleassetplacer/ui/status_overlay.tscn` - Restructured with VBox layout, removed buttons, reduced size
+- `addons/simpleassetplacer/ui/status_overlay_control.gd` - Simplified to display-only (~100 lines removed)
+- `addons/simpleassetplacer/managers/input_handler.gd` - Simplified viewport check (removed overlay collision detection)
+- `addons/simpleassetplacer/managers/overlay_manager.gd` - Added toolbar reference handling
+
+### �🏗️ Refactored
 
 - **Directory Structure**: Reorganized plugin files into logical folder hierarchy for better maintainability
   - Created 7 organized subdirectories: `core/`, `placement/`, `ui/`, `settings/`, `managers/`, `thumbnails/`, `utils/`

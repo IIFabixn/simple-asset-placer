@@ -1,0 +1,121 @@
+[gd_scene load_steps=3 format=3 uid="uid://c8x4y2jb3qxa0"]
+
+[ext_resource type="Script" uid="uid://cjbq8xojekc2i" path="res://addons/simpleassetplacer/ui/status_overlay_control.gd" id="1_control"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_status"]
+bg_color = Color(0, 0, 0, 0.8)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.5, 0.5, 0.5, 0.9)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="StatusOverlay" type="CanvasLayer"]
+script = ExtResource("1_control")
+
+[node name="OverlayControl" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="StatusPanel" type="Panel" parent="OverlayControl"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -350.0
+offset_top = -100.0
+offset_right = 350.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_status")
+
+[node name="ContentVBox" type="VBoxContainer" parent="OverlayControl/StatusPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = -8.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 6
+
+[node name="TitleHBox" type="HBoxContainer" parent="OverlayControl/StatusPanel/ContentVBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ModeLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox/TitleHBox"]
+layout_mode = 2
+size_flags_horizontal = 0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "🎯 PLACEMENT MODE"
+
+[node name="NodeLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox/TitleHBox"]
+layout_mode = 2
+size_flags_horizontal = 0
+theme_override_colors/font_color = Color(0.8, 0.8, 0.8, 1)
+theme_override_font_sizes/font_size = 11
+text = ""
+
+[node name="Spacer" type="Control" parent="OverlayControl/StatusPanel/ContentVBox/TitleHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="StrategyLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox/TitleHBox"]
+layout_mode = 2
+size_flags_horizontal = 0
+theme_override_colors/font_color = Color(0.7, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 11
+text = "🎯 Collision"
+
+[node name="TransformHBox" type="HBoxContainer" parent="OverlayControl/StatusPanel/ContentVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PositionLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox/TransformHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 0.8, 0.4, 1)
+theme_override_font_sizes/font_size = 10
+text = "Pos: X: 0.00  Y: 0.00  Z: 0.00"
+
+[node name="VSeparator1" type="VSeparator" parent="OverlayControl/StatusPanel/ContentVBox/TransformHBox"]
+layout_mode = 2
+
+[node name="RotationLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox/TransformHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.6, 1, 0.6, 1)
+theme_override_font_sizes/font_size = 10
+text = "Rot: X: 0.0°  Y: 0.0°  Z: 0.0°"
+
+[node name="VSeparator2" type="VSeparator" parent="OverlayControl/StatusPanel/ContentsVBox/TransformHBox"]
+layout_mode = 2
+
+[node name="ScaleLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox/TransformHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.8, 0.6, 1, 1)
+theme_override_font_sizes/font_size = 10
+text = "Scale: 100.0%"
+
+[node name="KeybindsLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+theme_override_font_sizes/font_size = 9
+text = "WASD (Move)  Q/E (Height)  PgUp/PgDn (Scale)  Mouse (Rotate)  P (Mode)"

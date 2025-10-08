@@ -31,9 +31,13 @@ USED BY: TransformationManager for all UI feedback
 DEPENDS ON: Godot UI system, EditorInterface for overlay containers
 """
 
+# Preload the status overlay scene
+const StatusOverlayScene = preload("res://addons/simpleassetplacer/ui/status_overlay.tscn")
+
 # Overlay references
 static var main_overlay: Control = null
-static var status_overlay: Control = null
+static var status_overlay: CanvasLayer = null  # Now loaded from scene as CanvasLayer
+static var toolbar_buttons: Control = null  # Toolbar buttons in 3D viewport menu
 static var grid_overlay: Node3D = null  # 3D grid visualization (main grid)
 static var half_step_grid_overlay: Node3D = null  # 3D half-step grid visualization (red)
 
@@ -68,162 +72,76 @@ static func _create_main_overlay():
 	if editor_viewport:
 		editor_viewport.add_child(main_overlay)
 	
-	# Create unified status overlay
-	_create_status_overlay()
+	# Load status overlay from scene
+	_load_status_overlay_scene()
 
 ## Status Overlay
 
-static func _create_status_overlay():
-	"""Create unified status overlay box in bottom center"""
+static func _load_status_overlay_scene():
+	"""Load status overlay from scene file"""
 	if status_overlay and is_instance_valid(status_overlay):
 		return
 	
-	# Main container for the overlay box
-	status_overlay = Control.new()
-	status_overlay.name = "StatusOverlay"
-	status_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	status_overlay.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	# Instance the status overlay scene (CanvasLayer)
+	status_overlay = StatusOverlayScene.instantiate()
 	
-	# Background panel for the overlay box
-	var panel = Panel.new()
-	panel.name = "StatusPanel"
+	# Add to the 3D viewport specifically so it's positioned relative to viewport, not entire editor
+	var viewport_3d = EditorInterface.get_editor_viewport_3d(0)
+	if viewport_3d:
+		viewport_3d.add_child(status_overlay)
 	
-	# Style the panel with dark background and border
-	var style_box = StyleBoxFlat.new()
-	style_box.bg_color = Color(0.0, 0.0, 0.0, 0.8)
-	style_box.border_color = Color(0.5, 0.5, 0.5, 0.9)
-	style_box.border_width_top = 2
-	style_box.border_width_bottom = 2
-	style_box.border_width_left = 2
-	style_box.border_width_right = 2
-	style_box.corner_radius_top_left = 8
-	style_box.corner_radius_top_right = 8
-	style_box.corner_radius_bottom_left = 8
-	style_box.corner_radius_bottom_right = 8
-	
-	panel.add_theme_stylebox_override("panel", style_box)
-	
-	# Position panel in bottom center (wider to accommodate placement strategy)
-	panel.size = Vector2(700, 120)
-	panel.position = Vector2(-350, -130)  # Centered horizontally, 130 pixels from bottom
-	panel.anchor_left = 0.5
-	panel.anchor_right = 0.5
-	panel.anchor_top = 1.0
-	panel.anchor_bottom = 1.0
-	
-	# Create main status label
-	var status_label = Label.new()
-	status_label.name = "StatusLabel"
-	status_label.text = "Asset Placer Ready"
-	status_label.add_theme_color_override("font_color", Color.WHITE)
-	status_label.add_theme_font_size_override("font_size", 14)
-	status_label.position = Vector2(10, 10)
-	status_label.size = Vector2(680, 25)
-	
-	# Create transform info label
-	var transform_label = Label.new()
-	transform_label.name = "TransformLabel"
-	transform_label.text = ""
-	transform_label.add_theme_color_override("font_color", Color.CYAN)
-	transform_label.add_theme_font_size_override("font_size", 12)
-	transform_label.position = Vector2(10, 35)
-	transform_label.size = Vector2(680, 75)
-	transform_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	transform_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
-	
-	panel.add_child(status_label)
-	panel.add_child(transform_label)
-	status_overlay.add_child(panel)
-	
-	if main_overlay:
-		main_overlay.add_child(status_overlay)
-	
-	status_overlay.visible = false
+	# Set visible to false AFTER it's in the tree (deferred to ensure _ready() has run)
+	status_overlay.call_deferred("set_visible", false)
+
+static func set_placement_settings_reference(placement_settings: Node):
+	"""Set the PlacementSettings reference for the status overlay"""
+	if status_overlay and is_instance_valid(status_overlay) and status_overlay.has_method("set_placement_settings"):
+		status_overlay.set_placement_settings(placement_settings)
+
+static func set_toolbar_reference(toolbar: Control):
+	"""Set the toolbar buttons reference"""
+	toolbar_buttons = toolbar
 
 static func show_transform_overlay(mode: TransformationManager.Mode, node_name: String = "", position: Vector3 = Vector3.ZERO, rotation: Vector3 = Vector3.ZERO, scale: float = 1.0, height_offset: float = 0.0):
 	"""Show unified transform overlay with all current transformation data"""
-	if not show_overlays or not status_overlay:
+	if not show_overlays or not status_overlay or not is_instance_valid(status_overlay):
 		return
 	
-	var status_label = status_overlay.get_node("StatusPanel/StatusLabel")
-	var transform_label = status_overlay.get_node("StatusPanel/TransformLabel")
+	# Ensure the scene is ready before calling methods (check if @onready vars are initialized)
+	if not status_overlay.is_node_ready():
+		return
 	
-	if status_label and transform_label:
-		# Get current placement strategy for display
-		var strategy_name = PlacementStrategyManager.get_active_strategy_name()
-		var strategy_icon = "🎯" if PlacementStrategyManager.get_active_strategy_type() == "collision" else "📐"
-		
-		# Set mode-specific status message with strategy indicator
-		match mode:
-			TransformationManager.Mode.PLACEMENT:
-				status_label.text = "🎯 PLACEMENT MODE" + (" - " + node_name if node_name != "" else "") + "  |  " + strategy_icon + " " + strategy_name
-				status_label.add_theme_color_override("font_color", Color.YELLOW)
-			TransformationManager.Mode.TRANSFORM:
-				status_label.text = "⚙️ TRANSFORM MODE" + (" - " + node_name if node_name != "" else "") + "  |  " + strategy_icon + " " + strategy_name
-				status_label.add_theme_color_override("font_color", Color.CYAN)
-			_:
-				status_label.text = "🔧 Asset Placer Active  |  " + strategy_icon + " " + strategy_name
-				status_label.add_theme_color_override("font_color", Color.GREEN)
-		
-		# Build transform info text
-		var transform_text = ""
-		transform_text += "Position: X: %.2f  Y: %.2f  Z: %.2f\n" % [position.x, position.y, position.z]
-		transform_text += "Rotation: X: %.1f°  Y: %.1f°  Z: %.1f°\n" % [rad_to_deg(rotation.x), rad_to_deg(rotation.y), rad_to_deg(rotation.z)]
-		transform_text += "Scale: %.1f%%  " % (scale * 100.0)
-		
-		if height_offset != 0.0:
-			transform_text += "Height Offset: %.2f" % height_offset
-		else:
-			# Get actual keybinds from settings
-			var settings = SettingsManager.get_combined_settings()
-			var move_keys = "%s%s%s%s" % [
-				settings.get("position_forward_key", "W"),
-				settings.get("position_left_key", "A"),
-				settings.get("position_back_key", "S"),
-				settings.get("position_right_key", "D")
-			]
-			var height_up = settings.get("height_up_key", "Q")
-			var height_down = settings.get("height_down_key", "E")
-			var cycle_mode = settings.get("cycle_placement_mode_key", "P")
-			
-			# Show mode-specific keybinds with actual keys
-			if mode == TransformationManager.Mode.PLACEMENT:
-				transform_text += "%s (Move)  %s/%s (Height)  Mouse (Rotate)  PgUp/PgDn (Scale)  %s (Mode)" % [move_keys, height_up, height_down, cycle_mode]
-			else:  # transform mode
-				transform_text += "%s (Move)  %s/%s (Height)  Mouse+X/Y/Z (Rotate)  %s (Mode)  CTRL/ALT (Modifiers)" % [move_keys, height_up, height_down, cycle_mode]
-		
-		transform_label.text = transform_text
-	
-	status_overlay.visible = true
+	# Use the scene's controller method
+	status_overlay.show_transform_info(mode, node_name, position, rotation, scale, height_offset)
 	current_mode = mode
+
+static func refresh_overlay_buttons():
+	"""Refresh the button states in the toolbar"""
+	if toolbar_buttons and is_instance_valid(toolbar_buttons) and toolbar_buttons.has_method("refresh_button_states"):
+		toolbar_buttons.refresh_button_states()
 
 static func show_status_message(message: String, color: Color = Color.GREEN, duration: float = 0.0):
 	"""Show a temporary status message"""
-	if not show_overlays or not status_overlay:
+	if not show_overlays or not status_overlay or not is_instance_valid(status_overlay):
 		return
 	
-	var status_label = status_overlay.get_node("StatusPanel/StatusLabel")
-	var transform_label = status_overlay.get_node("StatusPanel/TransformLabel")
+	# Ensure the scene is ready before calling methods
+	if not status_overlay.is_node_ready():
+		return
 	
-	if status_label and transform_label:
-		status_label.text = message
-		status_label.add_theme_color_override("font_color", color)
-		transform_label.text = ""  # Clear transform info for simple messages
-	
-	status_overlay.visible = true
+	# Use the scene's controller method
+	status_overlay.show_status_message(message, color)
 	
 	# Auto-hide after duration if specified
 	if duration > 0.0:
 		await Engine.get_main_loop().create_timer(duration).timeout
 		if status_overlay and current_mode == TransformationManager.Mode.NONE:  # Only hide if not in active mode
-			status_overlay.visible = false
+			status_overlay.hide_overlay()
 
 static func hide_transform_overlay():
 	"""Hide the unified transform overlay"""
-	if status_overlay:
-		status_overlay.visible = false
-		# Also hide it deferred to ensure it stays hidden
-		status_overlay.call_deferred("set_visible", false)
+	if status_overlay and is_instance_valid(status_overlay) and status_overlay.is_node_ready():
+		status_overlay.hide_overlay()
 	current_mode = TransformationManager.Mode.NONE
 
 static func hide_status_overlay():

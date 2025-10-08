@@ -27,8 +27,12 @@ const AssetPlacerDock = preload("res://addons/simpleassetplacer/ui/asset_placer_
 const ThumbnailGenerator = preload("res://addons/simpleassetplacer/thumbnails/thumbnail_generator.gd")
 const ThumbnailQueueManager = preload("res://addons/simpleassetplacer/thumbnails/thumbnail_queue_manager.gd")
 
+# Toolbar scene
+const ToolbarButtonsScene = preload("res://addons/simpleassetplacer/ui/toolbar_buttons.tscn")
+
 # Plugin state
 var dock: AssetPlacerDock
+var toolbar_buttons: Control = null
 
 ## Plugin Lifecycle
 
@@ -44,6 +48,7 @@ func _enter_tree() -> void:
 	# Initialize systems in order
 	_initialize_systems()
 	_setup_dock()
+	_setup_toolbar()
 	_load_settings()
 	
 	# Enable input forwarding for reliable input handling
@@ -56,6 +61,7 @@ func _exit_tree() -> void:
 	
 	# Clean up in reverse order
 	_cleanup_systems()
+	_cleanup_toolbar()
 	_cleanup_dock()
 	
 	PluginLogger.log_cleanup_complete(PluginConstants.COMPONENT_MAIN)
@@ -113,7 +119,18 @@ func _setup_dock():
 	# Store dock reference for UI updates
 	TransformationManager.dock_reference = dock
 	
+	# Set PlacementSettings reference for status overlay (deferred to ensure dock is fully initialized)
+	call_deferred("_connect_placement_settings_to_overlay")
+	
 	PluginLogger.info(PluginConstants.COMPONENT_DOCK, "Dock setup complete")
+
+func _connect_placement_settings_to_overlay():
+	"""Connect the PlacementSettings reference to the status overlay"""
+	if dock and dock.has_method("get_placement_settings_instance"):
+		var placement_settings = dock.get_placement_settings_instance()
+		if placement_settings:
+			OverlayManager.set_placement_settings_reference(placement_settings)
+			PluginLogger.info(PluginConstants.COMPONENT_DOCK, "PlacementSettings reference connected to overlay")
 
 func _cleanup_dock():
 	"""Clean up the dock"""
@@ -124,6 +141,40 @@ func _cleanup_dock():
 	
 	# Clear dock reference
 	TransformationManager.dock_reference = null
+
+## Toolbar Management
+
+func _setup_toolbar():
+	"""Set up the toolbar buttons in 3D viewport"""
+	if ToolbarButtonsScene:
+		toolbar_buttons = ToolbarButtonsScene.instantiate()
+		
+		# Add to spatial editor menu container
+		add_control_to_container(CONTAINER_SPATIAL_EDITOR_MENU, toolbar_buttons)
+		
+		# Set PlacementSettings reference (deferred to ensure dock is fully initialized)
+		call_deferred("_connect_placement_settings_to_toolbar")
+		
+		PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Toolbar setup complete")
+
+func _connect_placement_settings_to_toolbar():
+	"""Connect the PlacementSettings reference to the toolbar"""
+	if dock and dock.has_method("get_placement_settings_instance") and toolbar_buttons:
+		var placement_settings = dock.get_placement_settings_instance()
+		if placement_settings and toolbar_buttons.has_method("set_placement_settings"):
+			toolbar_buttons.set_placement_settings(placement_settings)
+			OverlayManager.set_toolbar_reference(toolbar_buttons)
+			PluginLogger.info(PluginConstants.COMPONENT_MAIN, "PlacementSettings reference connected to toolbar")
+
+func _cleanup_toolbar():
+	"""Clean up the toolbar"""
+	if toolbar_buttons:
+		remove_control_from_container(CONTAINER_SPATIAL_EDITOR_MENU, toolbar_buttons)
+		toolbar_buttons.queue_free()
+		toolbar_buttons = null
+	
+	# Clear toolbar reference in OverlayManager
+	OverlayManager.set_toolbar_reference(null)
 
 ## Settings Management
 

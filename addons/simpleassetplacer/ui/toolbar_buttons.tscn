@@ -1,0 +1,42 @@
+[gd_scene load_steps=2 format=3 uid="uid://dvx4j2k8qr1a5"]
+
+[ext_resource type="Script" path="res://addons/simpleassetplacer/ui/toolbar_buttons.gd" id="1_toolbar"]
+
+[node name="ToolbarButtons" type="HBoxContainer"]
+script = ExtResource("1_toolbar")
+
+[node name="PlacementModeButton" type="Button" parent="."]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+tooltip_text = "Cycle Placement Strategy
+🎯 Collision-based
+📐 Plane-based"
+flat = true
+text = "🎯"
+
+[node name="GridSnapButton" type="Button" parent="."]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+tooltip_text = "Toggle Grid Snapping
+Snap objects to grid positions"
+toggle_mode = true
+flat = true
+text = "📏"
+
+[node name="GridOverlayButton" type="Button" parent="."]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+tooltip_text = "Toggle Grid Overlay
+Show/hide visual grid"
+toggle_mode = true
+flat = true
+text = "🔲"
+
+[node name="RandomRotationButton" type="Button" parent="."]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+tooltip_text = "Toggle Random Y Rotation
+Randomize rotation on placement"
+toggle_mode = true
+flat = true
+text = "🔄"

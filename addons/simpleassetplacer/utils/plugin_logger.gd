@@ -65,8 +65,6 @@ static func warning(component: String, message: String) -> void:
 static func error(component: String, message: String) -> void:
 	"""Log an error message - always shown"""
 	_log(LogLevel.ERROR, component, message)
-	# Also use Godot's push_error for errors to show in debugger
-	push_error("[" + component + "] " + message)
 
 ## Configuration
 
@@ -109,12 +107,19 @@ static func _log(level: LogLevel, component: String, message: String) -> void:
 	
 	var log_message = timestamp_string + "[" + level_string + "] [" + component + "] " + message
 	
-	# Use color coding if enabled
-	if use_colors and OS.has_feature("editor"):
-		var color = _get_level_color(level)
-		print_rich("[color=" + color + "]" + log_message + "[/color]")
-	else:
-		print(log_message)
+	# Use appropriate Godot logging function based on level
+	match level:
+		LogLevel.ERROR:
+			printerr(log_message)
+		LogLevel.WARNING:
+			push_warning(log_message)
+		LogLevel.DEBUG, LogLevel.INFO:
+			# Use color coding if enabled for debug/info
+			if use_colors and OS.has_feature("editor"):
+				var color = _get_level_color(level)
+				print_rich("[color=" + color + "]" + log_message + "[/color]")
+			else:
+				print(log_message)
 
 static func _get_level_string(level: LogLevel) -> String:
 	"""Get string representation of log level"""

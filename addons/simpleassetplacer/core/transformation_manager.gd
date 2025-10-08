@@ -1114,7 +1114,7 @@ static func handle_tab_key_activation(dock_instance = null):
 	var selected_nodes = selection.get_selected_nodes()
 	
 	if selected_nodes.is_empty():
-		OverlayManager.show_status_message("No node selected. Select a Node3D and press TAB.", Color.YELLOW, 3.0)
+		PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "No node selected. Select a Node3D and press TAB.")
 		return
 	
 	# Find ALL Node3D nodes in selection
@@ -1124,7 +1124,7 @@ static func handle_tab_key_activation(dock_instance = null):
 			target_node3ds.append(node)
 	
 	if target_node3ds.is_empty():
-		OverlayManager.show_status_message("Selected node is not a Node3D. Select a Node3D and press TAB.", Color.YELLOW, 3.0)
+		PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Selected node is not a Node3D. Select a Node3D and press TAB.")
 		return
 	
 	# Determine mode based on node context (check first node)

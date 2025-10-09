@@ -1,0 +1,111 @@
+[gd_scene load_steps=3 format=3 uid="uid://dyxmn4j2qw7vp"]
+
+[ext_resource type="Script" path="res://addons/simpleassetplacer/ui/status_overlay_control.gd" id="1_control"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_status"]
+bg_color = Color(0, 0, 0, 0.8)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.5, 0.5, 0.5, 0.9)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="StatusOverlay" type="CanvasLayer"]
+script = ExtResource("1_control")
+
+[node name="OverlayControl" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+
+[node name="StatusPanel" type="Panel" parent="OverlayControl"]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -350.0
+offset_top = -160.0
+offset_right = 350.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 1
+theme_override_styles/panel = SubResource("StyleBoxFlat_status")
+
+[node name="StatusLabel" type="Label" parent="OverlayControl/StatusPanel"]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 690.0
+offset_bottom = 35.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "Asset Placer Ready"
+
+[node name="TransformLabel" type="Label" parent="OverlayControl/StatusPanel"]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 35.0
+offset_right = 690.0
+offset_bottom = 105.0
+theme_override_colors/font_color = Color(0, 1, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = ""
+autowrap_mode = 3
+clip_text = false
+
+[node name="ButtonContainer" type="HBoxContainer" parent="OverlayControl/StatusPanel"]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 110.0
+offset_right = 690.0
+offset_bottom = 140.0
+mouse_filter = 1
+theme_override_constants/separation = 8
+
+[node name="PlacementModeButton" type="Button" parent="OverlayControl/StatusPanel/ButtonContainer"]
+custom_minimum_size = Vector2(120, 28)
+layout_mode = 2
+mouse_filter = 0
+tooltip_text = "Cycle Placement Strategy
+🎯 Collision-based
+📐 Plane-based"
+text = "🎯 Collision"
+
+[node name="GridSnapButton" type="Button" parent="OverlayControl/StatusPanel/ButtonContainer"]
+custom_minimum_size = Vector2(100, 28)
+layout_mode = 2
+mouse_filter = 0
+toggle_mode = true
+tooltip_text = "Toggle Grid Snapping
+Snap objects to grid positions"
+text = "📏 Snap: ON"
+
+[node name="GridOverlayButton" type="Button" parent="OverlayControl/StatusPanel/ButtonContainer"]
+custom_minimum_size = Vector2(100, 28)
+layout_mode = 2
+mouse_filter = 0
+toggle_mode = true
+tooltip_text = "Toggle Grid Overlay
+Show/hide visual grid"
+text = "🔲 Grid: ON"
+
+[node name="RandomRotationButton" type="Button" parent="OverlayControl/StatusPanel/ButtonContainer"]
+custom_minimum_size = Vector2(120, 28)
+layout_mode = 2
+mouse_filter = 0
+toggle_mode = true
+tooltip_text = "Toggle Random Y Rotation
+Randomize rotation on placement"
+text = "🔄 Random: OFF"

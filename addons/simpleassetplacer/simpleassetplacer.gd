@@ -5,27 +5,34 @@ extends EditorPlugin
 # Only handles editor integration and delegates everything to TransformationManager
 
 # Import utilities
-const PluginLogger = preload("res://addons/simpleassetplacer/plugin_logger.gd")
-const PluginConstants = preload("res://addons/simpleassetplacer/plugin_constants.gd")
-const SettingsManager = preload("res://addons/simpleassetplacer/settings_manager.gd")
-const ErrorHandler = preload("res://addons/simpleassetplacer/error_handler.gd")
+const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
+const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
+const SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
+const ErrorHandler = preload("res://addons/simpleassetplacer/utils/error_handler.gd")
 
 # Import specialized managers
-const InputHandler = preload("res://addons/simpleassetplacer/input_handler.gd")
-const PositionManager = preload("res://addons/simpleassetplacer/position_manager.gd")
-const OverlayManager = preload("res://addons/simpleassetplacer/overlay_manager.gd")
-const RotationManager = preload("res://addons/simpleassetplacer/rotation_manager.gd")
-const ScaleManager = preload("res://addons/simpleassetplacer/scale_manager.gd")
-const PreviewManager = preload("res://addons/simpleassetplacer/preview_manager.gd")
-const TransformationManager = preload("res://addons/simpleassetplacer/transformation_manager.gd")
+const InputHandler = preload("res://addons/simpleassetplacer/managers/input_handler.gd")
+const PositionManager = preload("res://addons/simpleassetplacer/core/position_manager.gd")
+const OverlayManager = preload("res://addons/simpleassetplacer/managers/overlay_manager.gd")
+const RotationManager = preload("res://addons/simpleassetplacer/core/rotation_manager.gd")
+const ScaleManager = preload("res://addons/simpleassetplacer/core/scale_manager.gd")
+const PreviewManager = preload("res://addons/simpleassetplacer/managers/preview_manager.gd")
+const TransformationManager = preload("res://addons/simpleassetplacer/core/transformation_manager.gd")
+
+# Import placement strategy system
+const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placement/placement_strategy_manager.gd")
 
 # Import dock and utilities (keep existing)
-const AssetPlacerDock = preload("res://addons/simpleassetplacer/asset_placer_dock.gd")
-const ThumbnailGenerator = preload("res://addons/simpleassetplacer/thumbnail_generator.gd")
-const ThumbnailQueueManager = preload("res://addons/simpleassetplacer/thumbnail_queue_manager.gd")
+const AssetPlacerDock = preload("res://addons/simpleassetplacer/ui/asset_placer_dock.gd")
+const ThumbnailGenerator = preload("res://addons/simpleassetplacer/thumbnails/thumbnail_generator.gd")
+const ThumbnailQueueManager = preload("res://addons/simpleassetplacer/thumbnails/thumbnail_queue_manager.gd")
+
+# Toolbar scene
+const ToolbarButtonsScene = preload("res://addons/simpleassetplacer/ui/toolbar_buttons.tscn")
 
 # Plugin state
 var dock: AssetPlacerDock
+var toolbar_buttons: Control = null
 
 ## Plugin Lifecycle
 
@@ -41,6 +48,7 @@ func _enter_tree() -> void:
 	# Initialize systems in order
 	_initialize_systems()
 	_setup_dock()
+	_setup_toolbar()
 	_load_settings()
 	
 	# Enable input forwarding for reliable input handling
@@ -53,6 +61,7 @@ func _exit_tree() -> void:
 	
 	# Clean up in reverse order
 	_cleanup_systems()
+	_cleanup_toolbar()
 	_cleanup_dock()
 	
 	PluginLogger.log_cleanup_complete(PluginConstants.COMPONENT_MAIN)
@@ -67,9 +76,12 @@ func _initialize_systems():
 	# Initialize error handler with editor interface instance
 	ErrorHandler.initialize(get_editor_interface())
 	
+	# Initialize placement strategy system
+	PlacementStrategyManager.initialize()
+	
 	# Initialize core systems
 	InputHandler.update_input_state({})  # Initialize with empty settings initially
-	PositionManager.configure({})
+	# Note: PositionManager.configure() is called when modes are started with transform_state
 	OverlayManager.initialize_overlays()
 	
 	# Initialize thumbnail system
@@ -88,6 +100,7 @@ func _cleanup_systems():
 	TransformationManager.cleanup()
 	ThumbnailGenerator.cleanup()
 	ThumbnailQueueManager.cleanup()
+	PlacementStrategyManager.cleanup()
 
 ## Dock Management
 
@@ -103,7 +116,21 @@ func _setup_dock():
 	# Add to Godot dock
 	add_control_to_dock(DOCK_SLOT_RIGHT_UL, dock)
 	
+	# Store dock reference for UI updates
+	TransformationManager.dock_reference = dock
+	
+	# Set PlacementSettings reference for status overlay (deferred to ensure dock is fully initialized)
+	call_deferred("_connect_placement_settings_to_overlay")
+	
 	PluginLogger.info(PluginConstants.COMPONENT_DOCK, "Dock setup complete")
+
+func _connect_placement_settings_to_overlay():
+	"""Connect the PlacementSettings reference to the status overlay"""
+	if dock and dock.has_method("get_placement_settings_instance"):
+		var placement_settings = dock.get_placement_settings_instance()
+		if placement_settings:
+			OverlayManager.set_placement_settings_reference(placement_settings)
+			PluginLogger.info(PluginConstants.COMPONENT_DOCK, "PlacementSettings reference connected to overlay")
 
 func _cleanup_dock():
 	"""Clean up the dock"""
@@ -111,6 +138,43 @@ func _cleanup_dock():
 		remove_control_from_docks(dock)
 		dock.queue_free()
 		dock = null
+	
+	# Clear dock reference
+	TransformationManager.dock_reference = null
+
+## Toolbar Management
+
+func _setup_toolbar():
+	"""Set up the toolbar buttons in 3D viewport"""
+	if ToolbarButtonsScene:
+		toolbar_buttons = ToolbarButtonsScene.instantiate()
+		
+		# Add to spatial editor menu container
+		add_control_to_container(CONTAINER_SPATIAL_EDITOR_MENU, toolbar_buttons)
+		
+		# Set PlacementSettings reference (deferred to ensure dock is fully initialized)
+		call_deferred("_connect_placement_settings_to_toolbar")
+		
+		PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Toolbar setup complete")
+
+func _connect_placement_settings_to_toolbar():
+	"""Connect the PlacementSettings reference to the toolbar"""
+	if dock and dock.has_method("get_placement_settings_instance") and toolbar_buttons:
+		var placement_settings = dock.get_placement_settings_instance()
+		if placement_settings and toolbar_buttons.has_method("set_placement_settings"):
+			toolbar_buttons.set_placement_settings(placement_settings)
+			OverlayManager.set_toolbar_reference(toolbar_buttons)
+			PluginLogger.info(PluginConstants.COMPONENT_MAIN, "PlacementSettings reference connected to toolbar")
+
+func _cleanup_toolbar():
+	"""Clean up the toolbar"""
+	if toolbar_buttons:
+		remove_control_from_container(CONTAINER_SPATIAL_EDITOR_MENU, toolbar_buttons)
+		toolbar_buttons.queue_free()
+		toolbar_buttons = null
+	
+	# Clear toolbar reference in OverlayManager
+	OverlayManager.set_toolbar_reference(null)
 
 ## Settings Management
 
@@ -139,7 +203,11 @@ func _process(delta: float) -> void:
 		SettingsManager.set_dock_settings(dock_settings)
 	
 	# Delegate frame processing to coordinator with combined settings
-	TransformationManager.process_frame_input(camera, SettingsManager.get_combined_settings())
+	TransformationManager.process_frame_input(camera, SettingsManager.get_combined_settings(), delta)
+	
+	# Update transform mode button state
+	if toolbar_buttons and toolbar_buttons.has_method("set_transform_mode_active"):
+		toolbar_buttons.set_transform_mode_active(TransformationManager.is_transform_mode())
 
 func _is_plugin_ready() -> bool:
 	"""Check if plugin is ready for processing"""
@@ -392,3 +460,10 @@ func debug_print_status():
 	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "System Status:")
 	for key in status:
 		PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "  " + key + ": " + str(status[key]))
+
+
+
+
+
+
+

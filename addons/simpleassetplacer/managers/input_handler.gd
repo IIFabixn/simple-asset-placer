@@ -66,8 +66,6 @@ static func update_input_state(input_settings: Dictionary = {}, viewport: SubVie
 	if viewport:
 		cached_viewport = viewport
 	
-
-	
 	# Store previous state for edge detection
 	previous_keys = current_keys.duplicate()
 	previous_mouse = current_mouse.duplicate()
@@ -88,6 +86,7 @@ static func _update_key_states():
 	
 	# Core navigation keys - use universal modifier support
 	current_keys["tab"] = _check_key_with_modifiers(settings.get("transform_mode_key", "TAB"))
+	current_keys["confirm"] = _check_key_with_modifiers(settings.get("confirm_action_key", "ENTER"))
 	current_keys["escape"] = Input.is_key_pressed(KEY_ESCAPE)
 	current_keys["shift"] = Input.is_key_pressed(KEY_SHIFT)
 	current_keys["ctrl"] = Input.is_key_pressed(KEY_CTRL)
@@ -280,8 +279,6 @@ static func _track_key_press_time(key_name: String, current_time: float):
 		if active_repeat_key == key_name:
 			active_repeat_key = ""
 			active_repeat_modifiers.clear()
-
-
 
 static func _update_mouse_states():
 	"""Update mouse state"""
@@ -485,7 +482,7 @@ static func get_position_input() -> Dictionary:
 		"position_backward_pressed": (is_key_just_pressed("position_backward") or is_action_key_held_with_repeat("position_backward", "position")) and not right_mouse_held,
 		"reset_position_pressed": is_key_just_pressed("reset_position") and not right_mouse_held,
 		"mouse_position": get_mouse_position(),
-		"left_clicked": is_mouse_button_just_pressed("left") and is_mouse_in_viewport(),
+		"confirm_action": (is_mouse_button_just_pressed("left") and is_mouse_in_viewport()) or is_key_just_pressed("confirm"),
 		"reverse_modifier_held": is_reverse_modifier_held(),
 		"large_increment_modifier_held": is_large_increment_modifier_held(),
 		"fine_increment_modifier_held": is_fine_increment_modifier_held()

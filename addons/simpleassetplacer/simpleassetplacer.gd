@@ -204,6 +204,10 @@ func _process(delta: float) -> void:
 	
 	# Delegate frame processing to coordinator with combined settings
 	TransformationManager.process_frame_input(camera, SettingsManager.get_combined_settings(), delta)
+	
+	# Update transform mode button state
+	if toolbar_buttons and toolbar_buttons.has_method("set_transform_mode_active"):
+		toolbar_buttons.set_transform_mode_active(TransformationManager.is_transform_mode())
 
 func _is_plugin_ready() -> bool:
 	"""Check if plugin is ready for processing"""

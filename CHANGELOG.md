@@ -2,6 +2,43 @@
 
 ## [Unreleased]
 
+### ✨ New Features
+
+#### Enhanced Quick Actions - Priority 1 Improvements
+- **Transform Mode Button**: Added toolbar button for Transform Mode visibility and control
+  - 🔧 **Transform Mode** - Toggle button shows when transform mode is active
+  - Displays `(TAB)` keyboard shortcut in tooltip (dynamically updated)
+  - Click to enter transform mode (requires selected Node3D objects)
+  - Click again to exit and confirm changes
+  - Button state automatically syncs with TAB key presses
+  - Visual feedback shows transform mode active state
+- **Reset All Transforms Button**: Quick action to reset all transform offsets at once
+  - ↺ **Reset All** - Momentary button clears position, rotation, scale, and height offsets
+  - Works in both Placement and Transform modes
+  - Shows feedback message when clicked
+  - Provides quick way to return to default transform state
+- **Dynamic Keybind Tooltips**: Tooltips now display actual configured keybinds
+  - Placement Mode tooltip shows configured `cycle_placement_mode_key` (default: P)
+  - Transform Mode tooltip shows configured `transform_mode_key` (default: TAB)
+  - Automatically updates when user changes keybinds in settings
+  - Reads directly from PlacementSettings for immediate consistency
+  - No more confusion from hardcoded default key hints
+
+#### Configurable Confirmation Keybind
+- **Keyboard Confirmation**: Added configurable keybind for confirming placements and transformations
+  - **Default Key**: Enter key (fully customizable in settings)
+  - **Works Alongside Mouse**: Both left mouse click and confirmation key work independently
+  - **Placement Mode**: Press Enter (or configured key) to place asset in scene
+  - **Transform Mode**: Press Enter (or configured key) to confirm transformations
+  - **Settings Integration**: "Confirm Placement/Transform" binding in Settings → Control Keys
+  - **Backward Compatible**: Left mouse click continues to work as before
+  - **Semantic Code**: Internal code now uses `confirm_action` instead of `left_clicked` for clarity
+  - Settings automatically persist across Godot sessions
+
+### 🎨 UI/UX Improvementsngelog
+
+## [Unreleased]
+
 ### � UI/UX Improvements
 
 #### Toolbar Button Migration
@@ -61,6 +98,17 @@
   - Added deferred state update in `_ready()` to wait for managers initialization
   - Buttons now correctly show actual settings state (not hardcoded values)
 - **Button State Sync**: Toggle buttons properly sync with settings panel changes
+- **Status Overlay Scene Path Typo**: Fixed `VSeparator2` parent path typo
+  - Changed `ContentsVBox` → `ContentVBox` in `status_overlay.tscn`
+  - Eliminated "path has vanished" warning on plugin load
+- **Dynamic Tooltip Updates**: Fixed tooltips showing outdated keybinds after changes
+  - Tooltips now read directly from PlacementSettings instance for immediate consistency
+  - Connected to `settings_changed` signal for automatic updates
+  - Deferred update ensures SettingsManager has refreshed values
+- **Placement Mode Button Icon Sync**: Fixed button icon not updating when using keyboard shortcut
+  - Placement mode button now updates icon (🎯 ↔ 📐) when cycling via keyboard (P key)
+  - Added `settings_changed.emit()` to `update_placement_strategy_ui()` in asset_placer_dock.gd
+  - Button icon now syncs correctly whether using button click or keyboard shortcut
 
 ### 🔧 Improved
 - **Cleaner Architecture**: Clear separation between status display (overlay) and interactive controls (toolbar)
@@ -69,8 +117,8 @@
 - **Reduced Code Complexity**: Removed ~100 lines of button logic from overlay script
 
 ### 📁 Files Added
-- `addons/simpleassetplacer/ui/toolbar_buttons.tscn` - Toolbar button scene
-- `addons/simpleassetplacer/ui/toolbar_buttons.gd` - Toolbar controller script
+- `addons/simpleassetplacer/ui/toolbar_buttons.tscn` - Toolbar button scene (6 buttons: 4 original + Transform Mode + Reset)
+- `addons/simpleassetplacer/ui/toolbar_buttons.gd` - Toolbar controller script with dynamic tooltip support
 - `TOOLBAR_MIGRATION_SUMMARY.md` - Complete migration documentation
 - `TOOLBAR_MIGRATION_QUICK_REF.md` - Visual reference guide
 - `STATUS_OVERLAY_FLEXIBLE_LAYOUT.md` - Layout restructure documentation
@@ -80,8 +128,10 @@
 - `TOOLBAR_BUTTON_INITIAL_STATE_FIX.md` - State initialization fix documentation
 
 ### 📝 Files Modified
-- `addons/simpleassetplacer/simpleassetplacer.gd` - Added toolbar setup/cleanup, container integration
-- `addons/simpleassetplacer/ui/status_overlay.tscn` - Restructured with VBox layout, removed buttons, reduced size
+- `addons/simpleassetplacer/simpleassetplacer.gd` - Added toolbar setup/cleanup, container integration, transform mode button sync
+- `addons/simpleassetplacer/ui/toolbar_buttons.tscn` - Added TransformModeButton and ResetTransformsButton nodes
+- `addons/simpleassetplacer/ui/toolbar_buttons.gd` - Added dynamic keybind tooltips, transform mode toggle, reset functionality, settings change listener
+- `addons/simpleassetplacer/ui/status_overlay.tscn` - Fixed VSeparator2 parent path typo, restructured with VBox layout, removed buttons, reduced size
 - `addons/simpleassetplacer/ui/status_overlay_control.gd` - Simplified to display-only (~100 lines removed)
 - `addons/simpleassetplacer/managers/input_handler.gd` - Simplified viewport check (removed overlay collision detection)
 - `addons/simpleassetplacer/managers/overlay_manager.gd` - Added toolbar reference handling

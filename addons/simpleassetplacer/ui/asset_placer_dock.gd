@@ -372,6 +372,9 @@ func update_placement_strategy_ui(strategy: String):
 				# Save to EditorSettings so it persists
 				placement_settings.save_settings()
 				
+				# Emit settings_changed to update toolbar buttons
+				placement_settings.settings_changed.emit()
+				
 				PluginLogger.info(PluginConstants.COMPONENT_DOCK, "Updated placement strategy UI to: " + strategy)
 			else:
 				PluginLogger.warning(PluginConstants.COMPONENT_DOCK, "Strategy not found in options: " + strategy)

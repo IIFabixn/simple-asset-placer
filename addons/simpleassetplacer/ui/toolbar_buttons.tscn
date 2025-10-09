@@ -40,3 +40,21 @@ Randomize rotation on placement"
 toggle_mode = true
 flat = true
 text = "🔄"
+
+[node name="TransformModeButton" type="Button" parent="."]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+tooltip_text = "Transform Mode
+Edit placed objects
+Position, Rotation, Scale"
+toggle_mode = true
+flat = true
+text = "🔧"
+
+[node name="ResetTransformsButton" type="Button" parent="."]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+tooltip_text = "Reset All Transforms
+Clear position, rotation, scale, height offsets"
+flat = true
+text = "↺"

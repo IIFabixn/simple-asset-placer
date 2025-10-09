@@ -571,7 +571,7 @@ static func _process_placement_input(camera: Camera3D):
 	_process_asset_cycling_input()
 	
 	# Handle placement action
-	if position_input.left_clicked:
+	if position_input.confirm_action:
 		place_at_preview_position()
 	
 	# Update overlays with current state
@@ -772,7 +772,7 @@ static func _process_transform_input(camera: Camera3D):
 			_process_scale_input(scale_input, node, node_original_scale)
 	
 	# Handle transform confirmation
-	if position_input.left_clicked:
+	if position_input.confirm_action:
 		exit_transform_mode(true)
 	
 	# Update overlays with current state (use first node as reference)

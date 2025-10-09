@@ -104,7 +104,7 @@ theme_override_colors/font_color = Color(0.6, 1, 0.6, 1)
 theme_override_font_sizes/font_size = 10
 text = "Rot: X: 0.0°  Y: 0.0°  Z: 0.0°"
 
-[node name="VSeparator2" type="VSeparator" parent="OverlayControl/StatusPanel/ContentsVBox/TransformHBox"]
+[node name="VSeparator2" type="VSeparator" parent="OverlayControl/StatusPanel/ContentVBox/TransformHBox"]
 layout_mode = 2
 
 [node name="ScaleLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox/TransformHBox"]

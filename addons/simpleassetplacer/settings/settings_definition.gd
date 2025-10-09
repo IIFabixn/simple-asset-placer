@@ -196,6 +196,7 @@ static func get_all_settings() -> Array:
 	
 	# Key Bindings - Control
 	_add_key_binding(settings, "cancel_key", "ESCAPE", "Cancel Placement", "control")
+	_add_key_binding(settings, "confirm_action_key", "ENTER", "Confirm Placement/Transform", "control")
 	_add_key_binding(settings, "transform_mode_key", "TAB", "Transform Mode", "control")
 	_add_key_binding(settings, "cycle_placement_mode_key", "P", "Cycle Placement Mode", "control")
 	_add_key_binding(settings, "cycle_next_asset_key", "BRACKETRIGHT", "Cycle Next Asset", "control")

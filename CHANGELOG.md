@@ -2,280 +2,156 @@
 
 ## [Unreleased]
 
+## [1.4.0] - 2025-10-09
+
 ### ✨ New Features
 
-#### Enhanced Quick Actions - Priority 1 Improvements
-- **Transform Mode Button**: Added toolbar button for Transform Mode visibility and control
-  - 🔧 **Transform Mode** - Toggle button shows when transform mode is active
-  - Displays `(TAB)` keyboard shortcut in tooltip (dynamically updated)
-  - Click to enter transform mode (requires selected Node3D objects)
-  - Click again to exit and confirm changes
-  - Button state automatically syncs with TAB key presses
-  - Visual feedback shows transform mode active state
-- **Reset All Transforms Button**: Quick action to reset all transform offsets at once
-  - ↺ **Reset All** - Momentary button clears position, rotation, scale, and height offsets
+#### Quick Action Toolbar Enhancements
+- **Transform Mode Button** (🔧): Added dedicated toolbar button for transform mode
+  - Toggle button with visual feedback when active
+  - Displays configured keyboard shortcut in tooltip (default: TAB)
+  - Button state automatically syncs with keyboard shortcut
+  - Requires selected Node3D objects to activate
+  
+- **Reset All Transforms Button** (↺): One-click reset for all transform offsets
+  - Clears position, rotation, scale, and height offsets instantly
   - Works in both Placement and Transform modes
-  - Shows feedback message when clicked
-  - Provides quick way to return to default transform state
-- **Dynamic Keybind Tooltips**: Tooltips now display actual configured keybinds
-  - Placement Mode tooltip shows configured `cycle_placement_mode_key` (default: P)
-  - Transform Mode tooltip shows configured `transform_mode_key` (default: TAB)
-  - Automatically updates when user changes keybinds in settings
-  - Reads directly from PlacementSettings for immediate consistency
-  - No more confusion from hardcoded default key hints
+  
+- **Dynamic Keybind Tooltips**: All toolbar buttons now show actual configured keybinds
+  - Automatically updates when settings change
+  - Reads directly from settings for immediate consistency
+  - Eliminates confusion from hardcoded hints
 
-#### Configurable Confirmation Keybind
-- **Keyboard Confirmation**: Added configurable keybind for confirming placements and transformations
-  - **Default Key**: Enter key (fully customizable in settings)
-  - **Works Alongside Mouse**: Both left mouse click and confirmation key work independently
-  - **Placement Mode**: Press Enter (or configured key) to place asset in scene
-  - **Transform Mode**: Press Enter (or configured key) to confirm transformations
-  - **Settings Integration**: "Confirm Placement/Transform" binding in Settings → Control Keys
-  - **Backward Compatible**: Left mouse click continues to work as before
-  - **Semantic Code**: Internal code now uses `confirm_action` instead of `left_clicked` for clarity
-  - Settings automatically persist across Godot sessions
+#### Keyboard Confirmation
+- **Configurable Confirmation Key**: Added keyboard shortcut for confirming placements/transformations
+  - Default: Enter key (customizable in Settings → Control Keys)
+  - Works alongside left mouse click
+  - Confirms asset placement and transformations
+  - Settings persist across sessions
 
-### 🎨 UI/UX Improvementsngelog
+#### Visual Enhancements
+- **Placement Strategy Indicator**: On-screen overlay shows active placement mode
+  - 🎯 Collision icon for raycast placement
+  - 📐 Plane icon for horizontal plane projection
+  - Updates in real-time when switching strategies
+  
+- **Half-Step Grid Visualization**: Visual feedback for fine increment snapping
+  - Red half-step grid appears when fine increment modifier (CTRL) is held
+  - Shows grid at 50% of normal spacing
+  - Semi-transparent overlay above main grid
 
-## [Unreleased]
+### 🎨 UI/UX Improvements
 
-### � UI/UX Improvements
+#### Toolbar Integration
+- **Quick Actions Moved to Viewport Toolbar**: Buttons relocated from overlay to 3D viewport menu
+  - Appears in `CONTAINER_SPATIAL_EDITOR_MENU` next to Transform/View tools
+  - Icon-only format (71% space reduction: 440px → 128px)
+  - **6 Toolbar Buttons**:
+    - 🎯 Placement Mode (cycles Collision ↔ Plane, icon changes)
+    - 📏 Grid Snap
+    - 🔲 Grid Overlay
+    - 🔄 Random Rotation
+    - 🔧 Transform Mode
+    - ↺ Reset All
+  - Matches Godot's native toolbar aesthetic
+  - Two-way sync with settings panel
 
-#### Toolbar Button Migration
-- **Moved Quick Action Buttons to 3D Viewport Toolbar**: Relocated 4 interactive buttons from status overlay to viewport menu bar
-  - Buttons now appear in `CONTAINER_SPATIAL_EDITOR_MENU` next to Transform/View tools
-  - Eliminated input handling conflicts with 3D viewport
-  - Removed hacky overlay collision detection from `input_handler.gd`
-  - **Buttons**:
-    - 🎯 **Placement Mode** - Cycles between collision/plane placement strategies
-    - 📏 **Grid Snap** - Toggles grid snapping on/off
-    - 🔲 **Grid Overlay** - Toggles grid visualization
-    - 🔄 **Random Rotation** - Toggles random Y rotation on placement
-  - Flat button style matches Godot's native toolbar aesthetic
-  - Icon-only format with detailed tooltips on hover (71% space reduction: 440px → 128px)
-  - Toggle buttons show visual pressed/unpressed state
-  - Placement mode button icon changes (🎯 ↔ 📐) based on active strategy
-  - Two-way sync with settings panel maintained via dependency injection
-  - Settings persist across Godot sessions
+#### Status Overlay Redesign
+- **Compact Layout**: Restructured with organized information hierarchy
+  - Title Row: Mode label + Node name + Strategy indicator
+  - Transform Row: Color-coded Position | Rotation | Scale (with VSeparator dividers)
+  - Keybinds Row: Context-sensitive control hints
+  - Size reduced: 800×120px → 700×100px (27% smaller)
+  - Mouse filter set to `IGNORE` (display-only)
 
-#### Status Overlay Restructure
-- **Flexible VBox Layout**: Completely restructured overlay with organized information hierarchy
-  - **Title Row** (HBoxContainer):
-    - Mode label (left): "🎯 PLACEMENT MODE" / "⚙️ TRANSFORM MODE"
-    - Node name (left): "- [node_name]" (hidden when no node selected)
-    - Spacer (flexible): Pushes strategy label to right
-    - Strategy label (right): "🎯 Collision" / "📐 Plane"
-  - **Transform Row** (HBoxContainer with VSeparators):
-    - Position: "Pos: X: 0.00  Y: 0.00  Z: 0.00" (orange/yellow color)
-    - VSeparator │ (visual divider)
-    - Rotation: "Rot: X: 0.0°  Y: 0.0°  Z: 0.0°" (light green color)
-    - VSeparator │ (visual divider)
-    - Scale: "Scale: 100.0%" (light purple color)
-  - **Keybinds Row**: Context-sensitive controls (gray, smaller text)
-  - **Size Optimization**: Reduced from 800×120px to 700×100px (27% smaller)
-  - **Color-coded sections** for quick visual scanning
-  - **Better readability** with transform values spread horizontally
-  - Mouse filter set to `IGNORE` (no interaction, pure display)
+### 🏗️ Architecture Improvements
 
-#### Visual Improvements
-- **Compact Design**: Overlay reduced padding (10px → 8px), spacing (8px → 6px)
-- **Font Sizes**: Optimized for readability - Mode (13), Transforms (10), Keybinds (9)
-- **Clean Separation**: VSeparators between position/rotation/scale for clear visual grouping
-- **Professional Look**: Matches Godot editor panel aesthetics
+#### Directory Reorganization
+- **Logical Folder Structure**: Organized 33 files into 7 subdirectories
+  - `core/` - Transform & state management (7 files)
+  - `placement/` - Strategy pattern system (4 files)
+  - `ui/` - User interface components (6 files)
+  - `settings/` - Settings management (4 files)
+  - `managers/` - Supporting managers (5 files)
+  - `thumbnails/` - Thumbnail generation (3 files)
+  - `utils/` - Utilities & helpers (4 files)
+  - Updated 100+ import paths
 
-### ✨ New Features
-- **Created toolbar_buttons.tscn**: New scene with 4 quick action buttons
-- **Created toolbar_buttons.gd**: Controller script with button handlers and state management
-- **Icon-Only Buttons**: Compact 32px buttons with emoji icons and tooltips
-- **Visual State Indicators**: Toggle buttons show ON/OFF via pressed/flat appearance
-
-### 🐛 Fixed
-- **Input Handling Conflicts**: Removed overlay from blocking viewport clicks
-  - Simplified `is_mouse_in_viewport()` in `input_handler.gd` (removed 15+ lines of overlay collision detection)
-  - Eliminated false click confirmations during placement
-- **Toolbar Button Initial State**: Fixed buttons not reflecting saved settings on load
-  - Removed hardcoded `button_pressed = true` from scene file
-  - Added deferred state update in `_ready()` to wait for managers initialization
-  - Buttons now correctly show actual settings state (not hardcoded values)
-- **Button State Sync**: Toggle buttons properly sync with settings panel changes
-- **Status Overlay Scene Path Typo**: Fixed `VSeparator2` parent path typo
-  - Changed `ContentsVBox` → `ContentVBox` in `status_overlay.tscn`
-  - Eliminated "path has vanished" warning on plugin load
-- **Dynamic Tooltip Updates**: Fixed tooltips showing outdated keybinds after changes
-  - Tooltips now read directly from PlacementSettings instance for immediate consistency
-  - Connected to `settings_changed` signal for automatic updates
-  - Deferred update ensures SettingsManager has refreshed values
-- **Placement Mode Button Icon Sync**: Fixed button icon not updating when using keyboard shortcut
-  - Placement mode button now updates icon (🎯 ↔ 📐) when cycling via keyboard (P key)
-  - Added `settings_changed.emit()` to `update_placement_strategy_ui()` in asset_placer_dock.gd
-  - Button icon now syncs correctly whether using button click or keyboard shortcut
-
-### 🔧 Improved
-- **Cleaner Architecture**: Clear separation between status display (overlay) and interactive controls (toolbar)
-- **Better User Experience**: Buttons in familiar toolbar location with native Godot feel
-- **More Viewport Space**: Smaller overlay leaves more room for 3D work
-- **Reduced Code Complexity**: Removed ~100 lines of button logic from overlay script
-
-### 📁 Files Added
-- `addons/simpleassetplacer/ui/toolbar_buttons.tscn` - Toolbar button scene (6 buttons: 4 original + Transform Mode + Reset)
-- `addons/simpleassetplacer/ui/toolbar_buttons.gd` - Toolbar controller script with dynamic tooltip support
-- `TOOLBAR_MIGRATION_SUMMARY.md` - Complete migration documentation
-- `TOOLBAR_MIGRATION_QUICK_REF.md` - Visual reference guide
-- `STATUS_OVERLAY_FLEXIBLE_LAYOUT.md` - Layout restructure documentation
-- `STATUS_OVERLAY_VSEPARATORS.md` - VSeparator addition notes
-- `UI_REFINEMENTS_COMPACT.md` - Size optimization documentation
-- `TOOLBAR_ICON_ONLY_BUTTONS.md` - Icon-only conversion guide
-- `TOOLBAR_BUTTON_INITIAL_STATE_FIX.md` - State initialization fix documentation
-
-### 📝 Files Modified
-- `addons/simpleassetplacer/simpleassetplacer.gd` - Added toolbar setup/cleanup, container integration, transform mode button sync
-- `addons/simpleassetplacer/ui/toolbar_buttons.tscn` - Added TransformModeButton and ResetTransformsButton nodes
-- `addons/simpleassetplacer/ui/toolbar_buttons.gd` - Added dynamic keybind tooltips, transform mode toggle, reset functionality, settings change listener
-- `addons/simpleassetplacer/ui/status_overlay.tscn` - Fixed VSeparator2 parent path typo, restructured with VBox layout, removed buttons, reduced size
-- `addons/simpleassetplacer/ui/status_overlay_control.gd` - Simplified to display-only (~100 lines removed)
-- `addons/simpleassetplacer/managers/input_handler.gd` - Simplified viewport check (removed overlay collision detection)
-- `addons/simpleassetplacer/managers/overlay_manager.gd` - Added toolbar reference handling
-
-### �🏗️ Refactored
-
-- **Directory Structure**: Reorganized plugin files into logical folder hierarchy for better maintainability
-  - Created 7 organized subdirectories: `core/`, `placement/`, `ui/`, `settings/`, `managers/`, `thumbnails/`, `utils/`
-  - Moved 33 .gd files from flat structure into appropriate folders
-  - **core/** (7 files): Transform & state management system
-  - **placement/** (4 files): Strategy pattern placement system
-  - **ui/** (6 files): User interface components
-  - **settings/** (4 files): Settings management system
-  - **managers/** (5 files): Supporting managers (overlay, preview, category, input, utility)
-  - **thumbnails/** (3 files): Thumbnail generation system
-  - **utils/** (4 files): Utilities & helpers (logger, constants, error handler, increment calculator)
-  - Updated 100+ import paths across entire codebase
-  - Improved navigation and logical organization of 1,500+ lines of code
-
-- **State Management Architecture**: Complete architectural refactoring to stateless design pattern
-  - Created `TransformState` class - unified container for all transform state (237 lines)
-    - Consolidates 30+ scattered static variables from 3 managers into single source of truth
-    - Provides reset, configuration, and serialization methods
-  - Created `TransformApplicator` service - centralized transform application (238 lines)
-    - Replaces duplicated `apply_*_to_node()` methods across managers
-    - Handles grid snapping and smooth transforms uniformly
-  - **RotationManager**: Fully refactored to stateless design (365 lines)
-    - Removed static state variables: `manual_rotation_offset`, `surface_alignment_rotation`, `surface_normal`
-    - All methods now accept `TransformState` as first parameter
-    - Pure calculation service with explicit state passing
-  - **ScaleManager**: Fully refactored to stateless design (293 lines)
-    - Removed static state variables: `scale_multiplier`, `non_uniform_multiplier`
-    - All methods now accept `TransformState` as first parameter
-    - Clean separation of configuration vs state data
-  - **PositionManager**: Fully refactored to stateless design (537 lines)
-    - Removed static state variables: `current_position`, `target_position`, `height_offset`, `base_height`, `manual_position_offset`, all snap settings
-    - All methods now accept `TransformState` as first parameter
-    - Removed unused legacy methods: `_raycast_to_world()`, `_project_to_plane()`
-  - **TransformationManager**: Updated to use TransformState pattern (1294 lines)
-    - Initializes `TransformState` when modes are started
-    - All manager calls updated to pass `transform_state` parameter
-    - Added null-safety checks for inactive modes
-  - **UtilityManager**: Updated to support transform state (209 lines)
-    - All placement functions now accept optional `transform_state` parameter
-    - Null-safe scale and rotation application
-  - **Benefits achieved**:
+#### State Management Refactor
+- **Stateless Design Pattern**: Eliminated scattered static variables
+  - **TransformState**: Unified container for all transform state (237 lines)
+  - **TransformApplicator**: Centralized transform application (238 lines)
+  - **PositionManager**, **RotationManager**, **ScaleManager**: Refactored to stateless
+    - All methods now accept `TransformState` as parameter
     - 48% reduction in state management complexity
-    - Single source of truth for all transform data
-    - Explicit data flow - no hidden static state
-    - Improved testability - managers are now pure functions
-    - Better separation of concerns: data/calculation/application
-    - Zero compilation errors, fully tested and working
-  - **Cleanup**: Removed 2 backup files and 3 unused legacy methods (~33 lines)
-- **Placement Strategy System**: Implemented Strategy Pattern for clean separation of placement modes
-  - Created modular placement strategy architecture with base `PlacementStrategy` class
-  - Added `CollisionPlacementStrategy` for physics-based raycast placement with surface detection
-  - Added `PlanePlacementStrategy` for fixed-height horizontal plane projection
-  - Introduced `PlacementStrategyManager` to coordinate strategy selection and execution
-  - Refactored `PositionManager.update_position_from_mouse()` from 100+ to ~40 lines
-  - Removed complex nested conditionals in favor of strategy delegation
-  - New `placement_strategy` setting: "collision", "plane", or "auto" (backward compatible)
-  - Legacy `snap_to_ground` setting still works via auto-selection
-  - Easy to extend with new strategies (terrain, grid, spline, voxel, etc.)
-  - Each strategy is independently testable and maintainable
-  - Reduced code complexity by 60% in positioning logic
-  - See `PLACEMENT_STRATEGY_REFACTORING.md` for detailed documentation
-- **Settings System Architecture**: Major refactoring of placement settings for improved maintainability
-  - Reduced `placement_settings.gd` from 2,178 lines to 301 lines (86% reduction)
-  - Created data-driven architecture with helper classes:
-    - `settings_definition.gd` (229 lines) - Single source of truth for all settings metadata
-    - `settings_ui_builder.gd` (234 lines) - Automated UI generation from settings definitions
-    - `settings_persistence.gd` (109 lines) - Centralized save/load operations
-  - Adding new settings now requires only 1 line instead of editing 15+ locations
-  - All settings handled uniformly through metadata-driven approach
-  - Eliminated 1,000+ lines of repetitive UI creation code
-  - Eliminated 400+ lines of repetitive save/load code
-  - Eliminated 200+ lines of signal connection/disconnection code
-  - 100% backward compatible - no changes needed to existing code
-  - Overall reduction: 60% (from 2,178 to 873 lines across 4 files)
+    - Single source of truth for transform data
+    - Improved testability (pure functions)
 
-### ✨ Added
-- **Visual Placement Strategy Indicator**: Added on-screen overlay showing active placement mode
-  - Displays strategy icon and name in top-right corner of 3D viewport
-  - 🎯 Collision icon for collision/raycast placement mode
-  - 📐 Plane icon for horizontal plane projection mode
-  - Semi-transparent design that doesn't obstruct the view
-  - Updates in real-time when switching strategies via keyboard or settings
-  - Only visible during placement or transform mode
-- **Half-Step Grid Visualization**: Visual feedback for fine-increment snapping mode
-  - Red half-step grid appears when fine increment modifier (CTRL by default) is held
-  - Shows grid at half the normal grid size for precise positioning
-  - Automatically updates when toggling between normal and half-step modes
-  - Semi-transparent red overlay layered above main blue grid
-  - Provides immediate visual confirmation of active snapping precision
+#### Placement Strategy Pattern
+- **Strategy-Based Architecture**: Clean separation of placement modes
+  - Base `PlacementStrategy` class with `CollisionPlacementStrategy` and `PlanePlacementStrategy`
+  - `PlacementStrategyManager` coordinates strategy selection
+  - Reduced `PositionManager.update_position_from_mouse()` from 100+ to ~40 lines
+  - 60% reduction in positioning logic complexity
 
-### 🔧 Improved
-- **Collision Exclusion System**: Implemented proper self-collision prevention for preview meshes
-  - Preview meshes no longer interfere with placement raycast detection
-  - System recursively gathers collision RIDs from nodes being placed/transformed
-  - Supports all standard Godot collision nodes (StaticBody3D, RigidBody3D, Area3D, etc.)
-  - Properly excludes CollisionShape3D, CollisionPolygon3D children
-  - **Known Limitation**: CSG nodes cannot be excluded due to Godot 4 engine architecture (CSG collision RIDs not exposed through standard APIs)
-  - Recommendation: Use Plane placement strategy when working with CSG nodes
-- **Placement Mode Switching**: Added easy ways to switch between collision and plane placement strategies
-  - **Keyboard Shortcut**: Press `P` to cycle through placement modes (Collision ↔ Plane)
-  - **Settings Dropdown**: "Placement Mode" dropdown in Settings tab with options: Auto, Collision, Plane
-  - Real-time switching without exiting placement OR transform mode
+#### Settings System Refactor
+- **Data-Driven Architecture**: 86% reduction in settings code
+  - **SettingsDefinition**: Single source of truth for metadata (229 lines)
+  - **SettingsUIBuilder**: Automated UI generation (234 lines)
+  - **SettingsPersistence**: Centralized save/load (109 lines)
+  - Reduced from 2,178 to 301 lines in main settings file
+  - Adding new settings now requires only 1 line instead of 15+
+
+### 🔧 Improvements
+
+- **Collision Exclusion System**: Preview meshes no longer interfere with placement raycasts
+  - Recursively gathers collision RIDs from nodes
+  - **Note**: CSG nodes cannot be excluded (Godot 4 engine limitation)
+  
+- **Placement Mode Switching**: Press `P` to cycle Collision ↔ Plane modes
   - Works in both placement and transform modes
-  - Visual feedback via on-screen overlay and log messages showing active strategy
-  - Customizable hotkey via Editor Settings
-  - See `PLACEMENT_MODE_SWITCHING_GUIDE.md` for detailed usage instructions
-- **Increment Calculation System**: Introduced centralized increment calculation to eliminate code duplication
-  - Created new `IncrementCalculator` utility class for unified step calculations with modifier support
-  - Added `InputHandler.get_modifier_state()` to retrieve all modifier states in a single call
-  - Added `*_with_modifiers()` methods to `RotationManager`, `ScaleManager`, and `PositionManager`
-  - Provides consistent increment scaling across all transform types (rotation, scale, position, height)
-  - Configurable multipliers (default: 5x for large increments, 0.1x for fine increments)
-  - Single source of truth for modifier logic improves maintainability
+  - Visual feedback via overlay
+  
+- **Increment Calculator**: Unified step calculations with modifier support
+  - Consistent scaling across rotation, scale, position, height
+  - Configurable multipliers (default: 5x large, 0.1x fine)
 
-### 🐛 Fixed
-- **Duplicate Strategy Logging**: Fixed placement strategy being set twice on mode entry
-  - Added caching in `PlacementStrategyManager` to track last requested strategy
-  - Only calls `set_strategy()` when strategy actually changes
-  - Eliminates redundant "Switched to [strategy]" log messages
-- **Reset Position on Exit Signal Connection**: Fixed missing signal reconnection for "Reset Position Offset" checkbox
-  - Added missing signal disconnect/reconnect for `reset_position_on_exit_check` in `_disconnect_ui_signals()` and `_connect_ui_signals()` methods
-  - Ensures setting updates are properly captured when UI signals are refreshed
-  - Maintains consistency with other reset behavior checkboxes (height, scale, rotation)
-- **Rotation/Scale Increment Values**: Fixed rotation and scale increments not using configured values
-  - Keyboard rotation now correctly uses `rotation_increment`, `fine_rotation_increment`, and `large_rotation_increment` from settings
-  - Mouse wheel rotation now correctly uses `fine_rotation_increment` (default) and `large_rotation_increment` (with ALT)
-  - Keyboard scale now correctly uses `scale_increment`, `fine_scale_increment`, and `large_scale_increment` from settings
-  - Previously used multiplier-based calculations (base × 5 = 75°) instead of configured values (90°)
-  - Large increment rotation with ALT now applies exactly 90° as configured, not 75° (15° × 5)
-  - Fine increment rotation with CTRL now applies exactly 5° as configured, not 1.5° (15° × 0.1)
-- **Position Offset Persistence**: Fixed position offsets not persisting between placement and transform modes
-  - Unified both modes to use `PositionManager.manual_position_offset` for WASD position adjustments
-  - Removed redundant `accumulated_xz_delta` tracking from transform mode
-  - Position adjustments made in placement mode now correctly carry over to transform mode
-- **Position Jump on Mode Switch**: Fixed objects jumping to incorrect positions when entering transform mode
-  - Removed problematic `snap_offset` calculation that was causing double application of manual offsets
-  - Transform mode now uses identical positioning logic to placement mode
-  - Both modes follow the same process: raycast → grid snap → add manual offset
-  - Eliminates inconsistencies and ensures smooth mode transitions
+### 🐛 Bug Fixes
+
+- Fixed toolbar buttons not reflecting saved settings on load
+- Fixed VSeparator2 parent path typo in status_overlay.tscn
+- Fixed tooltip lag when updating keybinds in settings
+- Fixed placement mode icon not syncing with keyboard shortcut (P key)
+- Fixed overlay collision detection blocking viewport clicks
+- Fixed duplicate strategy logging on mode entry
+- Fixed position offsets not persisting between placement/transform modes
+- Fixed objects jumping when entering transform mode
+- Fixed rotation/scale increments not using configured values
+
+### 📁 Technical Changes
+
+**New Files:**
+- `core/transform_state.gd` - Unified transform state container
+- `core/transform_applicator.gd` - Centralized transform application
+- `core/smooth_transform_manager.gd` - Interpolation system
+- `placement/placement_strategy.gd` - Base strategy class
+- `placement/collision_placement_strategy.gd` - Raycast placement
+- `placement/plane_placement_strategy.gd` - Plane projection
+- `placement/placement_strategy_manager.gd` - Strategy coordinator
+- `settings/settings_definition.gd` - Settings metadata
+- `settings/settings_ui_builder.gd` - Automated UI generation
+- `settings/settings_persistence.gd` - Save/load operations
+- `ui/toolbar_buttons.tscn` - Toolbar button scene
+- `ui/toolbar_buttons.gd` - Toolbar controller
+- `ui/status_overlay.tscn` - Status overlay scene
+- `ui/status_overlay_control.gd` - Status overlay controller
+- `utils/increment_calculator.gd` - Increment calculations
+
+**Reorganized Files:**
+- Moved all managers to respective folders (core/, managers/, etc.)
+- Updated 100+ import paths across codebase
+
+---
 
 ## [1.3.2] - 2025-10-05
 
@@ -386,6 +262,8 @@
   - UI controls for fine increment modifier key binding with key capture support
   - Settings persist across sessions via EditorSettings
 
+---
+
 ## [1.2.1] - 2025-10-04
 
 ### 🐛 Fixed
@@ -400,6 +278,8 @@
 - **Key Binding Capture Logic**: Redesigned to use a recording approach that tracks all pressed keys and captures on complete release
 - **Action Key Detection**: Action keys (Y, X, Z, Q, E, etc.) now properly detected even when modifiers are held
 - **Modifier Separation**: Modifier state checks are now independent from action key detection, allowing proper combinations like SHIFT+Y for reverse rotation
+
+---
 
 ## [1.2.0] - 2025-10-04
 
@@ -453,12 +333,6 @@
 - **Modifier isolation**: Modifiers no longer interfere with simple key bindings
 - **International layouts**: Keyboards requiring modifiers for brackets/special chars now work properly
 
-### 📚 Documentation
-- Added `ASSET_CYCLING_IMPLEMENTATION.md` - Complete technical documentation
-- Added `KEYBOARD_LAYOUT_SUPPORT.md` - Guide for international keyboard users
-- Updated README with asset cycling feature description
-- Added usage examples for different keyboard layouts
-
 ### 🏗️ Technical Improvements
 - New `InputHandler._check_key_with_modifiers()` - Universal modifier detection
 - Enhanced input state tracking for tap vs hold detection
@@ -478,6 +352,8 @@
 - One-handed operation (place with mouse, cycle with keyboard)
 - Works seamlessly with existing filtering and search features
 
+---
+
 ## [1.1.1] - 2025-10-04
 
 ### 🔧 Architecture & Bug Fixes
@@ -486,30 +362,19 @@
 - **RotationManager**: Complete refactor to use offset-based system instead of absolute rotations
   - Renamed `current_rotation` → `manual_rotation_offset` (breaking change for internal API)
   - Renamed `set_rotation()` → `set_rotation_offset()`
-  - Renamed `get_rotation()` → `get_rotation_offset()`
-  - Renamed `get_rotation_degrees()` → `get_rotation_offset_degrees()`
   - Now preserves original node rotations when entering transform mode
-  - Updated `apply_rotation_to_node()` to accept `original_rotation` parameter
   - Rotation formula: `final_rotation = original_rotation + surface_alignment + manual_offset`
-  - All rotation operations (rotate_x, rotate_y, rotate_z) now modify offset instead of absolute rotation
   
 - **ScaleManager**: Complete refactor to use multiplier-based system instead of absolute scales
   - Renamed `current_scale` → `scale_multiplier` (breaking change for internal API)
   - Renamed `non_uniform_scale` → `non_uniform_multiplier`
-  - Renamed `set_scale()` → `set_scale_multiplier()`
-  - Renamed `get_scale()` → `get_scale_multiplier()`
   - Now preserves original node scales when entering transform mode
-  - Updated `apply_scale_to_node()` and `apply_uniform_scale_to_node()` to accept `original_scale` parameter
   - Scale formula: `final_scale = original_scale * scale_multiplier`
 
 #### Transform Mode Improvements
 - **Fixed critical bug**: Node rotations no longer reset to zero when entering transform mode with multiple nodes
 - **Group rotation**: Implemented rotation around collective center while preserving individual node rotations
-  - Each node orbits the group center while maintaining its own rotation offset
-  - Uses rotation basis calculation: `rotation_basis * original_offset` for proper orbital motion
 - **Position updates**: Eliminated `initial_frame` workaround for cleaner logic
-  - `snap_offset` now calculated once at mode start for consistent positioning
-  - Simplified flow: `new_center = mouse_center + snap_offset + accumulated_delta`
 - **Original transforms**: All original transforms (position, rotation, scale) now stored in `original_transforms` dictionary at mode start
 - Unified transform application flow with consistent offset-based approach
 
@@ -670,19 +535,14 @@
 
 ## Installation & Usage
 
-This update is a major enhancement release focusing on:
-1. **Better positioning control** with grid snapping and surface alignment
-2. **Enhanced transformation tools** supporting multiple objects
-3. **Improved asset management** with filtering and better thumbnails
-4. **Persistent settings** that remember your preferences
-5. **Cleaner codebase** with better error handling and logging
+This plugin helps you quickly place assets in your Godot 3D scenes with powerful transform controls, grid snapping, and asset management features.
 
 ### Breaking Changes
-None - all changes are backward compatible.
+- v1.1.1: Internal API changes in RotationManager and ScaleManager (offset-based architecture)
 
 ### Known Issues
-- Terrain3D plugin files included for testing purposes (will be removed in future release)
+None currently reported
 
 ---
 
-**Total Changes**: 42 commits, affecting 27 core files with 3000+ lines of improvements
+**Full Changelog**: https://github.com/IIFabixn/simple-asset-placer/commits/main

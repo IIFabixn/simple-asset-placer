@@ -50,7 +50,7 @@ func calculate_position(from: Vector3, to: Vector3, config: Dictionary) -> Place
 	Returns:
 		PlacementResult with position, normal, and metadata
 	"""
-	push_error("PlacementStrategy.calculate_position() must be overridden in subclass")
+	PluginLogger.error("PlacementStrategy", "calculate_position() must be overridden in subclass")
 	return PlacementResult.new()
 
 func get_strategy_name() -> String:

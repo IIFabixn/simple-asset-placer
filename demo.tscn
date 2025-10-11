@@ -6,7 +6,7 @@
 [ext_resource type="PackedScene" uid="uid://bl5wvbh8ofgd2" path="res://sample/assets/kenny_retro-medival-kit/tower-top.glb" id="4_c6xj6"]
 [ext_resource type="Texture2D" uid="uid://14lix33xubj1" path="res://sample/textures/rocky_terrain/rocky_terrain_02_diff_1k.jpg" id="5_6bw2v"]
 [ext_resource type="PackedScene" uid="uid://c14fvskvwnirm" path="res://sample/building_d.tscn" id="6_kem5a"]
-[ext_resource type="PackedScene" uid="uid://b6c0q5frrklx6" path="res://barrels_2.tscn" id="7_gxmxl"]
+[ext_resource type="PackedScene" uid="uid://b1j3bv70o8u0f" path="res://sample/assets/kenny_retro-medival-kit/barrels.glb" id="7_gxmxl"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kem5a"]
 albedo_texture = ExtResource("5_6bw2v")
@@ -20,15 +20,12 @@ use_collision = true
 [node name="CSGBox3D" type="CSGBox3D" parent="CSGCombiner3D"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.0030367, -0.08929825, 0.008166313)
 use_collision = true
-size = Vector3(25, 0.1, 25)
+size = Vector3(50, 0.1, 50)
 material = SubResource("StandardMaterial3D_kem5a")
 
-[node name="CSGBox3D2" type="CSGBox3D" parent="CSGCombiner3D"]
-transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, -1, 0, -9)
-
-[node name="CSGBox3D3" type="CSGBox3D" parent="CSGCombiner3D"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1.6417236, -10.089844)
-size = Vector3(1, 3.8913574, 3.1796875)
+[node name="CSGCylinder3D" type="CSGCylinder3D" parent="CSGCombiner3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -3)
+operation = 2
 
 [node name="building_a" parent="." instance=ExtResource("1_m0rpm")]
 transform = Transform3D(-1, 0, -1.509958e-07, 0, 1, 0, 1.509958e-07, 0, -1, 3, 9.536743e-07, -3)
@@ -43,19 +40,10 @@ transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 3, -
 transform = Transform3D(7.549784e-08, 0, -0.9999991, 0, 1, 0, 0.9999991, 0, 7.549784e-08, 3, 1.4305115e-06, 1)
 
 [node name="tower-top" parent="." instance=ExtResource("4_c6xj6")]
-transform = Transform3D(-1.6292067e-07, 1.8213079e-07, 1, 8.1460335e-08, 1, -1.8213078e-07, -1, 8.146031e-08, -1.6292068e-07, -1, -0.039298058, -2)
+transform = Transform3D(-1.955048e-07, 5.1815834e-07, 1.2, 9.7752405e-08, 1.2, -5.1815834e-07, -1.2, 9.775232e-08, -1.9550482e-07, 0, -0.039298058, -3)
 
 [node name="building_d" parent="." instance=ExtResource("6_kem5a")]
 transform = Transform3D(-1, 0, -1.509958e-07, 0, 1, 0, 1.509958e-07, 0, -1, -4, -0.10000048, -2)
 
-[node name="barrels_2" parent="." instance=ExtResource("7_gxmxl")]
-transform = Transform3D(0.9659257, 0, -0.25881898, 0, 1, 0, 0.25881898, 0, 0.9659257, -2, -0.039298296, -5)
-
-[node name="barrels_2_2" parent="." instance=ExtResource("7_gxmxl")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.039298296, -5.5)
-
-[node name="barrels_2_3" parent="." instance=ExtResource("7_gxmxl")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, -0.03929639, -5)
-
-[node name="barrels_2_4" parent="." instance=ExtResource("7_gxmxl")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.039298296, -4)
+[node name="barrels" type="Node3D" parent="." instance=ExtResource("7_gxmxl")]
+transform = Transform3D(1, 6.500875e-06, 5.960465e-07, -6.500875e-06, 1, 7.2849473e-09, -5.9604645e-07, -7.288822e-09, 1, 0, 0, -5)

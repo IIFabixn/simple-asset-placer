@@ -302,6 +302,17 @@ static func get_target_position(node: Node3D) -> Vector3:
 		return smooth_data.target_position
 	return node.global_position if node.is_inside_tree() else Vector3.ZERO
 
+static func get_target_rotation(node: Node3D) -> Vector3:
+	"""Get the target rotation for an object"""
+	if not node:
+		return Vector3.ZERO
+	
+	var node_id = node.get_instance_id()
+	var smooth_data = _smooth_data.get(node_id)
+	if smooth_data:
+		return smooth_data.target_rotation
+	return node.rotation if node.is_inside_tree() else Vector3.ZERO
+
 static func get_target_scale(node: Node3D) -> Vector3:
 	"""Get the target scale for an object"""
 	if not node:

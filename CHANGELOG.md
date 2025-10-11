@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### 🐛 Bug Fixes
+
+#### Scale and Transform Fixes
+- **Fixed Smooth Transforms Scale Application**: Assets now placed with correct scale when smooth transforms enabled
+  - Preview manager now returns target transforms instead of mid-lerp values
+  - Added `get_target_rotation()` method to SmoothTransformManager
+  - Newly placed objects use `apply_transform_immediately()` to prevent lerp interference
+  - Resolves issue where 120% scaled assets were placed at 100%
+
+- **Changed Scale System to Additive**: Transform mode now uses additive scaling instead of multiplicative
+  - Formula changed from `final = original × multiplier` to `final = original + offset`
+  - Allows symmetric stepping: increase by 0.2 then decrease by 0.2 returns to original scale
+  - Fixed issue where transforming 1.2 scale asset would land on 0.96 instead of 1.0
+  - Added floating point rounding (snappedf to 0.001) to prevent 0.999999 values
+
+#### Tag Management Dialog Fixes
+- **Fixed "Manage Tags" Dialog Compatibility**: Dialog now works with both asset browsers
+  - Added `_get_asset_identifier()` helper to handle different asset structures
+  - Regular assets use 'path' key, meshlib items use 'meshlib_path:name' format
+  - Added `_get_asset_display_name()` for consistent name display
+  - Fixes "Invalid access to property 'path'" errors when opening from meshlib browser
+
 ## [1.4.0] - 2025-10-09
 
 ### ✨ New Features

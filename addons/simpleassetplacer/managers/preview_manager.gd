@@ -198,20 +198,29 @@ static func has_preview() -> bool:
 	return preview_mesh != null and is_instance_valid(preview_mesh) and preview_mesh.is_inside_tree()
 
 static func get_preview_position() -> Vector3:
-	"""Get current preview position"""
+	"""Get current preview position (returns target position when smooth transforms are enabled)"""
 	if has_preview() and preview_mesh.is_inside_tree():
+		# If smooth transforms are enabled, return the target position instead of current
+		if SmoothTransformManager.is_smooth_transforms_enabled():
+			return SmoothTransformManager.get_target_position(preview_mesh)
 		return preview_mesh.global_position
 	return current_position
 
 static func get_preview_rotation() -> Vector3:
-	"""Get current preview rotation"""
+	"""Get current preview rotation (returns target rotation when smooth transforms are enabled)"""
 	if has_preview():
+		# If smooth transforms are enabled, return the target rotation instead of current
+		if SmoothTransformManager.is_smooth_transforms_enabled():
+			return SmoothTransformManager.get_target_rotation(preview_mesh)
 		return preview_mesh.rotation
 	return current_rotation
 
 static func get_preview_scale() -> Vector3:
-	"""Get current preview scale"""
+	"""Get current preview scale (returns target scale when smooth transforms are enabled)"""
 	if has_preview():
+		# If smooth transforms are enabled, return the target scale instead of current
+		if SmoothTransformManager.is_smooth_transforms_enabled():
+			return SmoothTransformManager.get_target_scale(preview_mesh)
 		return preview_mesh.scale
 	return current_scale
 

@@ -126,7 +126,7 @@ func load_config_file(search_path: String = "res://") -> bool:
 	# Load and parse JSON
 	var file = FileAccess.open(config_path, FileAccess.READ)
 	if not file:
-		push_error("CategoryManager: Failed to open config file: " + config_path)
+		PluginLogger.error("CategoryManager", "Failed to open config file: " + config_path)
 		return false
 	
 	var json_string = file.get_as_text()
@@ -136,7 +136,7 @@ func load_config_file(search_path: String = "res://") -> bool:
 	var error = json.parse(json_string)
 	
 	if error != OK:
-		push_error("CategoryManager: Failed to parse JSON in " + config_path + " at line " + str(json.get_error_line()) + ": " + json.get_error_message())
+		PluginLogger.error("CategoryManager", "Failed to parse JSON in " + config_path + " at line " + str(json.get_error_line()) + ": " + json.get_error_message())
 		return false
 	
 	var data = json.data
@@ -198,7 +198,7 @@ func save_config_file() -> bool:
 	
 	var file = FileAccess.open(config_file_path, FileAccess.WRITE)
 	if not file:
-		push_error("CategoryManager: Failed to save config file: " + config_file_path)
+		PluginLogger.error("CategoryManager", "Failed to save config file: " + config_file_path)
 		return false
 	
 	file.store_string(json_string)

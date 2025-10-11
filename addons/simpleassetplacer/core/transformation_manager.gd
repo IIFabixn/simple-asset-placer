@@ -1190,6 +1190,10 @@ static func place_at_preview_position():
 	var position = PositionManager.get_current_position(transform_state)
 	var placed_node = null
 	
+	# Debug: Log transform state scale
+	if transform_state:
+		PluginLogger.info("TransformationManager", "Placing with scale multiplier: " + str(transform_state.scale_multiplier))
+	
 	# Use internal placement functions
 	if placement_data.get("meshlib") and placement_data.get("item_id", -1) >= 0:
 		placed_node = UtilityManager.place_meshlib_item_in_scene(

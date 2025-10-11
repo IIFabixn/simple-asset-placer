@@ -133,9 +133,14 @@ static func place_asset_in_scene(asset_path: String, position: Vector3 = Vector3
 		
 		# Apply scale (assume uniform scale from ScaleManager)
 		var scale_multiplier = ScaleManager.get_scale(transform_state) if transform_state else 1.0
-		scene_instance.scale *= scale_multiplier
+		PluginLogger.info("UtilityManager", "Applying scale multiplier: " + str(scale_multiplier) + " (transform_state: " + ("present" if transform_state else "null") + ")")
+		var final_scale = scene_instance.scale * scale_multiplier
 		
-		PluginLogger.info("UtilityManager", "Successfully placed asset as: " + unique_name)
+		# Apply scale immediately without smooth transitions (newly placed objects should snap to final scale)
+		const SmoothTransformManager = preload("res://addons/simpleassetplacer/core/smooth_transform_manager.gd")
+		SmoothTransformManager.apply_transform_immediately(scene_instance, scene_instance.global_position, scene_instance.rotation, final_scale)
+		
+		PluginLogger.info("UtilityManager", "Successfully placed asset as: " + unique_name + " with final scale: " + str(scene_instance.scale))
 		return scene_instance
 	else:
 		PluginLogger.error("UtilityManager", "No current scene root found")
@@ -179,9 +184,14 @@ static func place_meshlib_item_in_scene(meshlib: MeshLibrary, item_id: int, posi
 		
 		# Apply scale (assume uniform scale from ScaleManager)
 		var scale_multiplier = ScaleManager.get_scale(transform_state) if transform_state else 1.0
-		mesh_instance.scale *= scale_multiplier
+		PluginLogger.info("UtilityManager", "Applying scale multiplier: " + str(scale_multiplier) + " (transform_state: " + ("present" if transform_state else "null") + ")")
+		var final_scale = mesh_instance.scale * scale_multiplier
 		
-		PluginLogger.info("UtilityManager", "Successfully placed meshlib item as: " + unique_name)
+		# Apply scale immediately without smooth transitions (newly placed objects should snap to final scale)
+		const SmoothTransformManager = preload("res://addons/simpleassetplacer/core/smooth_transform_manager.gd")
+		SmoothTransformManager.apply_transform_immediately(mesh_instance, mesh_instance.global_position, mesh_instance.rotation, final_scale)
+		
+		PluginLogger.info("UtilityManager", "Successfully placed meshlib item as: " + unique_name + " with final scale: " + str(mesh_instance.scale))
 		return mesh_instance
 	else:
 		PluginLogger.error("UtilityManager", "No current scene root found")
@@ -222,8 +232,14 @@ static func place_mesh_in_scene(mesh: Mesh, position: Vector3, settings: Diction
 		
 		# Apply scale (assume uniform scale from ScaleManager)
 		var scale_multiplier = ScaleManager.get_scale(transform_state) if transform_state else 1.0
-		mesh_instance.scale *= scale_multiplier
+		PluginLogger.info("UtilityManager", "Applying scale multiplier: " + str(scale_multiplier) + " (transform_state: " + ("present" if transform_state else "null") + ")")
+		var final_scale = mesh_instance.scale * scale_multiplier
 		
+		# Apply scale immediately without smooth transitions (newly placed objects should snap to final scale)
+		const SmoothTransformManager = preload("res://addons/simpleassetplacer/core/smooth_transform_manager.gd")
+		SmoothTransformManager.apply_transform_immediately(mesh_instance, mesh_instance.global_position, mesh_instance.rotation, final_scale)
+		
+		PluginLogger.info("UtilityManager", "Successfully placed mesh as: " + unique_name + " with final scale: " + str(mesh_instance.scale))
 		return mesh_instance
 	else:
 		PluginLogger.error("UtilityManager", "No current scene root found")

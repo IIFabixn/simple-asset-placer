@@ -292,8 +292,8 @@ func _populate_asset_tree() -> void:
 	var search_text = search_line_edit.text.to_lower() if search_line_edit else ""
 	
 	for asset_info in all_assets:
-		var asset_path = asset_info.path
-		var asset_name = asset_path.get_file()
+		var asset_identifier = _get_asset_identifier(asset_info)
+		var asset_name = _get_asset_display_name(asset_info)
 		
 		# Apply search filter
 		if search_text != "" and not asset_name.to_lower().contains(search_text):
@@ -301,14 +301,14 @@ func _populate_asset_tree() -> void:
 		
 		var item = asset_tree.create_item(root)
 		item.set_text(0, asset_name)
-		item.set_metadata(0, asset_path)
-		item.set_tooltip_text(0, asset_path)
+		item.set_metadata(0, asset_identifier)
+		item.set_tooltip_text(0, asset_identifier)
 		
 		# Make column 1 non-selectable so clicking it selects column 0 (whole row effect)
 		item.set_selectable(1, false)
 		
 		# Show current tags
-		var tags = category_manager.get_custom_tags(asset_path)
+		var tags = category_manager.get_custom_tags(asset_identifier)
 		if tags.size() > 0:
 			item.set_text(1, ", ".join(tags))
 		else:
@@ -369,7 +369,8 @@ func _update_statistics() -> void:
 	# Count tagged vs untagged assets
 	var tagged_count = 0
 	for asset_info in all_assets:
-		var tags = category_manager.get_custom_tags(asset_info.path)
+		var asset_identifier = _get_asset_identifier(asset_info)
+		var tags = category_manager.get_custom_tags(asset_identifier)
 		if tags.size() > 0:
 			tagged_count += 1
 	
@@ -415,6 +416,27 @@ func _on_tag_selection_changed(_index: int = -1, _selected: bool = true) -> void
 func _has_tag(asset_path: String, tag: String) -> bool:
 	var tags = category_manager.get_custom_tags(asset_path)
 	return tag in tags
+
+func _get_asset_identifier(asset_info: Dictionary) -> String:
+	## Returns the unique identifier for an asset
+	## For regular assets: returns the "path" key
+	## For meshlib items: returns "meshlib_path:name"
+	if asset_info.has("path"):
+		return asset_info["path"]
+	elif asset_info.has("meshlib_path") and asset_info.has("name"):
+		return asset_info["meshlib_path"] + ":" + asset_info["name"]
+	else:
+		PluginLogger.error("TagManagementDialog", "Asset info missing required keys: " + str(asset_info.keys()))
+		return ""
+
+func _get_asset_display_name(asset_info: Dictionary) -> String:
+	## Returns a display name for the asset
+	if asset_info.has("path"):
+		return asset_info["path"].get_file()
+	elif asset_info.has("name"):
+		return asset_info["name"]
+	else:
+		return "Unknown Asset"
 
 func _update_selected_assets() -> void:
 	selected_asset_paths.clear()
@@ -531,8 +553,9 @@ func _on_rename_tag() -> void:
 		# Rename tag for all assets
 		var assets_with_tag = []
 		for asset_info in all_assets:
-			if _has_tag(asset_info.path, old_tag):
-				assets_with_tag.append(asset_info.path)
+			var asset_identifier = _get_asset_identifier(asset_info)
+			if _has_tag(asset_identifier, old_tag):
+				assets_with_tag.append(asset_identifier)
 		
 		for asset_path in assets_with_tag:
 			category_manager.remove_tag(asset_path, old_tag)
@@ -595,16 +618,17 @@ func _on_merge_tags() -> void:
 		# Merge all tags into target
 		var affected_assets = 0
 		for asset_info in all_assets:
+			var asset_identifier = _get_asset_identifier(asset_info)
 			var has_any_merge_tag = false
 			for tag in tags_to_merge:
-				if _has_tag(asset_info.path, tag):
+				if _has_tag(asset_identifier, tag):
 					has_any_merge_tag = true
 					if tag != target_tag:
-						category_manager.remove_tag(asset_info.path, tag)
+						category_manager.remove_tag(asset_identifier, tag)
 			
 			if has_any_merge_tag:
-				if not _has_tag(asset_info.path, target_tag):
-					category_manager.add_tag(asset_info.path, target_tag)
+				if not _has_tag(asset_identifier, target_tag):
+					category_manager.add_tag(asset_identifier, target_tag)
 				affected_assets += 1
 		
 		category_manager.save_config_file()
@@ -638,9 +662,10 @@ func _on_delete_tag() -> void:
 	dialog.confirmed.connect(func():
 		var affected_assets = 0
 		for asset_info in all_assets:
+			var asset_identifier = _get_asset_identifier(asset_info)
 			for tag in selected_tags:
-				if _has_tag(asset_info.path, tag):
-					category_manager.remove_tag(asset_info.path, tag)
+				if _has_tag(asset_identifier, tag):
+					category_manager.remove_tag(asset_identifier, tag)
 					affected_assets += 1
 		
 		category_manager.save_config_file()

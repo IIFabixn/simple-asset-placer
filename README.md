@@ -41,6 +41,11 @@ Simple Asset Placer brings professional-grade asset placement capabilities to Go
 8. ESC to exit placement mode.
 ```
 
+<div align="center">
+  <img src="branding/gifs/placement_mode.gif" alt="Placement Mode Demo" width="80%"/>
+  <p><i>Placement Mode in action - selecting, positioning, and placing assets</i></p>
+</div>
+
 ### **Advanced Usage - Transform Mode**
 ```
 1. Select any Node3D object(s) in the scene tree.
@@ -50,6 +55,23 @@ Simple Asset Placer brings professional-grade asset placement capabilities to Go
 5. All placement controls work in Transform Mode.
 6. Left-click to confirm changes, or ESC to cancel and restore original state.
 ```
+
+<div align="center">
+  <img src="branding/gifs/transform_mode.gif" alt="Transform Mode Demo" width="80%"/>
+  <p><i>Transform Mode - modifying existing objects in the scene</i></p>
+</div>
+
+### **Asset Browser Interface**
+
+<div align="center">
+  <img src="branding/screnshoots/asset_browser.png" alt="3D Models Asset Browser" width="80%"/>
+  <p><i>3D Models Browser - Browse, search, and organize your 3D assets</i></p>
+</div>
+
+<div align="center">
+  <img src="branding/screnshoots/meshlib_browser.png" alt="MeshLibrary Browser" width="80%"/>
+  <p><i>MeshLibrary Browser - Access GridMap mesh items</i></p>
+</div>
 
 ### **Essential Controls**
 - **Left-Click**: Place asset (Placement Mode) / Confirm changes (Transform Mode)
@@ -159,6 +181,15 @@ If your keyboard requires modifier keys for brackets:
 | **ALT**              | Large adjustment mode (10x base increment for rotation/scale/position)                    |
 | **SHIFT**            | Reverse direction for height adjustments (Q/E become E/Q)                                 |
 
+### **Controls in Action**
+
+<div align="center">
+  <img src="branding/gifs/position.gif" alt="Position Controls Demo" width="32%"/>
+  <img src="branding/gifs/rotation.gif" alt="Rotation Controls Demo" width="32%"/>
+  <img src="branding/gifs/scale.gif" alt="Scale Controls Demo" width="32%"/>
+  <p><i>Position, Rotation, and Scale controls demonstrated</i></p>
+</div>
+
 ### **Advanced Key Binding Features**
 - **Universal Modifier Support**: Use CTRL, ALT, SHIFT, META (Windows/Command key) alone or in combinations with ANY keybind.
 - **International Keyboard Layouts**: Configure keys like `CTRL+ALT+8` for brackets on German keyboards, `ALT+5` on French keyboards, etc.
@@ -267,6 +298,11 @@ Right-click any asset for quick actions:
 
 ### **Advanced Tag Management Dialog**
 Click the "Manage Tags..." button next to the category filter for powerful bulk operations:
+
+<div align="center">
+  <img src="branding/screnshoots/afvance_tag_management_dialog.png" alt="Advanced Tag Management Dialog" width="80%"/>
+  <p><i>Advanced Tag Management Dialog - Bulk tag operations and organization</i></p>
+</div>
 
 **Features:**
 - 📋 **Asset Table**: See all assets with their current tags

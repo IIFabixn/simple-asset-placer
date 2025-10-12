@@ -35,9 +35,23 @@ const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger
 
 ## Configuration
 
+static func configure(state: TransformState, settings: Dictionary):
+	"""Configure rotation manager with settings"""
+	# Handle smooth transform settings
+	if settings.has("smooth_enabled") and settings.has("smooth_speed"):
+		SmoothTransformManager.configure(settings.smooth_enabled, settings.smooth_speed)
+	
+	# Handle initial rotation
+	if settings.has("initial_rotation"):
+		var initial = settings.initial_rotation
+		if initial is Vector3:
+			set_rotation_offset_degrees(state, initial)
+
+## @deprecated: Use configure() with a Dictionary instead
 static func configure_smooth_transforms(enabled: bool, speed: float = 8.0):
-	"""Configure smooth transform settings for rotation"""
+	"""Configure smooth transform settings for rotation (deprecated - use configure() instead)"""
 	# No local caching - SmoothTransformManager handles the settings
+	SmoothTransformManager.configure(enabled, speed)
 
 ## Core Rotation Functions
 
@@ -340,13 +354,6 @@ static func set_rotation_preset(state: TransformState, preset_name: String):
 			PluginLogger.warning("RotationManager", "Unknown preset: " + preset_name)
 
 ## Configuration and Settings
-
-static func configure(state: TransformState, settings: Dictionary):
-	"""Configure rotation manager with settings"""
-	if settings.has("initial_rotation"):
-		var initial = settings.initial_rotation
-		if initial is Vector3:
-			set_rotation_offset_degrees(state, initial)
 
 static func get_configuration(state: TransformState) -> Dictionary:
 	"""Get current configuration"""

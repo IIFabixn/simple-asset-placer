@@ -37,9 +37,31 @@ const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger
 
 ## Configuration
 
+static func configure(state: TransformState, settings: Dictionary):
+	"""Configure scale manager with settings"""
+	# Handle smooth transform settings
+	if settings.has("smooth_enabled") and settings.has("smooth_speed"):
+		SmoothTransformManager.configure(settings.smooth_enabled, settings.smooth_speed)
+	
+	# Handle initial scale
+	if settings.has("initial_scale"):
+		var initial = settings.initial_scale
+		if initial is float or initial is int:
+			set_scale_multiplier(state, float(initial))
+		elif initial is Vector3:
+			set_non_uniform_multiplier(state, initial)
+	
+	# Handle scale limits
+	if settings.has("min_scale"):
+		var min_val = settings.get("min_scale", 0.01)
+		var max_val = settings.get("max_scale", 100.0)
+		clamp_scale(state, min_val, max_val)
+
+## @deprecated: Use configure() with a Dictionary instead
 static func configure_smooth_transforms(enabled: bool, speed: float = 8.0):
-	"""Configure smooth transform settings for scaling"""
+	"""Configure smooth transform settings for scaling (deprecated - use configure() instead)"""
 	# No local caching - SmoothTransformManager handles the settings
+	SmoothTransformManager.configure(enabled, speed)
 
 ## Core Scale Functions
 
@@ -250,20 +272,6 @@ static func lerp_to_scale_vector(state: TransformState, target_multiplier: Vecto
 	set_non_uniform_multiplier(state, state.non_uniform_multiplier.lerp(target_multiplier, weight))
 
 ## Configuration and Settings
-
-static func configure(state: TransformState, settings: Dictionary):
-	"""Configure scale manager with settings"""
-	if settings.has("initial_scale"):
-		var initial = settings.initial_scale
-		if initial is float or initial is int:
-			set_scale_multiplier(state, float(initial))
-		elif initial is Vector3:
-			set_non_uniform_multiplier(state, initial)
-	
-	if settings.has("min_scale"):
-		var min_val = settings.get("min_scale", 0.01)
-		var max_val = settings.get("max_scale", 100.0)
-		clamp_scale(state, min_val, max_val)
 
 static func get_configuration(state: TransformState) -> Dictionary:
 	"""Get current configuration"""

@@ -44,10 +44,28 @@ static var preview_color: Color = Color.WHITE
 
 ## Configuration
 
+static func configure(settings: Dictionary) -> void:
+	"""Configure preview manager with settings"""
+	# Handle smooth transform settings
+	if settings.has("smooth_enabled") and settings.has("smooth_speed"):
+		SmoothTransformManager.configure(settings.smooth_enabled, settings.smooth_speed)
+	
+	# Handle preview appearance settings
+	if settings.has("preview_opacity"):
+		set_preview_opacity(settings.preview_opacity)
+	
+	if settings.has("preview_color"):
+		set_preview_color(settings.preview_color)
+	
+	# Recreate material with new settings if it exists
+	if preview_material and (settings.has("preview_opacity") or settings.has("preview_color")):
+		preview_material.queue_free()
+		preview_material = null
+
+## @deprecated: Use configure() with a Dictionary instead
 static func configure_smooth_transforms(enabled: bool, speed: float) -> void:
-	"""Configure smooth transform settings"""
-	# Pass through to SmoothTransformManager - no local caching
-	SmoothTransformManager.configure(enabled, speed)
+	"""Configure smooth transform settings (deprecated - use configure() instead)"""
+	configure({"smooth_enabled": enabled, "smooth_speed": speed})
 
 static func update_smooth_transforms(delta: float) -> void:
 	"""Update smooth transformations - call every frame"""
@@ -267,21 +285,6 @@ static func cleanup_preview() -> void:
 		SmoothTransformManager.unregister_object(preview_mesh)
 		preview_mesh = NodeUtils.cleanup_and_null(preview_mesh)
 		PluginLogger.debug("PreviewManager", "Cleaned up preview")
-
-## Configuration
-
-static func configure(settings: Dictionary) -> void:
-	"""Configure preview manager with settings"""
-	if settings.has("preview_opacity"):
-		set_preview_opacity(settings.preview_opacity)
-	
-	if settings.has("preview_color"):
-		set_preview_color(settings.preview_color)
-	
-	# Recreate material with new settings
-	if preview_material:
-		preview_material.queue_free()
-		preview_material = null
 
 static func get_configuration() -> Dictionary:
 	"""Get current configuration"""

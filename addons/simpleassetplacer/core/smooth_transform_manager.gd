@@ -51,14 +51,32 @@ class SmoothTransform:
 
 ## CONFIGURATION
 
-static func configure(smooth_enabled: bool, smooth_speed: float):
-	"""Configure smooth transformation settings"""
+static func configure(smooth_enabled_or_settings, smooth_speed: float = 8.0):
+	"""Configure smooth transformation settings
+	
+	Can be called two ways:
+	1. configure(settings: Dictionary) - Recommended
+	2. configure(enabled: bool, speed: float) - Legacy
+	"""
+	var enabled: bool
+	var speed: float
+	
+	# Handle Dictionary input (new standardized way)
+	if smooth_enabled_or_settings is Dictionary:
+		var settings: Dictionary = smooth_enabled_or_settings
+		enabled = settings.get("smooth_enabled", _smooth_enabled)
+		speed = settings.get("smooth_speed", _smooth_speed)
+	# Handle legacy boolean + float input
+	else:
+		enabled = smooth_enabled_or_settings
+		speed = smooth_speed
+	
 	var was_enabled = _smooth_enabled
-	_smooth_enabled = smooth_enabled
-	_smooth_speed = clamp(smooth_speed, 0.1, 50.0)  # Safety clamps
+	_smooth_enabled = enabled
+	_smooth_speed = clamp(speed, 0.1, 50.0)  # Safety clamps
 	
 	# If smooth transforms were just disabled, snap all objects to their targets
-	if was_enabled and not smooth_enabled:
+	if was_enabled and not enabled:
 		force_update_to_targets()
 
 static func load_from_editor_settings():

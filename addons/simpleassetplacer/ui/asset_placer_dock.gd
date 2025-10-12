@@ -278,10 +278,13 @@ func _on_cache_cleared():
 		modellib_browser.update_asset_grid()
 
 func _on_settings_changed():
-	"""Handle settings change event - reload SettingsManager from EditorSettings"""
-	# Reload SettingsManager from EditorSettings to sync with UI changes
-	var SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
-	SettingsManager.reload_from_editor_settings()
+	"""Handle settings change event"""
+	# NOTE: Don't reload from EditorSettings here!
+	# The settings_changed signal means PlacementSettings just saved new values,
+	# but EditorSettings might not have them yet (async write).
+	# Reloading here would restore old values and cause button states to flip back.
+	# The button update handlers will get the correct values from PlacementSettings directly.
+	pass
 
 func _ensure_settings_loaded():
 	"""Ensure settings are properly loaded and applied to UI after initialization"""

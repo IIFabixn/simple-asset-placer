@@ -163,17 +163,17 @@ static func _apply_grid_snap(state: TransformState, pos: Vector3) -> Vector3:
 
 ## Height Management
 
-static func update_base_height_from_raycast(state: TransformState, y_position: float):
+static func update_base_height_from_raycast(state: TransformState, y_position: float) -> void:
 	"""Update base height when a new raycast hit is detected (for initial placement)"""
 	state.base_height = y_position
 	state.target_position.y = state.base_height + state.height_offset
 	state.position.y = state.target_position.y
 
-static func adjust_height(state: TransformState, delta: float):
+static func adjust_height(state: TransformState, delta: float) -> void:
 	"""Adjust the current height offset (state only - position will be updated on next mouse update)"""
 	state.height_offset += delta
 
-static func adjust_height_with_modifiers(state: TransformState, base_delta: float, modifiers: Dictionary):
+static func adjust_height_with_modifiers(state: TransformState, base_delta: float, modifiers: Dictionary) -> void:
 	"""Adjust height with modifier-calculated step
 	
 	Args:
@@ -184,50 +184,50 @@ static func adjust_height_with_modifiers(state: TransformState, base_delta: floa
 	var step = IncrementCalculator.calculate_height_step(base_delta, modifiers)
 	adjust_height(state, step)
 
-static func increase_height(state: TransformState):
+static func increase_height(state: TransformState) -> void:
 	"""Increase height by one step"""
 	# Use Y snap step if Y snapping is enabled, otherwise use height step size
 	var step = state.snap_y_step if state.snap_y_enabled else height_step_size
 	adjust_height(state, step)
 
-static func decrease_height(state: TransformState):
+static func decrease_height(state: TransformState) -> void:
 	"""Decrease height by one step"""
 	# Use Y snap step if Y snapping is enabled, otherwise use height step size
 	var step = state.snap_y_step if state.snap_y_enabled else height_step_size
 	adjust_height(state, -step)
 
-static func reset_height(state: TransformState):
+static func reset_height(state: TransformState) -> void:
 	"""Reset height offset to zero"""
 	state.height_offset = 0.0
 	state.target_position.y = state.base_height
 	state.position = state.target_position
 
 # Position adjustment functions (camera-relative)
-static func move_left(state: TransformState, delta: float, camera: Camera3D = null):
+static func move_left(state: TransformState, delta: float, camera: Camera3D = null) -> void:
 	"""Move the position left relative to camera view (state only - position will be updated on next mouse update)"""
 	var move_dir = _get_camera_right_direction(camera) * -1.0  # Left is negative right
 	var movement = move_dir * delta
 	state.manual_position_offset += movement
 
-static func move_right(state: TransformState, delta: float, camera: Camera3D = null):
+static func move_right(state: TransformState, delta: float, camera: Camera3D = null) -> void:
 	"""Move the position right relative to camera view (state only - position will be updated on next mouse update)"""
 	var move_dir = _get_camera_right_direction(camera)
 	var movement = move_dir * delta
 	state.manual_position_offset += movement
 
-static func move_forward(state: TransformState, delta: float, camera: Camera3D = null):
+static func move_forward(state: TransformState, delta: float, camera: Camera3D = null) -> void:
 	"""Move the position forward relative to camera view (state only - position will be updated on next mouse update)"""
 	var move_dir = _get_camera_forward_direction(camera)
 	var movement = move_dir * delta
 	state.manual_position_offset += movement
 
-static func move_backward(state: TransformState, delta: float, camera: Camera3D = null):
+static func move_backward(state: TransformState, delta: float, camera: Camera3D = null) -> void:
 	"""Move the position backward relative to camera view (state only - position will be updated on next mouse update)"""
 	var move_dir = _get_camera_forward_direction(camera) * -1.0  # Backward is negative forward
 	var movement = move_dir * delta
 	state.manual_position_offset += movement
 
-static func move_direction_with_modifiers(state: TransformState, direction: String, base_delta: float, modifiers: Dictionary, camera: Camera3D = null):
+static func move_direction_with_modifiers(state: TransformState, direction: String, base_delta: float, modifiers: Dictionary, camera: Camera3D = null) -> void:
 	"""Move in a direction with modifier-calculated step
 	
 	Args:
@@ -287,7 +287,7 @@ static func _get_camera_right_direction(camera: Camera3D) -> Vector3:
 		# Primarily Z-axis movement
 		return Vector3(0, 0, sign(right.z))
 
-static func reset_position(state: TransformState):
+static func reset_position(state: TransformState) -> void:
 	"""Reset manual position offset to zero"""
 	# Remove the current offset from positions
 	state.position -= state.manual_position_offset
@@ -295,7 +295,7 @@ static func reset_position(state: TransformState):
 	# Clear the offset
 	state.manual_position_offset = Vector3.ZERO
 
-static func rotate_manual_offset(state: TransformState, axis: String, angle_degrees: float):
+static func rotate_manual_offset(state: TransformState, axis: String, angle_degrees: float) -> void:
 	"""Rotate the manual position offset around the specified axis
 	This is called when the preview mesh rotates so the offset rotates with it"""
 	if state.manual_position_offset.length_squared() < 0.0001:
@@ -345,13 +345,13 @@ static func rotate_manual_offset(state: TransformState, axis: String, angle_degr
 	state.position += state.manual_position_offset  # Apply new offset
 	state.target_position = state.position
 
-static func set_base_height(state: TransformState, y: float):
+static func set_base_height(state: TransformState, y: float) -> void:
 	"""Set the base height reference point"""
 	state.base_height = y
 	state.target_position.y = state.base_height + state.height_offset
 	state.position = state.target_position
 
-static func reset_for_new_placement(state: TransformState, reset_height_offset: bool = true, reset_position_offset: bool = true):
+static func reset_for_new_placement(state: TransformState, reset_height_offset: bool = true, reset_position_offset: bool = true) -> void:
 	"""Reset position manager state for a new placement session
 	
 	reset_height_offset: If true, reset height_offset to 0. If false, preserve current height.
@@ -378,7 +378,7 @@ static func get_target_position(state: TransformState) -> Vector3:
 	"""Get the target position (may be different during interpolation)"""
 	return state.target_position
 
-static func set_position(state: TransformState, pos: Vector3):
+static func set_position(state: TransformState, pos: Vector3) -> void:
 	"""Directly set the current position"""
 	state.position = pos
 	state.target_position = pos
@@ -428,16 +428,16 @@ static func clamp_position_to_bounds(pos: Vector3, bounds: AABB = AABB()) -> Vec
 
 ## Position Interpolation and Smoothing
 
-static func enable_smooth_positioning(speed: float = 10.0):
+static func enable_smooth_positioning(speed: float = 10.0) -> void:
 	"""Enable smooth position interpolation"""
 	interpolation_enabled = true
 	interpolation_speed = speed
 
-static func disable_smooth_positioning():
+static func disable_smooth_positioning() -> void:
 	"""Disable position interpolation"""
 	interpolation_enabled = false
 
-static func update_smooth_position(state: TransformState, delta: float):
+static func update_smooth_position(state: TransformState, delta: float) -> void:
 	"""Update position with smooth interpolation (call from _process)"""
 	if not interpolation_enabled:
 		return
@@ -447,7 +447,7 @@ static func update_smooth_position(state: TransformState, delta: float):
 
 ## Configuration
 
-static func configure(state: TransformState, config: Dictionary):
+static func configure(state: TransformState, config: Dictionary) -> void:
 	"""Configure position manager settings and placement strategies"""
 	# Configure global settings
 	snap_to_ground = config.get("snap_to_ground", true)
@@ -486,7 +486,7 @@ static func get_configuration(state: TransformState) -> Dictionary:
 
 ## Transform Node Positioning (for Transform Mode)
 
-static func update_transform_node_position(state: TransformState, transform_node: Node3D, camera: Camera3D, mouse_pos: Vector2):
+static func update_transform_node_position(state: TransformState, transform_node: Node3D, camera: Camera3D, mouse_pos: Vector2) -> void:
 	"""Update position of a transform mode node based on mouse input"""
 	if not transform_node or not camera:
 		return
@@ -500,7 +500,7 @@ static func update_transform_node_position(state: TransformState, transform_node
 	if transform_node.is_inside_tree():
 		transform_node.global_position = world_pos
 
-static func start_transform_positioning(state: TransformState, node: Node3D):
+static func start_transform_positioning(state: TransformState, node: Node3D) -> void:
 	"""Initialize positioning for transform mode"""
 	if node and node.is_inside_tree():
 		set_position(state, node.global_position)
@@ -532,7 +532,7 @@ static func get_surface_normal_at_position(pos: Vector3) -> Vector3:
 
 ## Debug and Visualization
 
-static func debug_print_position_state(state: TransformState):
+static func debug_print_position_state(state: TransformState) -> void:
 	"""Print current position state for debugging"""
 	PluginLogger.debug("PositionManager", "Position: %v, Height: %.2f" % [state.position, state.height_offset])
 

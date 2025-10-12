@@ -115,7 +115,7 @@ static func apply_magnitude_only(value: float, modifiers: Dictionary) -> float:
 
 ## Configuration
 
-static func configure_multipliers(large: float = 5.0, fine: float = 0.1):
+static func configure_multipliers(large: float = 5.0, fine: float = 0.1) -> void:
 	"""Configure the multiplier values used for large/fine increments
 	
 	Args:
@@ -176,7 +176,7 @@ static func is_fine_active(modifiers: Dictionary) -> bool:
 
 ## Debug and Information
 
-static func debug_print_step_calculation(base_step: float, modifiers: Dictionary):
+static func debug_print_step_calculation(base_step: float, modifiers: Dictionary) -> void:
 	"""Print step calculation details for debugging"""
 	var final_step = calculate_step(base_step, modifiers)
 	PluginLogger.debug("IncrementCalculator", "Step Calculation:")

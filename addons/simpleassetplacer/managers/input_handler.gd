@@ -33,9 +33,15 @@ static var current_actions: Dictionary = {}
 # Settings reference for key mappings
 static var settings: Dictionary = {}
 
-# Key state tracking for edge detection
+# Key state tracking for edge detection (double-buffered for swap optimization)
 static var previous_keys: Dictionary = {}
 static var previous_mouse: Dictionary = {}
+# Swap buffers - avoids duplicate() allocation every frame
+static var _keys_buffer_a: Dictionary = {}
+static var _keys_buffer_b: Dictionary = {}
+static var _mouse_buffer_a: Dictionary = {}
+static var _mouse_buffer_b: Dictionary = {}
+static var _use_buffer_a: bool = true  # Track which buffer is "current"
 
 # Grace period tracking for tap vs hold detection
 static var key_press_times: Dictionary = {}  # Track when each key was pressed
@@ -66,11 +72,27 @@ static func update_input_state(input_settings: Dictionary = {}, viewport: SubVie
 	if viewport:
 		cached_viewport = viewport
 	
-	# Store previous state for edge detection
-	previous_keys = current_keys.duplicate()
-	previous_mouse = current_mouse.duplicate()
+	# Swap buffers instead of duplicate() - avoids per-frame allocation
+	# This optimization reduces GC pressure in hot path (called every frame)
+	if _use_buffer_a:
+		# A is current, B becomes previous
+		previous_keys = _keys_buffer_a
+		previous_mouse = _mouse_buffer_a
+		# B becomes current
+		current_keys = _keys_buffer_b
+		current_mouse = _mouse_buffer_b
+	else:
+		# B is current, A becomes previous
+		previous_keys = _keys_buffer_b
+		previous_mouse = _mouse_buffer_b
+		# A becomes current
+		current_keys = _keys_buffer_a
+		current_mouse = _mouse_buffer_a
 	
-	# Clear current state
+	# Toggle buffer selection for next frame
+	_use_buffer_a = not _use_buffer_a
+	
+	# Clear current state (reusing buffer)
 	current_keys.clear()
 	current_mouse.clear() 
 	current_actions.clear()
@@ -702,7 +724,11 @@ static func is_action_key_held_with_repeat(key_name: String, action_type: String
 	if active_repeat_key != key_name:
 		# Cancel previous repeat (only one at a time)
 		active_repeat_key = key_name
-		active_repeat_modifiers = current_modifiers.duplicate()
+		# Avoid duplicate() - just assign values directly (small dict, 3 keys)
+		active_repeat_modifiers.clear()
+		active_repeat_modifiers["reverse_modifier"] = current_modifiers["reverse_modifier"]
+		active_repeat_modifiers["large_increment_modifier"] = current_modifiers["large_increment_modifier"]
+		active_repeat_modifiers["fine_increment_modifier"] = current_modifiers["fine_increment_modifier"]
 	else:
 		# Check if modifier state changed - cancel repeat if so
 		if current_modifiers != active_repeat_modifiers:

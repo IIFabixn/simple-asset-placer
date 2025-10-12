@@ -18,6 +18,12 @@ static var light: DirectionalLight3D
 static var generation_mutex: Mutex = Mutex.new()
 static var is_generating: bool = false
 
+# Performance optimization constants
+const MAX_AABB_DEPTH = 15  # Maximum recursion depth for AABB calculation
+const MAX_NODES_PER_AABB = 200  # Maximum nodes to process in AABB calculation
+const YIELD_INTERVAL = 10  # Yield control every N nodes to prevent UI freeze
+static var _nodes_processed: int = 0  # Track nodes processed in current AABB calculation
+
 static func _cleanup_generation():
 	generation_mutex.unlock()
 
@@ -358,17 +364,33 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 		# Get the AABB of the entire scene container (includes all children)
 		var scene_aabb = VisualInstance3D.new().get_aabb() if scene_container.get_child_count() == 0 else AABB()
 		
-		# Calculate AABB from all VisualInstance3D children
+		# Calculate AABB from all VisualInstance3D children (async for better performance)
+		_nodes_processed = 0  # Reset node counter
 		var first = true
 		if scene_container and is_instance_valid(scene_container):
 			for child in scene_container.get_children():
-				var child_aabb = _get_node_aabb_recursive(child)
+				# Use async version for large scenes
+				var child_aabb = await _get_node_aabb_recursive_async(child, 0)
+				
+				# Validate scene_container after await - might have been freed
+				if not scene_container or not is_instance_valid(scene_container):
+					PluginLogger.debug(PluginConstants.COMPONENT_THUMBNAIL, 
+						"scene_container became invalid during AABB calculation (plugin disabled)")
+					scene_container = null
+					_cleanup_generation()
+					return null
+				
 				if child_aabb.has_volume():
 					if first:
 						scene_aabb = child_aabb
 						first = false
 					else:
 						scene_aabb = scene_aabb.merge(child_aabb)
+		
+		# Log AABB calculation stats
+		if _nodes_processed > 0:
+			PluginLogger.debug(PluginConstants.COMPONENT_THUMBNAIL, 
+				"AABB calculated from %d nodes" % _nodes_processed)
 		
 		# Position camera to view the entire scene
 		if scene_aabb.has_volume():
@@ -565,6 +587,85 @@ static func _get_node_aabb_recursive(node: Node) -> AABB:
 	# Process children recursively
 	for child in node.get_children():
 		var child_aabb = _get_node_aabb_recursive(child)
+		if child_aabb.has_volume():
+			if first:
+				combined_aabb = child_aabb
+				first = false
+			else:
+				combined_aabb = combined_aabb.merge(child_aabb)
+	
+	return combined_aabb
+
+
+static func _get_node_aabb_recursive_async(node: Node, depth: int = 0) -> AABB:
+	"""
+	Asynchronously calculate the combined AABB of a node and all its children.
+	Yields control periodically to prevent UI freezing on large scenes.
+	
+	Performance limits:
+	- MAX_AABB_DEPTH: Maximum recursion depth (prevents infinite loops)
+	- MAX_NODES_PER_AABB: Maximum nodes to process (prevents excessive processing)
+	- YIELD_INTERVAL: Yield every N nodes (keeps UI responsive)
+	"""
+	var combined_aabb = AABB()
+	var first = true
+	
+	# Early exit: Check depth limit
+	if depth > MAX_AABB_DEPTH:
+		PluginLogger.debug(PluginConstants.COMPONENT_THUMBNAIL, 
+			"AABB calculation reached max depth: %d" % MAX_AABB_DEPTH)
+		return combined_aabb
+	
+	# Early exit: Check node count limit
+	if _nodes_processed > MAX_NODES_PER_AABB:
+		PluginLogger.debug(PluginConstants.COMPONENT_THUMBNAIL, 
+			"AABB calculation reached max nodes: %d" % MAX_NODES_PER_AABB)
+		return combined_aabb
+	
+	# Increment node counter
+	_nodes_processed += 1
+	
+	# Yield control periodically to keep UI responsive
+	if _nodes_processed % YIELD_INTERVAL == 0:
+		await Engine.get_main_loop().process_frame
+		
+		# Validate node after await - might have been freed
+		if not node or not is_instance_valid(node):
+			PluginLogger.debug(PluginConstants.COMPONENT_THUMBNAIL, 
+				"Node became invalid during async AABB calculation")
+			return combined_aabb
+	
+	# Check if this node has a visual representation
+	if node is VisualInstance3D:
+		var visual = node as VisualInstance3D
+		var local_aabb = visual.get_aabb()
+		
+		if local_aabb.has_volume():
+			# Transform AABB to global space
+			var transform = visual.global_transform
+			var corners = [
+				transform * (local_aabb.position),
+				transform * (local_aabb.position + Vector3(local_aabb.size.x, 0, 0)),
+				transform * (local_aabb.position + Vector3(0, local_aabb.size.y, 0)),
+				transform * (local_aabb.position + Vector3(0, 0, local_aabb.size.z)),
+				transform * (local_aabb.position + Vector3(local_aabb.size.x, local_aabb.size.y, 0)),
+				transform * (local_aabb.position + Vector3(local_aabb.size.x, 0, local_aabb.size.z)),
+				transform * (local_aabb.position + Vector3(0, local_aabb.size.y, local_aabb.size.z)),
+				transform * (local_aabb.position + local_aabb.size)
+			]
+			
+			combined_aabb = AABB(corners[0], Vector3.ZERO)
+			for corner in corners:
+				combined_aabb = combined_aabb.expand(corner)
+			first = false
+	
+	# Process children recursively
+	for child in node.get_children():
+		# Validate child before processing
+		if not child or not is_instance_valid(child):
+			continue
+			
+		var child_aabb = await _get_node_aabb_recursive_async(child, depth + 1)
 		if child_aabb.has_volume():
 			if first:
 				combined_aabb = child_aabb

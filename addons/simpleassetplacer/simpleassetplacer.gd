@@ -34,6 +34,11 @@ const ToolbarButtonsScene = preload("res://addons/simpleassetplacer/ui/toolbar_b
 var dock: AssetPlacerDock
 var toolbar_buttons: Control = null
 
+# Performance: Frame-based settings cache (Task 3.3)
+# Avoids redundant SettingsManager.get_combined_settings() calls within the same frame
+var _cached_settings: Dictionary = {}
+var _settings_cache_frame: int = -1
+
 ## Plugin Lifecycle
 
 func _enable_plugin() -> void:
@@ -218,6 +223,26 @@ func _load_settings():
 
 ## Core Processing Loop
 
+func _get_frame_settings() -> Dictionary:
+	"""
+	Get combined settings for the current frame (cached).
+	
+	Performance optimization: Settings are fetched once per frame and cached.
+	This avoids redundant EditorSettings queries when settings are accessed
+	multiple times within the same frame.
+	
+	Cache automatically invalidates each frame via frame number check.
+	"""
+	var current_frame = Engine.get_process_frames()
+	
+	if _settings_cache_frame != current_frame:
+		# Cache miss - fetch fresh settings
+		_cached_settings = SettingsManager.get_combined_settings()
+		_settings_cache_frame = current_frame
+	
+	# Cache hit - return cached settings
+	return _cached_settings
+
 func _process(delta: float) -> void:
 	"""Main processing loop - delegates everything to TransformationManager"""
 	if not _is_plugin_ready():
@@ -232,9 +257,11 @@ func _process(delta: float) -> void:
 	if dock and dock.has_method("get_placement_settings"):
 		var dock_settings = dock.get_placement_settings()
 		SettingsManager.set_dock_settings(dock_settings)
+		# Invalidate cache when settings change
+		_settings_cache_frame = -1
 	
-	# Delegate frame processing to coordinator with combined settings
-	TransformationManager.process_frame_input(camera, SettingsManager.get_combined_settings(), delta)
+	# Delegate frame processing to coordinator with cached settings (Task 3.3 optimization)
+	TransformationManager.process_frame_input(camera, _get_frame_settings(), delta)
 	
 	# Update transform mode button state
 	if toolbar_buttons and toolbar_buttons.has_method("set_transform_mode_active"):
@@ -437,7 +464,8 @@ func _on_asset_selected(asset_path: String, mesh_resource: Resource, settings: D
 	
 	# Update dock settings and get combined settings
 	SettingsManager.update_dock_settings(settings)
-	var combined_settings = SettingsManager.get_combined_settings()
+	_settings_cache_frame = -1  # Invalidate cache when settings change
+	var combined_settings = _get_frame_settings()  # Use cached getter
 	
 	# Start placement mode through the coordinator
 	if mesh_resource and mesh_resource is Mesh:
@@ -454,7 +482,8 @@ func _on_meshlib_item_selected(meshlib: MeshLibrary, item_id: int, settings: Dic
 	
 	# Update dock settings and get combined settings
 	SettingsManager.update_dock_settings(settings)
-	var combined_settings = SettingsManager.get_combined_settings()
+	_settings_cache_frame = -1  # Invalidate cache when settings change
+	var combined_settings = _get_frame_settings()  # Use cached getter
 	
 	# Start placement mode through the coordinator
 	TransformationManager.start_placement_mode(null, meshlib, item_id, "", combined_settings, dock)
@@ -467,11 +496,12 @@ func _on_meshlib_item_selected(meshlib: MeshLibrary, item_id: int, settings: Dic
 func update_plugin_settings(new_settings: Dictionary):
 	"""Update plugin settings"""
 	SettingsManager.set_plugin_settings(new_settings)
+	_settings_cache_frame = -1  # Invalidate cache when settings change
 	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Settings updated")
 
 func get_plugin_settings() -> Dictionary:
-	"""Get current plugin settings"""
-	return SettingsManager.get_combined_settings()
+	"""Get current plugin settings (cached per frame)"""
+	return _get_frame_settings()
 
 ## Debug and Information
 

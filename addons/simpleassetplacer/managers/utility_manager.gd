@@ -44,20 +44,15 @@ static func generate_unique_name(base_name: String, parent: Node) -> String:
 	
 	return unique_name
 
-static func add_node_with_undo_redo(node: Node, parent: Node, action_name: String):
-	"""Add a node with undo/redo support"""
-	var undo_redo = EditorInterface.get_editor_undo_redo()
+static func add_node_to_scene(node: Node, parent: Node) -> void:
+	"""Add a node to the scene
 	
-	if undo_redo:
-		undo_redo.create_action(action_name)
-		undo_redo.add_do_method(parent, "add_child", node)
-		undo_redo.add_do_property(node, "owner", EditorInterface.get_edited_scene_root())
-		undo_redo.add_undo_method(parent, "remove_child", node)
-		undo_redo.commit_action()
-	else:
-		# Fallback if undo/redo is not available
-		parent.add_child(node)
-		node.owner = EditorInterface.get_edited_scene_root()
+	NOTE: This does NOT create undo/redo entries. Undo/redo is handled by
+	PlacementModeHandler using UndoRedoHelper after the node is placed.
+	This separation allows the handler to capture the full transform state.
+	"""
+	parent.add_child(node)
+	node.owner = EditorInterface.get_edited_scene_root()
 
 static func extract_mesh_from_node3d(node: Node3D) -> Mesh:
 	"""Extract a mesh from a Node3D (MeshInstance3D, CSG nodes, etc.)"""
@@ -116,8 +111,8 @@ static func place_asset_in_scene(asset_path: String, position: Vector3 = Vector3
 		var unique_name = generate_unique_name(base_name, current_scene)
 		scene_instance.name = unique_name
 		
-		# Add to scene with undo/redo support
-		add_node_with_undo_redo(scene_instance, current_scene, "Place Asset")
+		# Add to scene (undo/redo handled by PlacementModeHandler)
+		add_node_to_scene(scene_instance, current_scene)
 		
 		# Now apply transforms (after node is in tree)
 		scene_instance.global_position = position
@@ -166,8 +161,8 @@ static func place_meshlib_item_in_scene(meshlib: MeshLibrary, item_id: int, posi
 		var unique_name = generate_unique_name(base_name, current_scene)
 		mesh_instance.name = unique_name
 		
-		# Add to scene with undo/redo support
-		add_node_with_undo_redo(mesh_instance, current_scene, "Place MeshLib Item")
+		# Add to scene (undo/redo handled by PlacementModeHandler)
+		add_node_to_scene(mesh_instance, current_scene)
 		
 		# Now apply transforms (after node is in tree)
 		mesh_instance.global_position = position
@@ -214,8 +209,8 @@ static func place_mesh_in_scene(mesh: Mesh, position: Vector3, settings: Diction
 		var unique_name = generate_unique_name(base_name, current_scene)
 		mesh_instance.name = unique_name
 		
-		# Add to scene with undo/redo support
-		add_node_with_undo_redo(mesh_instance, current_scene, "Place Mesh")
+		# Add to scene (undo/redo handled by PlacementModeHandler)
+		add_node_to_scene(mesh_instance, current_scene)
 		
 		# Now apply transforms (after node is in tree)
 		mesh_instance.global_position = position

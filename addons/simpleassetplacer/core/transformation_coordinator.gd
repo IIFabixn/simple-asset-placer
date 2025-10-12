@@ -76,6 +76,9 @@ static var settings: Dictionary = {}
 # Dock reference (for UI updates)
 static var dock_reference = null
 
+# Undo/Redo manager
+static var undo_redo: EditorUndoRedoManager = null
+
 # Callbacks
 static var placement_end_callback: Callable
 static var mesh_placed_callback: Callable
@@ -118,6 +121,9 @@ static func start_placement_mode(
 	transform_state = TransformState.new()
 	transform_state.configure_from_settings(placement_settings)
 	
+	# Ensure undo/redo manager is available
+	_ensure_undo_redo()
+	
 	# Delegate to placement mode handler
 	placement_data = PlacementModeHandler.enter_placement_mode(
 		mesh,
@@ -125,7 +131,8 @@ static func start_placement_mode(
 		item_id,
 		asset_path,
 		placement_settings,
-		transform_state
+		transform_state,
+		undo_redo
 	)
 	
 	# Store dock reference in placement data
@@ -161,11 +168,15 @@ static func start_transform_mode(target_nodes: Variant, dock_instance = null) ->
 	if not settings.is_empty():
 		transform_state.configure_from_settings(settings)
 	
+	# Ensure undo/redo manager is available
+	_ensure_undo_redo()
+	
 	# Delegate to transform mode handler
 	transform_data = TransformModeHandler.enter_transform_mode(
 		target_nodes,
 		settings,
-		transform_state
+		transform_state,
+		undo_redo
 	)
 	
 	# Store dock reference in transform data
@@ -437,6 +448,21 @@ static func cleanup() -> void:
 	OverlayManager.cleanup_all_overlays()
 	PreviewManager.cleanup_preview()
 	GridManager.cleanup_grid()
+
+## INTERNAL HELPERS
+
+static func _ensure_undo_redo() -> void:
+	"""Ensure undo/redo manager is initialized and available
+	
+	This lazily initializes the EditorUndoRedoManager reference.
+	Called before entering any mode that needs undo support.
+	"""
+	if not undo_redo:
+		undo_redo = EditorInterface.get_editor_undo_redo()
+		if undo_redo:
+			PluginLogger.debug("TransformationCoordinator", "Initialized EditorUndoRedoManager")
+		else:
+			PluginLogger.warning("TransformationCoordinator", "Failed to get EditorUndoRedoManager")
 	placement_data.clear()
 	transform_data.clear()
 	settings.clear()

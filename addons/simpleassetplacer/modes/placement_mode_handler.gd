@@ -32,6 +32,7 @@ USES: PreviewManager, PositionManager, RotationManager, ScaleManager, OverlayMan
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
 const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
 const NodeUtils = preload("res://addons/simpleassetplacer/utils/node_utils.gd")
+const UndoRedoHelper = preload("res://addons/simpleassetplacer/utils/undo_redo_helper.gd")
 
 # Import managers
 const InputHandler = preload("res://addons/simpleassetplacer/managers/input_handler.gd")
@@ -55,7 +56,8 @@ static func enter_placement_mode(
 	item_id: int = -1,
 	asset_path: String = "",
 	settings: Dictionary = {},
-	transform_state: TransformState = null
+	transform_state: TransformState = null,
+	undo_redo: EditorUndoRedoManager = null
 ) -> Dictionary:
 	"""Initialize placement mode and return placement data
 	
@@ -66,6 +68,7 @@ static func enter_placement_mode(
 		asset_path: Path to scene/asset to place
 		settings: Placement settings dictionary
 		transform_state: Transform state to configure
+		undo_redo: EditorUndoRedoManager for undo/redo support
 		
 	Returns:
 		Dictionary: placement_data containing all placement state
@@ -77,7 +80,8 @@ static func enter_placement_mode(
 		"item_id": item_id,
 		"asset_path": asset_path,
 		"settings": settings,
-		"dock_reference": null
+		"dock_reference": null,
+		"undo_redo": undo_redo
 	}
 	
 	# Initialize managers for placement mode
@@ -437,7 +441,7 @@ static func place_at_current_position(
 	"""Place object at current preview position
 	
 	Args:
-		placement_data: Placement data dictionary
+		placement_data: Placement data dictionary (must contain undo_redo if undo is needed)
 		transform_state: Transform state containing placement transform
 		placed_callback: Optional callback to call when placement succeeds
 		
@@ -480,6 +484,22 @@ static func place_at_current_position(
 			settings,
 			transform_state
 		)
+	
+	# Create undo/redo action if placement succeeded
+	if placed_node:
+		var undo_redo = placement_data.get("undo_redo")
+		if undo_redo:
+			# Generate action name based on what was placed
+			var action_name = ""
+			if meshlib and item_id >= 0:
+				action_name = "Place " + meshlib.get_item_name(item_id)
+			else:
+				action_name = "Place " + placed_node.name
+			
+			# Create undo action
+			var success = UndoRedoHelper.create_placement_undo(undo_redo, placed_node, action_name)
+			if not success:
+				PluginLogger.warning("PlacementModeHandler", "Failed to create undo action for placement")
 	
 	# Call placement callback
 	if placed_node and placed_callback.is_valid():

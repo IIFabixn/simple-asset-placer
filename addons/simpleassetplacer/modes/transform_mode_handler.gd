@@ -31,6 +31,7 @@ USES: PositionManager, RotationManager, ScaleManager, SmoothTransformManager,
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
 const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
 const NodeUtils = preload("res://addons/simpleassetplacer/utils/node_utils.gd")
+const UndoRedoHelper = preload("res://addons/simpleassetplacer/utils/undo_redo_helper.gd")
 
 # Import managers
 const InputHandler = preload("res://addons/simpleassetplacer/managers/input_handler.gd")
@@ -52,7 +53,8 @@ const ModeStateMachine = preload("res://addons/simpleassetplacer/core/mode_state
 static func enter_transform_mode(
 	target_nodes: Variant,  # Node3D or Array of Node3D
 	settings: Dictionary,
-	transform_state: TransformState
+	transform_state: TransformState,
+	undo_redo: EditorUndoRedoManager = null
 ) -> Dictionary:
 	"""Initialize transform mode and return transform data
 	
@@ -60,6 +62,7 @@ static func enter_transform_mode(
 		target_nodes: Single Node3D or Array of Node3D objects to transform together
 		settings: Transform settings dictionary
 		transform_state: Transform state to configure
+		undo_redo: EditorUndoRedoManager for undo/redo support
 		
 	Returns:
 		Dictionary: transform_data containing all transform state
@@ -105,7 +108,8 @@ static func enter_transform_mode(
 		"original_center": center_pos,  # Store the original center position
 		"node_offsets": node_offsets,  # Store each node's offset from original center
 		"dock_reference": null,
-		"accumulated_y_delta": 0.0  # Track accumulated height adjustments
+		"accumulated_y_delta": 0.0,  # Track accumulated height adjustments
+		"undo_redo": undo_redo  # Store undo/redo manager
 	}
 	
 	# Initialize managers for transform mode
@@ -147,22 +151,52 @@ static func exit_transform_mode(
 	confirm_changes: bool,
 	settings: Dictionary
 ) -> void:
-	"""Clean up transform mode
+	"""Clean up transform mode and create undo action if confirming
 	
 	Args:
-		transform_data: Transform data dictionary
+		transform_data: Transform data dictionary (contains undo_redo if available)
 		transform_state: Transform state to reset
-		confirm_changes: If false, restore original transforms
+		confirm_changes: If false, restore original transforms; if true, create undo action
 		settings: Settings dictionary for reset behavior
 	"""
 	var target_nodes = transform_data.get("target_nodes", [])
 	var original_transforms = transform_data.get("original_transforms", {})
+	var undo_redo = transform_data.get("undo_redo")
 	
 	if not confirm_changes:
-		# Restore original transforms if not confirming changes
+		# Restore original transforms if not confirming changes (CANCEL)
 		for node in target_nodes:
 			if node and original_transforms.has(node):
 				node.transform = original_transforms[node]
+	else:
+		# Create undo/redo action if confirming changes (CONFIRM)
+		if undo_redo and UndoRedoHelper.should_create_undo(confirm_changes):
+			# Check if this is single or multiple object transformation
+			if target_nodes.size() == 1:
+				# Single object transform
+				var node = target_nodes[0]
+				if UndoRedoHelper.is_valid_for_undo(node) and original_transforms.has(node):
+					var original = original_transforms[node]
+					var new_transform = node.transform
+					var success = UndoRedoHelper.create_transform_undo(
+						undo_redo,
+						node,
+						original,
+						new_transform,
+						"Transform " + node.name
+					)
+					if not success:
+						PluginLogger.warning("TransformModeHandler", "Failed to create undo action for single node transform")
+			else:
+				# Multiple object transform
+				var success = UndoRedoHelper.create_multi_transform_undo(
+					undo_redo,
+					target_nodes,
+					original_transforms,
+					"Transform " + str(target_nodes.size()) + " objects"
+				)
+				if not success:
+					PluginLogger.warning("TransformModeHandler", "Failed to create undo action for multi-node transform")
 	
 	# Unregister all target nodes from smooth transforms
 	for node in target_nodes:

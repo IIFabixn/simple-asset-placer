@@ -27,6 +27,84 @@ static func initialize(editor_interface: EditorInterface) -> void:
 	_editor_interface = editor_interface
 	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "ErrorHandler initialized")
 
+## Dialog Cleanup Helper
+
+static func _connect_dialog_cleanup(dialog: Window) -> void:
+	"""Connect dialog signals with proper disconnection before queue_free
+	
+	This prevents memory leaks by ensuring signals are disconnected before
+	the dialog is freed. Without disconnection, signal connections can linger
+	in memory even after the dialog is destroyed.
+	
+	Args:
+		dialog: The dialog window to set up cleanup for
+	"""
+	# Store references to the callables so we can disconnect them
+	var callbacks = {
+		"confirmed": Callable(),
+		"canceled": Callable()
+	}
+	
+	callbacks["confirmed"] = func():
+		# Disconnect both signals before freeing
+		if dialog.confirmed.is_connected(callbacks["confirmed"]):
+			dialog.confirmed.disconnect(callbacks["confirmed"])
+		if dialog.canceled.is_connected(callbacks["canceled"]):
+			dialog.canceled.disconnect(callbacks["canceled"])
+		dialog.queue_free()
+	
+	callbacks["canceled"] = func():
+		# Disconnect both signals before freeing
+		if dialog.confirmed.is_connected(callbacks["confirmed"]):
+			dialog.confirmed.disconnect(callbacks["confirmed"])
+		if dialog.canceled.is_connected(callbacks["canceled"]):
+			dialog.canceled.disconnect(callbacks["canceled"])
+		dialog.queue_free()
+	
+	dialog.confirmed.connect(callbacks["confirmed"])
+	dialog.canceled.connect(callbacks["canceled"])
+
+static func _connect_dialog_with_callbacks(dialog: Window, on_confirm: Callable, on_cancel: Callable) -> void:
+	"""Connect dialog with user callbacks and proper cleanup
+	
+	This is similar to _connect_dialog_cleanup but also calls user-provided
+	callbacks before disconnecting and freeing the dialog.
+	
+	Args:
+		dialog: The dialog window to set up
+		on_confirm: User callback for confirmed signal (can be invalid)
+		on_cancel: User callback for canceled signal (can be invalid)
+	"""
+	var callbacks = {
+		"confirmed": Callable(),
+		"canceled": Callable()
+	}
+	
+	callbacks["confirmed"] = func():
+		# Call user callback first
+		if on_confirm.is_valid():
+			on_confirm.call()
+		# Then disconnect and cleanup
+		if dialog.confirmed.is_connected(callbacks["confirmed"]):
+			dialog.confirmed.disconnect(callbacks["confirmed"])
+		if dialog.canceled.is_connected(callbacks["canceled"]):
+			dialog.canceled.disconnect(callbacks["canceled"])
+		dialog.queue_free()
+	
+	callbacks["canceled"] = func():
+		# Call user callback first
+		if on_cancel.is_valid():
+			on_cancel.call()
+		# Then disconnect and cleanup
+		if dialog.confirmed.is_connected(callbacks["confirmed"]):
+			dialog.confirmed.disconnect(callbacks["confirmed"])
+		if dialog.canceled.is_connected(callbacks["canceled"]):
+			dialog.canceled.disconnect(callbacks["canceled"])
+		dialog.queue_free()
+	
+	dialog.confirmed.connect(callbacks["confirmed"])
+	dialog.canceled.connect(callbacks["canceled"])
+
 ## User-Facing Error Messages
 
 static func show_error(component: String, title: String, message: String, details: String = "") -> void:
@@ -46,9 +124,8 @@ static func show_error(component: String, title: String, message: String, detail
 		if base:
 			base.add_child(dialog)
 			dialog.popup_centered(Vector2i(400, 200))
-			# Cleanup when closed
-			dialog.confirmed.connect(func(): dialog.queue_free())
-			dialog.canceled.connect(func(): dialog.queue_free())
+			# Cleanup when closed - properly disconnect signals to prevent memory leaks
+			_connect_dialog_cleanup(dialog)
 	
 	# Also push to Godot's error system
 	push_error("[" + component + "] " + message)
@@ -69,8 +146,7 @@ static func show_warning(component: String, title: String, message: String, deta
 		if base:
 			base.add_child(dialog)
 			dialog.popup_centered(Vector2i(400, 200))
-			dialog.confirmed.connect(func(): dialog.queue_free())
-			dialog.canceled.connect(func(): dialog.queue_free())
+			_connect_dialog_cleanup(dialog)
 	
 	push_warning("[" + component + "] " + message)
 
@@ -87,8 +163,7 @@ static func show_info(component: String, title: String, message: String) -> void
 		if base:
 			base.add_child(dialog)
 			dialog.popup_centered(Vector2i(350, 150))
-			dialog.confirmed.connect(func(): dialog.queue_free())
-			dialog.canceled.connect(func(): dialog.queue_free())
+			_connect_dialog_cleanup(dialog)
 
 ## Quick Feedback (No Dialog)
 
@@ -255,16 +330,8 @@ static func show_confirmation(title: String, message: String, on_confirm: Callab
 	if base:
 		base.add_child(dialog)
 		
-		# Connect callbacks
-		if on_confirm.is_valid():
-			dialog.confirmed.connect(on_confirm)
-		
-		if on_cancel.is_valid():
-			dialog.canceled.connect(on_cancel)
-		
-		# Cleanup
-		dialog.confirmed.connect(func(): dialog.queue_free())
-		dialog.canceled.connect(func(): dialog.queue_free())
+		# Connect callbacks with proper cleanup
+		_connect_dialog_with_callbacks(dialog, on_confirm, on_cancel)
 		
 		dialog.popup_centered(Vector2i(400, 150))
 

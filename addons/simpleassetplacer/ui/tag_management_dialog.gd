@@ -40,6 +40,44 @@ func setup(manager: CategoryManager, assets: Array) -> void:
 		_populate_tag_list()
 		_update_statistics()
 
+func _connect_dialog_with_action(dialog: Window, action: Callable) -> void:
+	"""Connect dialog signals with proper disconnection before queue_free
+	
+	This prevents memory leaks by ensuring signals are disconnected before
+	the dialog is freed. The action callable is executed before cleanup.
+	
+	Args:
+		dialog: The dialog window to set up cleanup for
+		action: The callable to execute when dialog is confirmed (can contain dialog.queue_free calls)
+	"""
+	var callbacks = {
+		"confirmed": Callable(),
+		"canceled": Callable()
+	}
+	
+	callbacks["confirmed"] = func():
+		# Execute the action (which might include queue_free)
+		if action.is_valid():
+			action.call()
+		# Only disconnect if dialog still exists
+		if is_instance_valid(dialog):
+			if dialog.confirmed.is_connected(callbacks["confirmed"]):
+				dialog.confirmed.disconnect(callbacks["confirmed"])
+			if dialog.canceled.is_connected(callbacks["canceled"]):
+				dialog.canceled.disconnect(callbacks["canceled"])
+	
+	callbacks["canceled"] = func():
+		# Disconnect both signals
+		if is_instance_valid(dialog):
+			if dialog.confirmed.is_connected(callbacks["confirmed"]):
+				dialog.confirmed.disconnect(callbacks["confirmed"])
+			if dialog.canceled.is_connected(callbacks["canceled"]):
+				dialog.canceled.disconnect(callbacks["canceled"])
+			dialog.queue_free()
+	
+	dialog.confirmed.connect(callbacks["confirmed"])
+	dialog.canceled.connect(callbacks["canceled"])
+
 func _build_ui() -> void:
 	# Main container - fills entire window
 	var main_vbox = VBoxContainer.new()
@@ -541,7 +579,8 @@ func _on_rename_tag() -> void:
 	line_edit.select_all()
 	dialog.add_child(line_edit)
 	
-	dialog.confirmed.connect(func():
+	# Connect with proper signal cleanup
+	var rename_action = func():
 		var new_tag = line_edit.text.strip_edges()
 		if new_tag.is_empty() or new_tag == old_tag:
 			return
@@ -569,9 +608,8 @@ func _on_rename_tag() -> void:
 		
 		_show_notification("Renamed tag '%s' to '%s' (%d assets)" % [old_tag, new_tag, assets_with_tag.size()])
 		dialog.queue_free()
-	)
 	
-	dialog.canceled.connect(func(): dialog.queue_free())
+	_connect_dialog_with_action(dialog, rename_action)
 	add_child(dialog)
 	dialog.popup_centered()
 	line_edit.grab_focus()
@@ -610,7 +648,8 @@ func _on_merge_tags() -> void:
 	line_edit.select_all()
 	vbox.add_child(line_edit)
 	
-	dialog.confirmed.connect(func():
+	# Connect with proper signal cleanup
+	var merge_action = func():
 		var target_tag = line_edit.text.strip_edges()
 		if target_tag.is_empty():
 			return
@@ -639,9 +678,8 @@ func _on_merge_tags() -> void:
 		
 		_show_notification("Merged %d tags into '%s' (%d assets affected)" % [tags_to_merge.size(), target_tag, affected_assets])
 		dialog.queue_free()
-	)
 	
-	dialog.canceled.connect(func(): dialog.queue_free())
+	_connect_dialog_with_action(dialog, merge_action)
 	add_child(dialog)
 	dialog.popup_centered()
 	line_edit.grab_focus()

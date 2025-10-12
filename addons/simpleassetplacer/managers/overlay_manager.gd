@@ -135,8 +135,10 @@ static func show_status_message(message: String, color: Color = Color.GREEN, dur
 	# Auto-hide after duration if specified
 	if duration > 0.0:
 		await Engine.get_main_loop().create_timer(duration).timeout
-		if status_overlay and current_mode == TransformationManager.Mode.NONE:  # Only hide if not in active mode
+		if status_overlay and is_instance_valid(status_overlay) and current_mode == TransformationManager.Mode.NONE:  # Only hide if not in active mode
 			status_overlay.hide_overlay()
+		elif status_overlay and not is_instance_valid(status_overlay):
+			status_overlay = null  # Clear invalid reference
 
 static func hide_transform_overlay():
 	"""Hide the unified transform overlay"""
@@ -170,8 +172,10 @@ static func show_all_overlays():
 	"""Show all relevant overlays for current mode"""
 	show_overlays = true
 	
-	if status_overlay:
+	if status_overlay and is_instance_valid(status_overlay):
 		status_overlay.visible = true
+	elif status_overlay and not is_instance_valid(status_overlay):
+		status_overlay = null  # Clear invalid reference
 
 static func hide_all_overlays():
 	"""Hide all overlays"""

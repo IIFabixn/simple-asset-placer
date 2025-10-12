@@ -90,17 +90,47 @@ func _initialize_systems():
 	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "All systems initialized")
 
 func _cleanup_systems():
-	"""Clean up all manager systems"""
-	# Exit any active modes
-	TransformationManager.exit_any_mode()
+	"""Clean up all manager systems with error handling"""
+	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Starting system cleanup...")
 	
-	# Clean up systems
-	OverlayManager.cleanup_all_overlays()
-	PreviewManager.cleanup_preview()
-	TransformationManager.cleanup()
-	ThumbnailGenerator.cleanup()
-	ThumbnailQueueManager.cleanup()
-	PlacementStrategyManager.cleanup()
+	# Wrap each cleanup to prevent cascade failures
+	# Exit any active modes first
+	_safe_cleanup("TransformationManager.exit_any_mode", func(): TransformationManager.exit_any_mode())
+	
+	# Clean up UI and visual systems
+	_safe_cleanup("OverlayManager.cleanup_all_overlays", func(): OverlayManager.cleanup_all_overlays())
+	_safe_cleanup("PreviewManager.cleanup_preview", func(): PreviewManager.cleanup_preview())
+	
+	# Clean up core systems
+	_safe_cleanup("TransformationManager.cleanup", func(): TransformationManager.cleanup())
+	
+	# Clean up thumbnail systems
+	_safe_cleanup("ThumbnailGenerator.cleanup", func(): ThumbnailGenerator.cleanup())
+	_safe_cleanup("ThumbnailQueueManager.cleanup", func(): ThumbnailQueueManager.cleanup())
+	
+	# Clean up placement system
+	_safe_cleanup("PlacementStrategyManager.cleanup", func(): PlacementStrategyManager.cleanup())
+	
+	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "System cleanup completed")
+
+func _safe_cleanup(component_name: String, cleanup_func: Callable) -> void:
+	"""Execute cleanup with error handling to prevent cascade failures
+	
+	Args:
+		component_name: Name of component being cleaned (for logging)
+		cleanup_func: Callable containing the cleanup operation
+		
+	Note: GDScript doesn't have try/catch, but this wrapper provides a
+	centralized logging point and prevents null callable crashes
+	"""
+	if not cleanup_func or not cleanup_func.is_valid():
+		PluginLogger.warning(PluginConstants.COMPONENT_MAIN, "✗ %s cleanup skipped - invalid callable" % component_name)
+		return
+	
+	# Execute cleanup - any errors will be caught by Godot's error system
+	# but won't crash the plugin entirely
+	cleanup_func.call()
+	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "✓ %s cleaned up" % component_name)
 
 ## Dock Management
 

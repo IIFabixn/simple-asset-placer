@@ -111,6 +111,11 @@ static func clear_all_objects():
 	_smooth_data.clear()
 	PluginLogger.info("SmoothTransformManager", "Cleared all smooth transform objects")
 
+static func cleanup():
+	"""Cleanup static resources (called on plugin disable)"""
+	clear_all_objects()
+	PluginLogger.debug("SmoothTransformManager", "Cleanup completed")
+
 ## TRANSFORM UPDATES
 
 static func set_target_position(node: Node3D, position: Vector3):

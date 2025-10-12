@@ -103,6 +103,7 @@ func _cleanup_systems():
 	
 	# Clean up core systems
 	_safe_cleanup("TransformationManager.cleanup", func(): TransformationManager.cleanup())
+	_safe_cleanup("SmoothTransformManager.cleanup", func(): SmoothTransformManager.cleanup())
 	
 	# Clean up thumbnail systems
 	_safe_cleanup("ThumbnailGenerator.cleanup", func(): ThumbnailGenerator.cleanup())

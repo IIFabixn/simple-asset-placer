@@ -3,10 +3,22 @@ extends RefCounted
 
 class_name ThumbnailQueueManager
 
-# Singleton instance
-static var _instance: ThumbnailQueueManager
+"""
+THUMBNAIL QUEUE MANAGER (INSTANCE-BASED)
+=======================================
 
-# Queue management
+PURPOSE: Manages asynchronous thumbnail generation requests
+
+ARCHITECTURE: Pure instance-based (no static singletons)
+- Created once during plugin initialization via ServiceRegistry
+- Injected to UI components that need thumbnails
+- All state is instance state, not static
+
+USED BY: UI components (AssetThumbnailItem, browsers)
+DEPENDS ON: ThumbnailGenerator (static methods for viewport management)
+"""
+
+# Queue management (instance state only)
 var request_queue: Array = []
 var is_processing: bool = false
 var current_request_id: int = 0
@@ -33,14 +45,10 @@ class ThumbnailRequest:
 		item_id = p_item_id
 		request_type = p_type
 
-# Get singleton instance
-static func get_instance() -> ThumbnailQueueManager:
-	if not _instance:
-		_instance = ThumbnailQueueManager.new()
-		_instance.initialize()
-	return _instance
+## Initialization
 
-func initialize():
+func _init() -> void:
+	"""Initialize the queue manager"""
 	# Initialize the thumbnail generator
 	ThumbnailGenerator.initialize()
 
@@ -179,15 +187,10 @@ class SignalAwaiter:
 		result_texture = texture
 		result_ready.emit(texture)
 
-# Cleanup function
-static func cleanup():
-	if _instance:
-		_instance.clear_queue()
-		_instance = null
-	ThumbnailGenerator.cleanup()
+## Cleanup
 
-
-
-
+func cleanup():
+	"""Clean up queue and resources"""
+	clear_queue()
 
 

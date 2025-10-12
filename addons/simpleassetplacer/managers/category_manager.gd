@@ -3,6 +3,8 @@ extends RefCounted
 
 class_name CategoryManager
 
+const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
+
 ## CategoryManager handles category detection, tag management, and filtering logic
 ## for the Simple Asset Placer plugin.
 ##
@@ -21,6 +23,7 @@ const MAX_RECENT_ASSETS = 20
 const EDITOR_SETTINGS_FAVORITES_KEY = "simple_asset_placer/categories/favorites"
 const EDITOR_SETTINGS_RECENT_KEY = "simple_asset_placer/categories/recent_assets"
 const EDITOR_SETTINGS_IGNORED_KEY = "simple_asset_placer/categories/ignored_assets"
+const EDITOR_SETTINGS_IGNORED_FOLDERS_KEY = "simple_asset_placer/categories/ignored_folders"
 
 # Category types
 enum CategoryType {
@@ -29,6 +32,10 @@ enum CategoryType {
 	SPECIAL      # Favorites, Recent, etc.
 }
 
+# === SERVICE REGISTRY ===
+
+var _services: ServiceRegistry
+
 # Data storage
 var custom_tags: Dictionary = {}  # {"asset_name_or_path": ["tag1", "tag2"]}
 var tag_usage: Dictionary = {}    # {"tag_name": usage_count}
@@ -36,18 +43,20 @@ var folder_categories: Dictionary = {}  # {"category_path": ["asset1", "asset2"]
 var favorites: Array = []  # Array of asset paths
 var recent_assets: Array = []  # Array of asset paths (most recent first)
 var ignored_assets: Array = []  # Array of ignored asset paths
+var ignored_folders: Array = []  # Array of ignored folder paths
 var config_file_path: String = ""
 var recently_used_tags: Array = []  # Last used tags for quick access
 
 
-func _init():
+func _init(services: ServiceRegistry):
+	_services = services
 	load_editor_settings()
 
 
 ## Load favorites and recent assets from EditorSettings
 func load_editor_settings():
 	if Engine.is_editor_hint():
-		var editor_settings = EditorInterface.get_editor_settings()
+		var editor_settings = _services.editor_facade.get_editor_settings()
 		if editor_settings:
 			# Load favorites
 			if editor_settings.has_setting(EDITOR_SETTINGS_FAVORITES_KEY):
@@ -69,22 +78,40 @@ func load_editor_settings():
 			else:
 				ignored_assets = []
 				editor_settings.set_setting(EDITOR_SETTINGS_IGNORED_KEY, ignored_assets)
+			
+			# Load ignored folders
+			if editor_settings.has_setting(EDITOR_SETTINGS_IGNORED_FOLDERS_KEY):
+				ignored_folders = editor_settings.get_setting(EDITOR_SETTINGS_IGNORED_FOLDERS_KEY)
+			else:
+				# Initialize with default ignored folders
+				ignored_folders = ["res://addons"]
+				editor_settings.set_setting(EDITOR_SETTINGS_IGNORED_FOLDERS_KEY, ignored_folders)
+			
+			# Ensure addons folder is in the ignored list (for users who had previous version)
+			if "res://addons" not in ignored_folders:
+				ignored_folders.append("res://addons")
+				editor_settings.set_setting(EDITOR_SETTINGS_IGNORED_FOLDERS_KEY, ignored_folders)
 
 
 ## Save favorites and recent assets to EditorSettings
 func save_editor_settings():
 	if Engine.is_editor_hint():
-		var editor_settings = EditorInterface.get_editor_settings()
+		var editor_settings = _services.editor_facade.get_editor_settings()
 		if editor_settings:
 			editor_settings.set_setting(EDITOR_SETTINGS_FAVORITES_KEY, favorites)
 			editor_settings.set_setting(EDITOR_SETTINGS_RECENT_KEY, recent_assets)
 			editor_settings.set_setting(EDITOR_SETTINGS_IGNORED_KEY, ignored_assets)
+			editor_settings.set_setting(EDITOR_SETTINGS_IGNORED_FOLDERS_KEY, ignored_folders)
 
 
 ## Extract folder-based categories from an asset path
 ## Returns array of category strings: ["props", "outdoor", "barrels"]
 func extract_folder_categories(asset_path: String) -> Array:
 	var categories = []
+	
+	# Check if the asset is within an ignored folder - if so, return empty categories
+	if is_in_ignored_folder(asset_path):
+		return categories
 	
 	# Remove res:// prefix and filename
 	var path = asset_path.replace("res://", "")
@@ -96,10 +123,17 @@ func extract_folder_categories(asset_path: String) -> Array:
 	# Split path into folder segments
 	var segments = dir_path.split("/")
 	
-	# Build hierarchical categories
+	# Build hierarchical categories, checking each cumulative path against ignored folders
+	var cumulative_path = "res://"
 	for segment in segments:
 		if not segment.is_empty() and segment != ".":
+			cumulative_path += segment
+			# Check if this cumulative path is an ignored folder
+			if is_folder_ignored(cumulative_path):
+				# Stop processing - all subsequent segments are under an ignored folder
+				break
 			categories.append(segment)
+			cumulative_path += "/"
 	
 	return categories
 
@@ -564,12 +598,95 @@ func toggle_ignored(asset_path: String):
 
 ## Check if asset is ignored
 func is_ignored(asset_path: String) -> bool:
-	return asset_path in ignored_assets
+	# Check if the asset itself is ignored
+	if asset_path in ignored_assets:
+		return true
+	
+	# Check if the asset is within an ignored folder
+	return is_in_ignored_folder(asset_path)
 
 
 ## Get all ignored assets
 func get_ignored_assets() -> Array:
 	return ignored_assets.duplicate()
+
+
+## Add folder to ignored list
+func add_folder_to_ignored(folder_path: String):
+	# Normalize folder path (ensure it starts with res:// and doesn't end with /)
+	var normalized_path = _normalize_folder_path(folder_path)
+	
+	if normalized_path not in ignored_folders:
+		ignored_folders.append(normalized_path)
+		save_editor_settings()
+		categories_updated.emit()
+
+
+## Remove folder from ignored list
+func remove_folder_from_ignored(folder_path: String):
+	var normalized_path = _normalize_folder_path(folder_path)
+	
+	if normalized_path in ignored_folders:
+		ignored_folders.erase(normalized_path)
+		save_editor_settings()
+		categories_updated.emit()
+
+
+## Toggle ignored status for a folder
+func toggle_folder_ignored(folder_path: String):
+	if is_folder_ignored(folder_path):
+		remove_folder_from_ignored(folder_path)
+	else:
+		add_folder_to_ignored(folder_path)
+
+
+## Check if a folder is directly ignored
+func is_folder_ignored(folder_path: String) -> bool:
+	var normalized_path = _normalize_folder_path(folder_path)
+	return normalized_path in ignored_folders
+
+
+## Check if an asset path is within an ignored folder
+func is_in_ignored_folder(asset_path: String) -> bool:
+	var normalized_asset = asset_path
+	if not normalized_asset.begins_with("res://"):
+		normalized_asset = "res://" + normalized_asset
+	
+	for ignored_folder in ignored_folders:
+		# Check if the asset path starts with the ignored folder path
+		if normalized_asset.begins_with(ignored_folder + "/") or normalized_asset == ignored_folder:
+			return true
+	
+	return false
+
+
+## Get all ignored folders
+func get_ignored_folders() -> Array:
+	return ignored_folders.duplicate()
+
+
+## Get the parent folder of an asset path
+func get_asset_folder(asset_path: String) -> String:
+	var normalized_path = asset_path
+	if not normalized_path.begins_with("res://"):
+		normalized_path = "res://" + normalized_path
+	
+	return normalized_path.get_base_dir()
+
+
+## Normalize folder path for consistent comparison
+func _normalize_folder_path(folder_path: String) -> String:
+	var normalized = folder_path
+	
+	# Ensure it starts with res://
+	if not normalized.begins_with("res://"):
+		normalized = "res://" + normalized
+	
+	# Remove trailing slash if present
+	if normalized.ends_with("/"):
+		normalized = normalized.substr(0, normalized.length() - 1)
+	
+	return normalized
 
 
 ## Add asset to recent list (called when asset is placed/used)
@@ -661,6 +778,7 @@ func build_category_tree(assets: Array) -> Dictionary:
 				current_node = current_node[category]
 	
 	return tree
+
 
 
 

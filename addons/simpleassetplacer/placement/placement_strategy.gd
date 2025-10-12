@@ -21,8 +21,7 @@ IMPLEMENTATIONS:
 - CollisionPlacementStrategy: Raycast-based collision detection
 - PlanePlacementStrategy: Fixed horizontal plane projection
 
-USED BY: PlacementStrategyManager to delegate positioning calculations
-"""
+USED BY: PlacementStrategyService to delegate positioning calculations"""
 
 # Result structure returned by placement strategies
 class PlacementResult:
@@ -91,28 +90,75 @@ static func create_ray_query(from: Vector3, to: Vector3, collision_mask: int, ex
 	
 	return query
 
-static func get_world_space_state() -> PhysicsDirectSpaceState3D:
-	"""Helper to get the current 3D world space state for raycasting"""
-	var world = EditorInterface.get_edited_scene_root()
-	if not world:
+func get_world_space_state() -> PhysicsDirectSpaceState3D:
+	"""Helper to get the current 3D world space state for raycasting
+	
+	Note: This method can remain as instance method since PlacementStrategy
+	is used through PlacementStrategyService which has ServiceRegistry access.
+	The service will provide the world root through configuration.
+	"""
+	# This will be called by subclasses that need world state
+	# The world root should be passed via config dictionary
+	return null  # Subclasses should override or get from config
+
+static func get_world_space_state_static(world_root: Node) -> PhysicsDirectSpaceState3D:
+	"""Static helper to get world space state from a given world root"""
+	if not world_root:
 		return null
 	
-	var world_3d = world.get_world_3d()
+	var world_3d = world_root.get_world_3d()
 	if not world_3d:
 		return null
 	
 	return world_3d.direct_space_state
 
-static func project_to_horizontal_plane(from: Vector3, direction: Vector3, plane_height: float) -> Vector3:
-	"""Helper to project a ray onto a horizontal plane at given height"""
-	var plane = Plane(Vector3.UP, plane_height)
+static func project_to_horizontal_plane(from: Vector3, direction: Vector3, plane_height: float, fallback: Vector3 = Vector3.ZERO, use_fallback: bool = false) -> Vector3:
+	"""Helper to project a ray onto a horizontal plane at given height (XZ plane)"""
+	var plane = Plane(Vector3.UP, -plane_height)
 	var intersection = plane.intersects_ray(from, direction)
-	
+    
 	if intersection:
 		return intersection
-	
+    
+	if use_fallback:
+		var result = fallback
+		result.y = plane_height
+		return result
+    
 	# If no intersection, return position at plane height
 	return Vector3(from.x, plane_height, from.z)
+
+static func project_to_xy_plane(from: Vector3, direction: Vector3, plane_distance: float, fallback: Vector3 = Vector3.ZERO, use_fallback: bool = false) -> Vector3:
+	"""Helper to project a ray onto a vertical XY plane at given Z distance"""
+	var plane = Plane(Vector3.BACK, plane_distance)
+	var intersection = plane.intersects_ray(from, direction)
+    
+	if intersection:
+		return intersection
+    
+	if use_fallback:
+		var result = fallback
+		result.z = plane_distance
+		return result
+    
+	# If no intersection, return position at plane distance
+	return Vector3(from.x, from.y, plane_distance)
+
+static func project_to_yz_plane(from: Vector3, direction: Vector3, plane_distance: float, fallback: Vector3 = Vector3.ZERO, use_fallback: bool = false) -> Vector3:
+	"""Helper to project a ray onto a vertical YZ plane at given X distance"""
+	var plane = Plane(Vector3.RIGHT, -plane_distance)
+	var intersection = plane.intersects_ray(from, direction)
+    
+	if intersection:
+		return intersection
+    
+	if use_fallback:
+		var result = fallback
+		result.x = plane_distance
+		return result
+    
+	# If no intersection, return position at plane distance
+	return Vector3(plane_distance, from.y, from.z)
 
 
 

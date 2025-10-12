@@ -6,16 +6,23 @@ class_name MeshLibraryBrowser
 const AssetThumbnailItem = preload("res://addons/simpleassetplacer/ui/asset_thumbnail_item.gd")
 const CategoryManager = preload("res://addons/simpleassetplacer/managers/category_manager.gd")
 const TagManagementDialog = preload("res://addons/simpleassetplacer/ui/tag_management_dialog.gd")
+const LayoutCalculator = preload("res://addons/simpleassetplacer/utils/layout_calculator.gd")
+const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
 
 signal meshlib_item_selected(meshlib: MeshLibrary, item_id: int)
 
+# Dependency injection
+var _services: ServiceRegistry = null
+var _thumbnail_queue_manager = null
+
+# UI state
 var category_filter: OptionButton
 var meshlib_option: OptionButton
 var items_grid: GridContainer
 var scroll_container: ScrollContainer
 var current_meshlib: MeshLibrary
 var current_meshlib_path: String = ""
-var thumbnail_size: int = 64
+var thumbnail_size: int = LayoutCalculator.THUMBNAIL_SIZE_DEFAULT  # Use optimized default size
 var selected_item_id: int = -1
 var selected_button: AssetThumbnailItem = null
 var current_search_text: String = ""
@@ -36,19 +43,20 @@ func setup_ui():
 	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(vbox)
 	
-	# Category filter with manage button
+	# Category filter with manage button (side-by-side)
 	var category_hbox = HBoxContainer.new()
 	vbox.add_child(category_hbox)
 	
 	category_filter = OptionButton.new()
 	category_filter.add_item("All Categories")
 	category_filter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	category_filter.clip_text = true  # Enable text clipping for long names
 	category_hbox.add_child(category_filter)
 	
 	manage_tags_button = Button.new()
 	manage_tags_button.text = "Manage Tags..."
 	manage_tags_button.tooltip_text = "Open advanced tag management dialog for bulk operations"
-	manage_tags_button.custom_minimum_size = Vector2(110, 0)
+	manage_tags_button.size_flags_horizontal = Control.SIZE_SHRINK_END  # Shrink to content
 	manage_tags_button.pressed.connect(_on_manage_tags_pressed)
 	category_hbox.add_child(manage_tags_button)
 	
@@ -79,12 +87,18 @@ func setup_ui():
 func set_category_manager(manager: CategoryManager):
 	category_manager = manager
 
+func set_services(services: ServiceRegistry) -> void:
+	"""Inject ServiceRegistry for access to managers"""
+	_services = services
+	if _services and _services.thumbnail_queue_manager:
+		_thumbnail_queue_manager = _services.thumbnail_queue_manager
+
 func update_grid_columns(available_width: float):
 	if items_grid:
-		# Calculate columns based on available width
-		var item_width = thumbnail_size + 36  # Thumbnail + padding + text + margins
-		var new_columns = max(1, int((available_width - 48) / item_width))
-		items_grid.columns = min(new_columns, 3)  # Max 3 columns for meshlib items
+		# Use LayoutCalculator for consistent grid calculation
+		# Calculate columns based on actual thumbnail size (margins added internally)
+		var columns = LayoutCalculator.calculate_grid_columns(available_width - 48, thumbnail_size, 12, 20)
+		items_grid.columns = columns  # Fully adaptive - no artificial limit
 
 func update_thumbnail_size(new_size: int):
 	thumbnail_size = new_size
@@ -106,8 +120,8 @@ func populate_meshlib_options(meshlib_paths: Array):
 	var last_meshlib_index = 0
 	
 	# Try to load the last selected meshlib from settings
-	const SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
-	last_meshlib_path = SettingsManager.get_setting("last_meshlib_path", "")
+	if _services and _services.settings_manager:
+		last_meshlib_path = _services.settings_manager.get_setting("last_meshlib_path", "")
 	
 	for path in meshlib_paths:
 		var meshlib_name = path.get_file().get_basename()
@@ -135,9 +149,9 @@ func _on_meshlib_selected(index: int):
 		meshlib_items_data.clear()
 		clear_items()
 		# Clear the saved selection
-		const SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
-		SettingsManager.set_plugin_setting("last_meshlib_path", "")
-		SettingsManager.save_to_file()
+		if _services and _services.settings_manager:
+			_services.settings_manager.set_plugin_setting("last_meshlib_path", "")
+			_services.settings_manager.save_plugin_settings_to_editor()
 		return
 	
 	var meshlib_path = meshlib_option.get_item_metadata(index)
@@ -150,9 +164,9 @@ func _on_meshlib_selected(index: int):
 		populate_category_filter()
 		
 		# Save the selected meshlib path to settings
-		const SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
-		SettingsManager.set_plugin_setting("last_meshlib_path", meshlib_path)
-		SettingsManager.save_to_file()
+		if _services and _services.settings_manager:
+			_services.settings_manager.set_plugin_setting("last_meshlib_path", meshlib_path)
+			_services.settings_manager.save_plugin_settings_to_editor()
 
 func clear_items():
 	for child in items_grid.get_children():
@@ -198,6 +212,8 @@ func update_meshlib_grid():
 	for item_data in filtered_items:
 		# Create thumbnail item using the new AssetThumbnailItem class
 		var thumbnail_item = AssetThumbnailItem.new(current_meshlib, item_data["id"], thumbnail_size)
+		if _thumbnail_queue_manager:
+			thumbnail_item.set_queue_manager(_thumbnail_queue_manager)
 		thumbnail_item.thumbnail_item_selected.connect(_on_meshlib_item_selected)
 		items_grid.add_child(thumbnail_item)
 
@@ -278,9 +294,9 @@ func _on_category_filter_changed(index: int):
 			current_category_filter = category_filter.get_item_text(index)
 	
 	# Save the selected category to settings
-	const SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
-	SettingsManager.set_plugin_setting("last_meshlib_category", current_category_filter)
-	SettingsManager.save_to_file()
+	if _services and _services.settings_manager:
+		_services.settings_manager.set_plugin_setting("last_meshlib_category", current_category_filter)
+		_services.settings_manager.save_plugin_settings_to_editor()
 	
 	update_meshlib_grid()
 
@@ -295,8 +311,8 @@ func populate_category_filter():
 	var last_category_index = 0
 	
 	# Try to load the last selected category from settings
-	const SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
-	last_category = SettingsManager.get_setting("last_meshlib_category", "")
+	if _services and _services.settings_manager:
+		last_category = _services.settings_manager.get_setting("last_meshlib_category", "")
 	
 	# Add special categories first
 	var has_special = false
@@ -346,12 +362,17 @@ func populate_category_filter():
 		for cat in folder_categories:
 			path_parts.append(cat)
 			var full_path = " > ".join(path_parts)
-			category_filter.add_item("  " + full_path)
+			var display_text = "  " + full_path
+			category_filter.add_item(display_text)
+			var item_index = category_filter.get_item_count() - 1
 			# Store leaf name for matching
-			category_filter.set_item_metadata(category_filter.get_item_count() - 1, cat)
+			category_filter.set_item_metadata(item_index, cat)
+			# Add tooltip for long paths to show full hierarchy
+			if display_text.length() > 25:
+				category_filter.set_item_tooltip(item_index, full_path)
 			# Check if this matches the last selected category
 			if cat == last_category:
-				last_category_index = category_filter.get_item_count() - 1
+				last_category_index = item_index
 	
 	# Get custom tags used by any item
 	var all_tags_set = {}
@@ -370,10 +391,15 @@ func populate_category_filter():
 		category_filter.set_item_disabled(category_filter.get_item_count() - 1, true)
 		
 		for tag in custom_tags:
-			category_filter.add_item("  " + tag)
+			var display_text = "  " + tag
+			category_filter.add_item(display_text)
+			var item_index = category_filter.get_item_count() - 1
+			# Add tooltip for long tag names
+			if display_text.length() > 25:
+				category_filter.set_item_tooltip(item_index, tag)
 			# Check if this matches the last selected category
 			if tag == last_category:
-				last_category_index = category_filter.get_item_count() - 1
+				last_category_index = item_index
 	
 	# Restore last category selection if found
 	if last_category_index > 0:

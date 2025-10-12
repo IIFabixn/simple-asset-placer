@@ -24,11 +24,12 @@ CONFIGURATION:
 - collision_layer: Which layer to use for raycasting
 - align_with_normal: Whether to extract and return surface normal
 
-USED BY: PlacementStrategyManager when user selects collision-based placement
-"""
+USED BY: PlacementStrategyService when user selects collision-based placement"""
 
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
 const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
+const PlacementStrategy = preload("res://addons/simpleassetplacer/placement/placement_strategy.gd")
+const NodeUtils = preload("res://addons/simpleassetplacer/utils/node_utils.gd")
 
 # Configuration
 var collision_mask: int = 1
@@ -56,8 +57,22 @@ func calculate_position(from: Vector3, to: Vector3, config: Dictionary) -> Place
 		if node:
 			_gather_collision_rids_recursive(node, exclude_rids)
 	
-	# Get world space state
-	var space_state = get_world_space_state()
+	# Get world space state from config or editor scene root
+	var space_state: PhysicsDirectSpaceState3D = null
+	
+	# Try to get from config first (if world_root was passed)
+	var world_root = config.get("world_root", null)
+	if world_root:
+		space_state = PlacementStrategy.get_world_space_state_static(world_root)
+	
+	# If not available, try to get from EditorInterface (plugin context)
+	if not space_state:
+		var editor_interface = Engine.get_singleton("EditorInterface")
+		if editor_interface:
+			var edited_scene_root = editor_interface.get_edited_scene_root()
+			if edited_scene_root:
+				space_state = PlacementStrategy.get_world_space_state_static(edited_scene_root)
+	
 	if not space_state:
 		PluginLogger.warning(PluginConstants.COMPONENT_POSITION, "CollisionPlacementStrategy: No space state available")
 		return _create_fallback_result(from, to)
@@ -115,49 +130,28 @@ func _create_fallback_result(from: Vector3, to: Vector3) -> PlacementResult:
 func _gather_collision_rids_recursive(node: Node, rids: Array) -> void:
 	"""Recursively gather all collision RIDs from node and its hierarchy
 	
-	This is crucial for transform mode to avoid self-collision. CSG nodes and other
-	physics objects have complex hierarchies where collision shapes might be on 
-	children, parents, or generated internally.
+	This is crucial for transform mode to avoid self-collision. Gathers RIDs from
+	CollisionObject3D nodes in the entire hierarchy.
 	
 	Args:
 		node: Root node to start gathering from
 		rids: Array to append RIDs to (modified in place)
 	"""
-	if not node or not is_instance_valid(node):
+	if not NodeUtils.is_valid(node):
 		return
 	
-	# Handle CollisionObject3D nodes (StaticBody3D, RigidBody3D, Area3D, etc.)
+	# Handle CollisionObject3D nodes (StaticBody3D, RigidBody3D, Area3D, CharacterBody3D, etc.)
 	if node is CollisionObject3D:
 		var node_rid = node.get_rid()
 		if node_rid and node_rid.is_valid() and not rids.has(node_rid):
 			rids.append(node_rid)
 	
-	# Skip CSG nodes - they manage collision internally and cannot be excluded
-	# CSG nodes in Godot 4 don't expose their collision RIDs through standard APIs
-	if node.get_class().begins_with("CSG"):
-		# Note: CSG collision exclusion is not supported in this implementation
-		pass
+	# Note: CSG nodes manage collision internally via automatically created StaticBody3D children
+	# These are handled by the normal CollisionObject3D check above
 	
 	# Recursively process all children to catch nested structures
 	for child in node.get_children():
 		_gather_collision_rids_recursive(child, rids)
-	
-	# Check parent (to handle child CSG nodes)
-	var parent = node.get_parent()
-	if parent and parent is Node3D and parent != node.get_tree().get_edited_scene_root():
-		# Avoid infinite loops by checking if we're not at scene root
-		if parent is CollisionObject3D:
-			var parent_rid = parent.get_rid()
-			if parent_rid and parent_rid.is_valid() and not rids.has(parent_rid):
-				rids.append(parent_rid)
-		# Also check if parent is a CSG node
-		elif parent.get_class().begins_with("CSG"):
-			for sibling in parent.get_children():
-				if sibling is StaticBody3D or sibling is CollisionShape3D:
-					if sibling.has_method("get_rid"):
-						var sibling_rid = sibling.get_rid()
-						if sibling_rid and sibling_rid.is_valid() and not rids.has(sibling_rid):
-							rids.append(sibling_rid)
 
 
 

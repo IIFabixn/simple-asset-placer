@@ -7,10 +7,14 @@ signal thumbnail_item_selected(meshlib: MeshLibrary, item_id: int)
 signal asset_item_selected(asset_info: Dictionary)
 signal context_menu_requested(asset_item: AssetThumbnailItem, position: Vector2)
 
+# Dependency injection
+var _queue_manager: ThumbnailQueueManager
+
+# Data
 var meshlib: MeshLibrary
 var item_id: int
 var asset_info: Dictionary
-var thumbnail_size: int = 64
+var thumbnail_size: int = LayoutCalculator.THUMBNAIL_SIZE_DEFAULT  # Use optimized default size
 var is_selected: bool = false
 var thumbnail_rect: TextureRect
 var label: Label
@@ -19,8 +23,14 @@ var is_meshlib_item: bool = false
 var ui_setup_complete: bool = false
 var category_manager = null
 
+## Dependency Injection
+
+func set_queue_manager(queue_manager: ThumbnailQueueManager) -> void:
+	"""Inject the thumbnail queue manager"""
+	_queue_manager = queue_manager
+
 # Constructor for MeshLibrary items
-func _init(p_meshlib: MeshLibrary = null, p_item_id: int = -1, p_thumbnail_size: int = 64):
+func _init(p_meshlib: MeshLibrary = null, p_item_id: int = -1, p_thumbnail_size: int = LayoutCalculator.THUMBNAIL_SIZE_DEFAULT):
 	if p_meshlib != null:
 		meshlib = p_meshlib
 		item_id = p_item_id
@@ -29,7 +39,7 @@ func _init(p_meshlib: MeshLibrary = null, p_item_id: int = -1, p_thumbnail_size:
 		setup_ui()
 
 # Alternative constructor for asset items
-static func create_for_asset(p_asset_info: Dictionary, p_thumbnail_size: int = 64) -> AssetThumbnailItem:
+static func create_for_asset(p_asset_info: Dictionary, p_thumbnail_size: int = LayoutCalculator.THUMBNAIL_SIZE_DEFAULT) -> AssetThumbnailItem:
 	var item = AssetThumbnailItem.new()
 	item.asset_info = p_asset_info
 	item.thumbnail_size = p_thumbnail_size
@@ -255,12 +265,12 @@ func _generate_meshlib_thumbnail():
 		thumbnail_rect.texture = preview
 		return
 	
-	# Use the ThumbnailQueueManager for centralized, sequential processing
-	var queue_manager = ThumbnailQueueManager.get_instance()
-	# Don't await - let it generate asynchronously and update when ready
-	_request_meshlib_thumbnail_async(queue_manager, mesh)
+	# Use the injected ThumbnailQueueManager for centralized, sequential processing
+	if _queue_manager:
+		# Don't await - let it generate asynchronously and update when ready
+		_request_meshlib_thumbnail_async(_queue_manager, mesh)
 
-func _request_meshlib_thumbnail_async(queue_manager, mesh: Mesh):
+func _request_meshlib_thumbnail_async(queue_manager: ThumbnailQueueManager, mesh: Mesh):
 	"""Request meshlib thumbnail generation asynchronously and update UI when ready"""
 	var thumbnail = await queue_manager.request_meshlib_thumbnail(meshlib, item_id)
 	
@@ -279,10 +289,10 @@ func _generate_asset_thumbnail():
 	
 	# For actual 3D model files and scene files, try 3D thumbnail generation first
 	if extension in ["fbx", "obj", "gltf", "glb", "dae", "blend", "tscn", "scn"] and asset_path != "":
-		# Use the ThumbnailQueueManager for centralized, sequential processing
-		var queue_manager = ThumbnailQueueManager.get_instance()
-		# Don't await - let it generate asynchronously and update when ready
-		_request_thumbnail_async(queue_manager, asset_path)
+		# Use the injected ThumbnailQueueManager for centralized, sequential processing
+		if _queue_manager:
+			# Don't await - let it generate asynchronously and update when ready
+			_request_thumbnail_async(_queue_manager, asset_path)
 		return
 	
 	# For scene files or if 3D thumbnail failed, try appropriate editor icons

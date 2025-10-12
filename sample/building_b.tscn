@@ -52,4 +52,4 @@ transform = Transform3D(-1, 0, -8.662515e-07, 0, 1, 0, 8.662515e-07, 0, -1, 1.49
 transform = Transform3D(-1, 0, -8.662515e-07, 0, 1, 0, 8.662515e-07, 0, -1, 1.5, 1.5, 1.5000002)
 
 [node name="roof_2" parent="Node3D" instance=ExtResource("6_asbjk")]
-transform = Transform3D(-1, 0, -8.662515e-07, 0, 1, 0, 8.662515e-07, 0, -1, 1.4999994, 1.5, 0.50000024)
+transform = Transform3D(-1, 0, -8.662515e-07, 0, 1, 0, 8.662515e-07, 0, -1, 1.4999999, 1.5, 0.50000024)

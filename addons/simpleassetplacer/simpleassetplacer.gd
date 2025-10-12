@@ -2,7 +2,7 @@
 extends EditorPlugin
 
 # Main Plugin
-# Only handles editor integration and delegates everything to TransformationManager
+# Only handles editor integration and delegates everything to TransformationCoordinator
 
 # Import utilities
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
@@ -17,7 +17,7 @@ const OverlayManager = preload("res://addons/simpleassetplacer/managers/overlay_
 const RotationManager = preload("res://addons/simpleassetplacer/core/rotation_manager.gd")
 const ScaleManager = preload("res://addons/simpleassetplacer/core/scale_manager.gd")
 const PreviewManager = preload("res://addons/simpleassetplacer/managers/preview_manager.gd")
-const TransformationManager = preload("res://addons/simpleassetplacer/core/transformation_manager.gd")
+const TransformationCoordinator = preload("res://addons/simpleassetplacer/core/transformation_coordinator.gd")
 
 # Import placement strategy system
 const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placement/placement_strategy_manager.gd")
@@ -100,14 +100,14 @@ func _cleanup_systems():
 	
 	# Wrap each cleanup to prevent cascade failures
 	# Exit any active modes first
-	_safe_cleanup("TransformationManager.exit_any_mode", func(): TransformationManager.exit_any_mode())
+	_safe_cleanup("TransformationCoordinator.exit_any_mode", func(): TransformationCoordinator.exit_any_mode())
 	
 	# Clean up UI and visual systems
 	_safe_cleanup("OverlayManager.cleanup_all_overlays", func(): OverlayManager.cleanup_all_overlays())
 	_safe_cleanup("PreviewManager.cleanup_preview", func(): PreviewManager.cleanup_preview())
 	
 	# Clean up core systems
-	_safe_cleanup("TransformationManager.cleanup", func(): TransformationManager.cleanup())
+	_safe_cleanup("TransformationCoordinator.cleanup", func(): TransformationCoordinator.cleanup())
 	_safe_cleanup("SmoothTransformManager.cleanup", func(): SmoothTransformManager.cleanup())
 	
 	# Clean up thumbnail systems
@@ -153,7 +153,7 @@ func _setup_dock():
 	add_control_to_dock(DOCK_SLOT_RIGHT_UL, dock)
 	
 	# Store dock reference for UI updates
-	TransformationManager.dock_reference = dock
+	TransformationCoordinator.dock_reference = dock
 	
 	# Set PlacementSettings reference for status overlay (deferred to ensure dock is fully initialized)
 	call_deferred("_connect_placement_settings_to_overlay")
@@ -176,7 +176,7 @@ func _cleanup_dock():
 		dock = null
 	
 	# Clear dock reference
-	TransformationManager.dock_reference = null
+	TransformationCoordinator.dock_reference = null
 
 ## Toolbar Management
 
@@ -244,7 +244,7 @@ func _get_frame_settings() -> Dictionary:
 	return _cached_settings
 
 func _process(delta: float) -> void:
-	"""Main processing loop - delegates everything to TransformationManager"""
+	"""Main processing loop - delegates everything to TransformationCoordinator"""
 	if not _is_plugin_ready():
 		return
 	
@@ -261,11 +261,11 @@ func _process(delta: float) -> void:
 		_settings_cache_frame = -1
 	
 	# Delegate frame processing to coordinator with cached settings (Task 3.3 optimization)
-	TransformationManager.process_frame_input(camera, _get_frame_settings(), delta)
+	TransformationCoordinator.process_frame_input(camera, _get_frame_settings(), delta)
 	
 	# Update transform mode button state
 	if toolbar_buttons and toolbar_buttons.has_method("set_transform_mode_active"):
-		toolbar_buttons.set_transform_mode_active(TransformationManager.is_transform_mode())
+		toolbar_buttons.set_transform_mode_active(TransformationCoordinator.is_transform_mode())
 
 func _is_plugin_ready() -> bool:
 	"""Check if plugin is ready for processing"""
@@ -278,20 +278,20 @@ func _get_current_camera() -> Camera3D:
 		return viewport_3d.get_camera_3d()
 	return null
 
-## Input Handling (Minimal - delegates to TransformationManager)
+## Input Handling (Minimal - delegates to TransformationCoordinator)
 
 func handles(object) -> bool:
 	"""Check if we should handle input for this object"""
-	return TransformationManager.is_any_mode_active()
+	return TransformationCoordinator.is_any_mode_active()
 
 func _input(event: InputEvent) -> void:
 	"""Handle input at the highest priority to prevent TAB focus issues and mouse wheel zoom"""
 	
 	# Handle mouse wheel events when modes are active to prevent viewport zoom
-	if event is InputEventMouseButton and TransformationManager.is_any_mode_active():
+	if event is InputEventMouseButton and TransformationCoordinator.is_any_mode_active():
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			# Check if we should handle this event (action key is held)
-			if TransformationManager.handle_mouse_wheel_input(event):
+			if TransformationCoordinator.handle_mouse_wheel_input(event):
 				# Event was handled - consume it IMMEDIATELY to prevent viewport zoom
 				get_viewport().set_input_as_handled()
 				return
@@ -359,11 +359,11 @@ func _shortcut_input(event: InputEvent) -> void:
 		if key_string == transform_key or full_key_string == transform_key:
 			# Consume the event immediately to prevent focus change
 			get_viewport().set_input_as_handled()
-			# Let TransformationManager handle the actual mode activation
+			# Let TransformationCoordinator handle the actual mode activation
 			return
 		
 		# For other plugin keys, only handle when modes are active
-		if TransformationManager.is_any_mode_active():
+		if TransformationCoordinator.is_any_mode_active():
 			# Check if this key matches any of our plugin keybindings
 			if SettingsManager.is_plugin_key(full_key_string) or SettingsManager.is_plugin_key(key_string):
 				# This is our key - consume it to prevent Godot from processing it
@@ -373,10 +373,10 @@ func _forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 	"""Forward 3D GUI input - intercept and consume plugin-related keys and mouse wheel"""
 	
 	# Handle mouse wheel events when modes are active
-	if event is InputEventMouseButton and TransformationManager.is_any_mode_active():
+	if event is InputEventMouseButton and TransformationCoordinator.is_any_mode_active():
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			# Check if we should handle this event (action key is held)
-			if TransformationManager.handle_mouse_wheel_input(event):
+			if TransformationCoordinator.handle_mouse_wheel_input(event):
 				# Event was handled - consume it IMMEDIATELY to prevent viewport zoom
 				# Mark as handled first, then return stop
 				event.set_canceled(true)
@@ -409,7 +409,7 @@ func _forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 			return EditorPlugin.AFTER_GUI_INPUT_STOP
 		
 		# For other plugin keys, only handle when modes are active
-		if not TransformationManager.is_any_mode_active():
+		if not TransformationCoordinator.is_any_mode_active():
 			return EditorPlugin.AFTER_GUI_INPUT_PASS
 		
 		# Check if this key matches any of our plugin keybindings
@@ -426,7 +426,7 @@ func _forward_canvas_gui_input(event: InputEvent) -> bool:
 	"""Handle canvas/2D GUI input - also intercept plugin keys"""
 	
 	# Only handle input when plugin modes are active
-	if not TransformationManager.is_any_mode_active():
+	if not TransformationCoordinator.is_any_mode_active():
 		return false
 	
 	# Handle key events to prevent conflicts with Godot shortcuts
@@ -469,9 +469,9 @@ func _on_asset_selected(asset_path: String, mesh_resource: Resource, settings: D
 	
 	# Start placement mode through the coordinator
 	if mesh_resource and mesh_resource is Mesh:
-		TransformationManager.start_placement_mode(mesh_resource, null, -1, "", combined_settings, dock)
+		TransformationCoordinator.start_placement_mode(mesh_resource, null, -1, "", combined_settings, dock)
 	else:
-		TransformationManager.start_placement_mode(null, null, -1, asset_path, combined_settings, dock)
+		TransformationCoordinator.start_placement_mode(null, null, -1, asset_path, combined_settings, dock)
 	
 	# Show user feedback
 	OverlayManager.show_status_message("Placement mode started - Left-click to place, ESC to exit", Color.GREEN, 3.0)
@@ -486,7 +486,7 @@ func _on_meshlib_item_selected(meshlib: MeshLibrary, item_id: int, settings: Dic
 	var combined_settings = _get_frame_settings()  # Use cached getter
 	
 	# Start placement mode through the coordinator
-	TransformationManager.start_placement_mode(null, meshlib, item_id, "", combined_settings, dock)
+	TransformationCoordinator.start_placement_mode(null, meshlib, item_id, "", combined_settings, dock)
 	
 	# Show user feedback
 	OverlayManager.show_status_message("Placement mode started - Left-click to place, ESC to exit", Color.GREEN, 3.0)
@@ -510,7 +510,7 @@ func get_system_status() -> Dictionary:
 	return {
 		"plugin_ready": _is_plugin_ready(),
 		"dock_exists": dock != null,
-		"current_mode": TransformationManager.get_current_mode(),
+		"current_mode": TransformationCoordinator.get_current_mode(),
 		"has_camera": _get_current_camera() != null,
 		"settings_loaded": SettingsManager.get_settings_summary()["plugin_settings_count"] > 0
 	}

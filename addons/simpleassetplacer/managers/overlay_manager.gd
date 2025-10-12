@@ -3,8 +3,8 @@ extends RefCounted
 
 class_name OverlayManager
 
-# Forward reference to TransformationManager for Mode enum
-const TransformationManager = preload("res://addons/simpleassetplacer/core/transformation_manager.gd")
+# Forward reference to ModeStateMachine for Mode enum
+const ModeStateMachine = preload("res://addons/simpleassetplacer/core/mode_state_machine.gd")
 const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placement/placement_strategy_manager.gd")
 const SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
 const NodeUtils = preload("res://addons/simpleassetplacer/utils/node_utils.gd")
@@ -28,7 +28,7 @@ ARCHITECTURE POSITION: Pure UI management with no business logic
 - Does NOT perform calculations (receives display data from other managers)
 - Does NOT know about transformation math
 
-USED BY: TransformationManager for all UI feedback
+USED BY: TransformationCoordinator for all UI feedback
 DEPENDS ON: Godot UI system, EditorInterface for overlay containers
 """
 
@@ -44,7 +44,7 @@ static var half_step_grid_overlay: Node3D = null  # 3D half-step grid visualizat
 
 # Overlay state
 static var overlays_initialized: bool = false
-static var current_mode: TransformationManager.Mode = TransformationManager.Mode.NONE
+static var current_mode: int = 0  # ModeStateMachine.Mode (using int for compatibility)
 static var show_overlays: bool = true
 
 ## Core Overlay Management
@@ -103,7 +103,7 @@ static func set_toolbar_reference(toolbar: Control):
 	"""Set the toolbar buttons reference"""
 	toolbar_buttons = toolbar
 
-static func show_transform_overlay(mode: TransformationManager.Mode, node_name: String = "", position: Vector3 = Vector3.ZERO, rotation: Vector3 = Vector3.ZERO, scale: float = 1.0, height_offset: float = 0.0):
+static func show_transform_overlay(mode: int, node_name: String = "", position: Vector3 = Vector3.ZERO, rotation: Vector3 = Vector3.ZERO, scale: float = 1.0, height_offset: float = 0.0):
 	"""Show unified transform overlay with all current transformation data"""
 	if not _is_overlay_ready():
 		return
@@ -128,7 +128,7 @@ static func show_status_message(message: String, color: Color = Color.GREEN, dur
 	# Auto-hide after duration if specified
 	if duration > 0.0:
 		await Engine.get_main_loop().create_timer(duration).timeout
-		if NodeUtils.is_valid(status_overlay) and current_mode == TransformationManager.Mode.NONE:  # Only hide if not in active mode
+		if NodeUtils.is_valid(status_overlay) and current_mode == 0:  # Only hide if not in active mode (0 = NONE)
 			status_overlay.hide_overlay()
 		elif not NodeUtils.is_valid(status_overlay):
 			status_overlay = null  # Clear invalid reference
@@ -137,7 +137,7 @@ static func hide_transform_overlay():
 	"""Hide the unified transform overlay"""
 	if NodeUtils.is_valid_and_ready(status_overlay):
 		status_overlay.hide_overlay()
-	current_mode = TransformationManager.Mode.NONE
+	current_mode = 0  # NONE mode
 
 static func hide_status_overlay():
 	"""Hide status overlay (legacy compatibility)"""
@@ -145,19 +145,17 @@ static func hide_status_overlay():
 
 ## Mode-Specific Display
 
-static func set_mode(mode: TransformationManager.Mode):
-	"""Set current mode and update displays accordingly"""
+static func set_mode(mode: int):
+	"""Update the current mode for overlay context"""
 	current_mode = mode
 	
 	match mode:
-		TransformationManager.Mode.PLACEMENT:
-			# Mode will be properly displayed via show_transform_overlay calls
-			pass
-		TransformationManager.Mode.TRANSFORM:
-			# Mode will be properly displayed via show_transform_overlay calls  
-			pass
-		TransformationManager.Mode.NONE:
-			hide_transform_overlay()
+		1:  # PLACEMENT mode
+			PluginLogger.debug("OverlayManager", "Mode set to PLACEMENT")
+		2:  # TRANSFORM mode
+			PluginLogger.debug("OverlayManager", "Mode set to TRANSFORM")
+		0:  # NONE mode
+			PluginLogger.debug("OverlayManager", "Mode set to NONE")
 
 ## Overlay Utilities
 

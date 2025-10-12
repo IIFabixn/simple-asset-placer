@@ -81,8 +81,8 @@ func _on_random_rotation_toggled(toggled_on: bool) -> void:
 
 func _on_transform_mode_toggled(toggled_on: bool) -> void:
 	"""Toggle transform mode"""
-	# Import TransformationManager for mode control
-	const TransformationManager = preload("res://addons/simpleassetplacer/core/transformation_manager.gd")
+	# Import TransformationCoordinator for mode control
+	const TransformationCoordinator = preload("res://addons/simpleassetplacer/core/transformation_coordinator.gd")
 	
 	if toggled_on:
 		# Button was pressed - try to enter transform mode
@@ -104,28 +104,28 @@ func _on_transform_mode_toggled(toggled_on: bool) -> void:
 			return
 		
 		# Start transform mode with selected nodes
-		TransformationManager.start_transform_mode(node3d_nodes)
+		TransformationCoordinator.start_transform_mode(node3d_nodes)
 	else:
 		# Button was unpressed - exit transform mode (confirm changes)
-		if TransformationManager.is_transform_mode():
-			TransformationManager.exit_transform_mode(true)
+		if TransformationCoordinator.is_transform_mode():
+			TransformationCoordinator.exit_transform_mode(true)
 
 func _on_reset_transforms_pressed() -> void:
 	"""Reset all transform offsets"""
 	# Import managers for reset operations
-	const TransformationManager = preload("res://addons/simpleassetplacer/core/transformation_manager.gd")
+	const TransformationCoordinator = preload("res://addons/simpleassetplacer/core/transformation_coordinator.gd")
 	const PositionManager = preload("res://addons/simpleassetplacer/core/position_manager.gd")
 	const RotationManager = preload("res://addons/simpleassetplacer/core/rotation_manager.gd")
 	const ScaleManager = preload("res://addons/simpleassetplacer/core/scale_manager.gd")
 	const OverlayManager = preload("res://addons/simpleassetplacer/managers/overlay_manager.gd")
 	
 	# Only reset if we're in a mode
-	if not TransformationManager.is_any_mode_active():
+	if not TransformationCoordinator.is_any_mode_active():
 		OverlayManager.show_status_message("No active mode. Enter placement or transform mode first.", Color.YELLOW, 2.0)
 		return
 	
-	# Get the transform state from TransformationManager
-	var transform_state = TransformationManager.transform_state
+	# Get the transform state from TransformationCoordinator
+	var transform_state = TransformationCoordinator.transform_state
 	if not transform_state:
 		return
 	

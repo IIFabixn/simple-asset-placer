@@ -22,8 +22,8 @@ class_name StatusOverlayControl
 # Keybinds label
 @onready var keybinds_label: Label = $OverlayControl/StatusPanel/ContentVBox/KeybindsLabel
 
-# Forward reference to TransformationManager for Mode enum
-const TransformationManager = preload("res://addons/simpleassetplacer/core/transformation_manager.gd")
+# Forward reference to ModeStateMachine for Mode enum
+const ModeStateMachine = preload("res://addons/simpleassetplacer/core/mode_state_machine.gd")
 const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placement/placement_strategy_manager.gd")
 const SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
 
@@ -50,10 +50,10 @@ func show_transform_info(mode: int, node_name: String = "", position: Vector3 = 
 	
 	# Update mode label and color
 	match mode:
-		TransformationManager.Mode.PLACEMENT:
+		ModeStateMachine.Mode.PLACEMENT:
 			mode_label.text = "🎯 PLACEMENT MODE"
 			mode_label.add_theme_color_override("font_color", Color.YELLOW)
-		TransformationManager.Mode.TRANSFORM:
+		ModeStateMachine.Mode.TRANSFORM:
 			mode_label.text = "⚙️ TRANSFORM MODE"
 			mode_label.add_theme_color_override("font_color", Color.CYAN)
 		_:
@@ -103,7 +103,7 @@ func show_transform_info(mode: int, node_name: String = "", position: Vector3 = 
 			var cycle_mode = settings.get("cycle_placement_mode_key", "P")
 			
 			# Show mode-specific keybinds with actual keys
-			if mode == TransformationManager.Mode.PLACEMENT:
+			if mode == ModeStateMachine.Mode.PLACEMENT:
 				keybinds_label.text = "%s (Move)  %s/%s (Height)  %s/%s (Scale)  Mouse (Rotate)  %s (Mode)" % [move_keys, height_up, height_down, scale_up, scale_down, cycle_mode]
 			else:  # transform mode
 				keybinds_label.text = "%s (Move)  %s/%s (Height)  %s/%s (Scale)  Mouse+X/Y/Z (Rotate)  %s (Mode)  CTRL/ALT (Modifiers)" % [move_keys, height_up, height_down, scale_up, scale_down, cycle_mode]

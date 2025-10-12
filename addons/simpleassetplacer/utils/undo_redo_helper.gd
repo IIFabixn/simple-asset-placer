@@ -115,19 +115,28 @@ static func create_placement_undo(
 	if action_name.is_empty():
 		action_name = "Place " + placed_node.name
 	
+	# Store the scene root
+	var scene_root = EditorInterface.get_edited_scene_root()
+	
+	# IMPORTANT: The node is already in the scene at this point from placement.
+	# We need to set its owner so it persists with the scene.
+	# The undo/redo system will handle adding/removing it.
+	
+	# Ensure the node has the correct owner (scene root) so it saves with the scene
+	placed_node.owner = scene_root
+	
 	# Create the undo/redo action
 	undo_redo.create_action(action_name)
 	
-	# DO: Keep reference alive (node already added to scene)
-	undo_redo.add_do_reference(placed_node)
+	# DO: Keep the node (set owner to ensure it's saved)
+	undo_redo.add_do_property(placed_node, "owner", scene_root)
 	
 	# UNDO: Remove node from scene and free it
 	undo_redo.add_undo_method(parent, "remove_child", placed_node)
 	undo_redo.add_undo_method(placed_node, "queue_free")
 	
-	# REDO: Re-add node to parent and set owner
-	undo_redo.add_do_method(parent, "add_child", placed_node)
-	undo_redo.add_do_property(placed_node, "owner", EditorInterface.get_edited_scene_root())
+	# Add undo reference to keep the node alive during undo operation
+	undo_redo.add_undo_reference(placed_node)
 	
 	# Commit the action
 	undo_redo.commit_action()

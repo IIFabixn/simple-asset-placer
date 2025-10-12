@@ -34,6 +34,16 @@ const ToolbarButtonsScene = preload("res://addons/simpleassetplacer/ui/toolbar_b
 var dock: AssetPlacerDock
 var toolbar_buttons: Control = null
 
+# Manager instances (Phase 5.2: Instance-based architecture)
+var transformation_coordinator: TransformationCoordinator = null
+var overlay_manager: OverlayManager = null
+var preview_manager: PreviewManager = null
+var smooth_transform_manager: SmoothTransformManager = null
+var input_handler: InputHandler = null
+var position_manager: PositionManager = null
+var mode_state_machine: ModeStateMachine = null
+var grid_manager: GridManager = null
+
 # Performance: Frame-based settings cache (Task 3.3)
 # Avoids redundant SettingsManager.get_combined_settings() calls within the same frame
 var _cached_settings: Dictionary = {}
@@ -84,6 +94,31 @@ func _initialize_systems():
 	# Initialize placement strategy system
 	PlacementStrategyManager.initialize()
 	
+	# Create manager instances (Phase 5.2: Instance-based architecture)
+	transformation_coordinator = TransformationCoordinator.new()
+	TransformationCoordinator._set_instance(transformation_coordinator)
+	
+	overlay_manager = OverlayManager.new()
+	OverlayManager._set_instance(overlay_manager)
+	
+	preview_manager = PreviewManager.new()
+	PreviewManager._set_instance(preview_manager)
+	
+	smooth_transform_manager = SmoothTransformManager.new()
+	SmoothTransformManager._set_instance(smooth_transform_manager)
+	
+	input_handler = InputHandler.new()
+	InputHandler._set_instance(input_handler)
+	
+	position_manager = PositionManager.new()
+	PositionManager._set_instance(position_manager)
+	
+	mode_state_machine = ModeStateMachine.new()
+	ModeStateMachine._set_instance(mode_state_machine)
+	
+	grid_manager = GridManager.new()
+	GridManager._set_instance(grid_manager)
+	
 	# Initialize core systems
 	InputHandler.update_input_state({})  # Initialize with empty settings initially
 	# Note: PositionManager.configure() is called when modes are started with transform_state
@@ -107,8 +142,8 @@ func _cleanup_systems():
 	_safe_cleanup("PreviewManager.cleanup_preview", func(): PreviewManager.cleanup_preview())
 	
 	# Clean up core systems
-	_safe_cleanup("TransformationCoordinator.cleanup", func(): TransformationCoordinator.cleanup())
-	_safe_cleanup("SmoothTransformManager.cleanup", func(): SmoothTransformManager.cleanup())
+	_safe_cleanup("TransformationCoordinator.cleanup_all", func(): TransformationCoordinator.cleanup_all())
+	_safe_cleanup("SmoothTransformManager.cleanup_all", func(): SmoothTransformManager.cleanup_all())
 	
 	# Clean up thumbnail systems
 	_safe_cleanup("ThumbnailGenerator.cleanup", func(): ThumbnailGenerator.cleanup())
@@ -116,6 +151,41 @@ func _cleanup_systems():
 	
 	# Clean up placement system
 	_safe_cleanup("PlacementStrategyManager.cleanup", func(): PlacementStrategyManager.cleanup())
+	
+	# Clear manager instances (Phase 5.2: Instance-based architecture)
+	if transformation_coordinator:
+		transformation_coordinator.cleanup()
+		TransformationCoordinator._set_instance(null)
+		transformation_coordinator = null
+	
+	if overlay_manager:
+		OverlayManager._set_instance(null)
+		overlay_manager = null
+	
+	if preview_manager:
+		PreviewManager._set_instance(null)
+		preview_manager = null
+	
+	if smooth_transform_manager:
+		smooth_transform_manager.cleanup()
+		SmoothTransformManager._set_instance(null)
+		smooth_transform_manager = null
+	
+	if input_handler:
+		InputHandler._set_instance(null)
+		input_handler = null
+	
+	if position_manager:
+		PositionManager._set_instance(null)
+		position_manager = null
+	
+	if mode_state_machine:
+		ModeStateMachine._set_instance(null)
+		mode_state_machine = null
+	
+	if grid_manager:
+		GridManager._set_instance(null)
+		grid_manager = null
 	
 	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "System cleanup completed")
 

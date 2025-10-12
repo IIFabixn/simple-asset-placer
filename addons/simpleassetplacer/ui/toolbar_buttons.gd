@@ -23,23 +23,18 @@ const OverlayManager = preload("res://addons/simpleassetplacer/managers/overlay_
 # Reference to PlacementSettings (set externally)
 var placement_settings_ref: PlacementSettings = null
 
+# Guard flags to prevent recursive toggle calls
+var _processing_grid_snap_toggle: bool = false
+var _processing_grid_overlay_toggle: bool = false
+var _processing_random_rotation_toggle: bool = false
+var _processing_transform_mode_toggle: bool = false
+
+# Global flag to block ALL toggle events during programmatic button updates
+var _updating_buttons_programmatically: bool = false
+
 func _ready() -> void:
-	# Connect button signals
-	if placement_mode_button:
-		placement_mode_button.pressed.connect(_on_placement_mode_pressed)
-	if grid_snap_button:
-		grid_snap_button.toggled.connect(_on_grid_snap_toggled)
-	if grid_overlay_button:
-		grid_overlay_button.toggled.connect(_on_grid_overlay_toggled)
-	if random_rotation_button:
-		random_rotation_button.toggled.connect(_on_random_rotation_toggled)
-	if transform_mode_button:
-		transform_mode_button.toggled.connect(_on_transform_mode_toggled)
-	if reset_transforms_button:
-		reset_transforms_button.pressed.connect(_on_reset_transforms_pressed)
-	
-	# Initialize button states from current settings (deferred to ensure managers are ready)
-	call_deferred("_update_button_states")
+	# Initialize button states FIRST before connecting signals (prevents spurious toggle events)
+	call_deferred("_initialize_buttons")
 
 ## Button Handlers
 
@@ -57,13 +52,54 @@ func _on_placement_mode_pressed() -> void:
 
 func _on_grid_snap_toggled(toggled_on: bool) -> void:
 	"""Toggle grid snapping"""
-	# Let PlacementSettings handle everything
+	# Block ALL events during programmatic button updates
+	if _updating_buttons_programmatically:
+		return
+	
+	# Prevent recursive calls
+	if _processing_grid_snap_toggle:
+		return
+	_processing_grid_snap_toggle = true
+	
+	# Ensure flag is cleared even if we return early
+	call_deferred("_clear_grid_snap_toggle_flag")
+	
+	# Check if state already matches settings to prevent redundant toggles
+	var settings = SettingsManager.get_combined_settings()
+	var current_state = settings.get("snap_enabled", false)
+	if toggled_on == current_state:
+		return  # State already matches, ignore redundant update
+	
+	# State is changing - apply the change
 	if placement_settings_ref:
 		placement_settings_ref.toggle_grid_snap(toggled_on)
 
 func _on_grid_overlay_toggled(toggled_on: bool) -> void:
 	"""Toggle grid overlay visibility"""
-	# Let PlacementSettings handle everything
+	# Block ALL events during programmatic button updates
+	if _updating_buttons_programmatically:
+		print("[DEBUG] Grid overlay toggle during programmatic update - ignoring")
+		return
+	
+	# Prevent recursive calls
+	if _processing_grid_overlay_toggle:
+		print("[DEBUG] Grid overlay toggle called while already processing - ignoring")
+		return
+	_processing_grid_overlay_toggle = true
+	
+	# Ensure flag is cleared even if we return early
+	call_deferred("_clear_grid_overlay_toggle_flag")
+	
+	# Check if state already matches settings to prevent redundant toggles
+	var settings = SettingsManager.get_combined_settings()
+	var current_state = settings.get("show_grid", true)
+	print("[DEBUG] Grid overlay toggle: toggled_on=", toggled_on, " current_state=", current_state)
+	if toggled_on == current_state:
+		print("[DEBUG] State already matches - ignoring")
+		return  # State already matches, ignore redundant update
+	
+	print("[DEBUG] Applying grid overlay change")
+	# State is changing - apply the change
 	if placement_settings_ref:
 		placement_settings_ref.toggle_grid_overlay(toggled_on)
 	
@@ -75,14 +111,51 @@ func _on_grid_overlay_toggled(toggled_on: bool) -> void:
 
 func _on_random_rotation_toggled(toggled_on: bool) -> void:
 	"""Toggle random Y rotation on placement"""
-	# Let PlacementSettings handle everything
+	# Block ALL events during programmatic button updates
+	if _updating_buttons_programmatically:
+		return
+	
+	# Prevent recursive calls
+	if _processing_random_rotation_toggle:
+		return
+	_processing_random_rotation_toggle = true
+	
+	# Ensure flag is cleared even if we return early
+	call_deferred("_clear_random_rotation_toggle_flag")
+	
+	# Check if state already matches settings to prevent redundant toggles
+	var settings = SettingsManager.get_combined_settings()
+	var current_state = settings.get("randomize_rotation", false)
+	if toggled_on == current_state:
+		return  # State already matches, ignore redundant update
+	
+	# State is changing - apply the change
 	if placement_settings_ref:
 		placement_settings_ref.toggle_random_rotation(toggled_on)
 
 func _on_transform_mode_toggled(toggled_on: bool) -> void:
 	"""Toggle transform mode"""
+	# Block ALL events during programmatic button updates
+	if _updating_buttons_programmatically:
+		return
+	
+	# Prevent recursive calls
+	if _processing_transform_mode_toggle:
+		return
+	_processing_transform_mode_toggle = true
+	
+	# Ensure flag is cleared even if we return early (deferred to next frame)
+	call_deferred("_clear_transform_mode_toggle_flag")
+	
 	# Import TransformationCoordinator for mode control
 	const TransformationCoordinator = preload("res://addons/simpleassetplacer/core/transformation_coordinator.gd")
+	
+	# Check if the button state matches the actual mode state
+	# If they don't match, this is likely a programmatic update from _process(), so ignore it
+	var actual_mode_active = TransformationCoordinator.is_transform_mode()
+	if toggled_on == actual_mode_active:
+		# State already matches - this is a redundant update, ignore it
+		return
 	
 	if toggled_on:
 		# Button was pressed - try to enter transform mode
@@ -171,7 +244,10 @@ func _update_grid_snap_button() -> void:
 	var settings = SettingsManager.get_combined_settings()
 	var enabled = settings.get("snap_enabled", false)
 	
+	# Block toggle events during programmatic update
+	_updating_buttons_programmatically = true
 	grid_snap_button.set_pressed_no_signal(enabled)  # Don't trigger toggled signal
+	_updating_buttons_programmatically = false
 	# Icon remains "📏" - no text update needed
 
 func _update_grid_overlay_button() -> void:
@@ -182,7 +258,10 @@ func _update_grid_overlay_button() -> void:
 	var settings = SettingsManager.get_combined_settings()
 	var enabled = settings.get("show_grid", true)
 	
+	# Block toggle events during programmatic update
+	_updating_buttons_programmatically = true
 	grid_overlay_button.set_pressed_no_signal(enabled)  # Don't trigger toggled signal
+	_updating_buttons_programmatically = false
 	# Icon remains "🔲" - no text update needed
 
 func _update_random_rotation_button() -> void:
@@ -193,7 +272,10 @@ func _update_random_rotation_button() -> void:
 	var settings = SettingsManager.get_combined_settings()
 	var enabled = settings.get("randomize_rotation", false)
 	
+	# Block toggle events during programmatic update
+	_updating_buttons_programmatically = true
 	random_rotation_button.set_pressed_no_signal(enabled)  # Don't trigger toggled signal
+	_updating_buttons_programmatically = false
 	# Icon remains "🔄" - no text update needed
 
 func _update_transform_mode_button() -> void:
@@ -201,8 +283,8 @@ func _update_transform_mode_button() -> void:
 	if not transform_mode_button:
 		return
 	
-	# Transform mode state will be synced from the main plugin
-	# For now, button state defaults to unpressed
+	# Transform mode state will be synced from the main plugin via set_transform_mode_active()
+	# No need to update here since it's handled externally
 	# Icon remains "🔧" - no text update needed
 
 func _update_button_tooltips() -> void:
@@ -259,4 +341,40 @@ func _on_settings_changed() -> void:
 func set_transform_mode_active(active: bool) -> void:
 	"""Update transform mode button state from external source"""
 	if transform_mode_button:
+		# Block toggle events during programmatic update
+		_updating_buttons_programmatically = true
 		transform_mode_button.set_pressed_no_signal(active)
+		_updating_buttons_programmatically = false
+
+func _initialize_buttons() -> void:
+	"""Initialize button states then connect signals (prevents spurious events)"""
+	# First, set all button states from settings
+	_update_button_states()
+	
+	# THEN connect the signals (this prevents initial state changes from triggering handlers)
+	if placement_mode_button:
+		placement_mode_button.pressed.connect(_on_placement_mode_pressed)
+	if grid_snap_button:
+		grid_snap_button.toggled.connect(_on_grid_snap_toggled)
+	if grid_overlay_button:
+		grid_overlay_button.toggled.connect(_on_grid_overlay_toggled)
+	if random_rotation_button:
+		random_rotation_button.toggled.connect(_on_random_rotation_toggled)
+	if transform_mode_button:
+		transform_mode_button.toggled.connect(_on_transform_mode_toggled)
+	if reset_transforms_button:
+		reset_transforms_button.pressed.connect(_on_reset_transforms_pressed)
+
+## Guard flag clear helpers (called deferred to ensure cleanup)
+
+func _clear_grid_snap_toggle_flag() -> void:
+	_processing_grid_snap_toggle = false
+
+func _clear_grid_overlay_toggle_flag() -> void:
+	_processing_grid_overlay_toggle = false
+
+func _clear_random_rotation_toggle_flag() -> void:
+	_processing_random_rotation_toggle = false
+
+func _clear_transform_mode_toggle_flag() -> void:
+	_processing_transform_mode_toggle = false

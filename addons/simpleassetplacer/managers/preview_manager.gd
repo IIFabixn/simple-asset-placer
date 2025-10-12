@@ -1,7 +1,23 @@
 @tool
-extends RefCounted
+extends InstanceManagerBase
 
 class_name PreviewManager
+
+# Import base class
+const InstanceManagerBase = preload("res://addons/simpleassetplacer/core/instance_manager_base.gd")
+
+# === SINGLETON INSTANCE ===
+
+static var _instance: PreviewManager = null
+
+static func _set_instance(instance: InstanceManagerBase) -> void:
+	_instance = instance as PreviewManager
+
+static func _get_instance() -> InstanceManagerBase:
+	return _instance
+
+static func has_instance() -> bool:
+	return _instance != null and is_instance_valid(_instance)
 
 """
 PREVIEW MESH MANAGEMENT SYSTEM
@@ -31,16 +47,48 @@ DEPENDS ON: Godot scene system, material system, resource loading, SmoothTransfo
 const SmoothTransformManager = preload("res://addons/simpleassetplacer/core/smooth_transform_manager.gd")
 const NodeUtils = preload("res://addons/simpleassetplacer/utils/node_utils.gd")
 
+# === INSTANCE VARIABLES ===
+
 # Preview state
-static var preview_mesh: Node3D = null
-static var preview_material: StandardMaterial3D = null
-static var current_position: Vector3 = Vector3.ZERO
-static var current_rotation: Vector3 = Vector3.ZERO
-static var current_scale: Vector3 = Vector3.ONE
+var _preview_mesh: Node3D = null
+var _preview_material: StandardMaterial3D = null
+var _current_position: Vector3 = Vector3.ZERO
+var _current_rotation: Vector3 = Vector3.ZERO
+var _current_scale: Vector3 = Vector3.ONE
 
 # Preview configuration
-static var preview_opacity: float = 0.6
-static var preview_color: Color = Color.WHITE
+var _preview_opacity: float = 0.6
+var _preview_color: Color = Color.WHITE
+
+# === STATIC PROPERTIES (BACKWARD COMPATIBILITY) ===
+
+static var preview_mesh: Node3D:
+	get: return _get_instance()._preview_mesh if has_instance() else null
+	set(value): if has_instance(): _get_instance()._preview_mesh = value
+
+static var preview_material: StandardMaterial3D:
+	get: return _get_instance()._preview_material if has_instance() else null
+	set(value): if has_instance(): _get_instance()._preview_material = value
+
+static var current_position: Vector3:
+	get: return _get_instance()._current_position if has_instance() else Vector3.ZERO
+	set(value): if has_instance(): _get_instance()._current_position = value
+
+static var current_rotation: Vector3:
+	get: return _get_instance()._current_rotation if has_instance() else Vector3.ZERO
+	set(value): if has_instance(): _get_instance()._current_rotation = value
+
+static var current_scale: Vector3:
+	get: return _get_instance()._current_scale if has_instance() else Vector3.ONE
+	set(value): if has_instance(): _get_instance()._current_scale = value
+
+static var preview_opacity: float:
+	get: return _get_instance()._preview_opacity if has_instance() else 0.6
+	set(value): if has_instance(): _get_instance()._preview_opacity = value
+
+static var preview_color: Color:
+	get: return _get_instance()._preview_color if has_instance() else Color.WHITE
+	set(value): if has_instance(): _get_instance()._preview_color = value
 
 ## Configuration
 

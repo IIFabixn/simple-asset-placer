@@ -115,25 +115,28 @@ static func place_asset_in_scene(asset_path: String, position: Vector3 = Vector3
 		add_node_to_scene(scene_instance, current_scene)
 		
 		# Now apply transforms (after node is in tree)
-		scene_instance.global_position = position
-		
-		# Apply rotation from RotationManager
+		# Calculate final rotation
+		var final_rotation = Vector3.ZERO
 		if transform_state:
-			RotationManager.apply_rotation_to_node(transform_state, scene_instance)
+			# Get rotation from transform state (includes surface alignment + manual offset)
+			var surface_transform = Transform3D(Basis.from_euler(transform_state.surface_alignment_rotation), Vector3.ZERO)
+			var manual_transform = Transform3D(Basis.from_euler(transform_state.manual_rotation_offset), Vector3.ZERO)
+			var combined_transform = surface_transform * manual_transform
+			final_rotation = combined_transform.basis.get_euler()
 		
 		# Apply random Y rotation if enabled
 		if settings.get("random_rotation", false):
 			var random_y_rotation = randf_range(0.0, TAU)  # Full 360 degrees in radians
-			scene_instance.rotate_y(random_y_rotation)
+			final_rotation.y += random_y_rotation
 		
 		# Apply scale (assume uniform scale from ScaleManager)
 		var scale_multiplier = ScaleManager.get_scale(transform_state) if transform_state else 1.0
 		PluginLogger.info("UtilityManager", "Applying scale multiplier: " + str(scale_multiplier) + " (transform_state: " + ("present" if transform_state else "null") + ")")
 		var final_scale = scene_instance.scale * scale_multiplier
 		
-		# Apply scale immediately without smooth transitions (newly placed objects should snap to final scale)
+		# Apply all transforms immediately without smooth transitions (newly placed objects should snap to final state)
 		const SmoothTransformManager = preload("res://addons/simpleassetplacer/core/smooth_transform_manager.gd")
-		SmoothTransformManager.apply_transform_immediately(scene_instance, scene_instance.global_position, scene_instance.rotation, final_scale)
+		SmoothTransformManager.apply_transform_immediately(scene_instance, position, final_rotation, final_scale)
 		
 		PluginLogger.info("UtilityManager", "Successfully placed asset as: " + unique_name + " with final scale: " + str(scene_instance.scale))
 		return scene_instance
@@ -165,16 +168,19 @@ static func place_meshlib_item_in_scene(meshlib: MeshLibrary, item_id: int, posi
 		add_node_to_scene(mesh_instance, current_scene)
 		
 		# Now apply transforms (after node is in tree)
-		mesh_instance.global_position = position
-		
-		# Apply rotation from RotationManager
+		# Calculate final rotation
+		var final_rotation = Vector3.ZERO
 		if transform_state:
-			RotationManager.apply_rotation_to_node(transform_state, mesh_instance)
+			# Get rotation from transform state (includes surface alignment + manual offset)
+			var surface_transform = Transform3D(Basis.from_euler(transform_state.surface_alignment_rotation), Vector3.ZERO)
+			var manual_transform = Transform3D(Basis.from_euler(transform_state.manual_rotation_offset), Vector3.ZERO)
+			var combined_transform = surface_transform * manual_transform
+			final_rotation = combined_transform.basis.get_euler()
 		
 		# Apply random Y rotation if enabled
 		if settings.get("random_rotation", false):
 			var random_y_rotation = randf_range(0.0, TAU)  # Full 360 degrees in radians
-			mesh_instance.rotate_y(random_y_rotation)
+			final_rotation.y += random_y_rotation
 			PluginLogger.debug("UtilityManager", "Applied random Y rotation: " + str(rad_to_deg(random_y_rotation)) + " degrees")
 		
 		# Apply scale (assume uniform scale from ScaleManager)
@@ -182,9 +188,9 @@ static func place_meshlib_item_in_scene(meshlib: MeshLibrary, item_id: int, posi
 		PluginLogger.info("UtilityManager", "Applying scale multiplier: " + str(scale_multiplier) + " (transform_state: " + ("present" if transform_state else "null") + ")")
 		var final_scale = mesh_instance.scale * scale_multiplier
 		
-		# Apply scale immediately without smooth transitions (newly placed objects should snap to final scale)
+		# Apply all transforms immediately without smooth transitions (newly placed objects should snap to final state)
 		const SmoothTransformManager = preload("res://addons/simpleassetplacer/core/smooth_transform_manager.gd")
-		SmoothTransformManager.apply_transform_immediately(mesh_instance, mesh_instance.global_position, mesh_instance.rotation, final_scale)
+		SmoothTransformManager.apply_transform_immediately(mesh_instance, position, final_rotation, final_scale)
 		
 		PluginLogger.info("UtilityManager", "Successfully placed meshlib item as: " + unique_name + " with final scale: " + str(mesh_instance.scale))
 		return mesh_instance
@@ -213,16 +219,19 @@ static func place_mesh_in_scene(mesh: Mesh, position: Vector3, settings: Diction
 		add_node_to_scene(mesh_instance, current_scene)
 		
 		# Now apply transforms (after node is in tree)
-		mesh_instance.global_position = position
-		
-		# Apply rotation from RotationManager
+		# Calculate final rotation
+		var final_rotation = Vector3.ZERO
 		if transform_state:
-			RotationManager.apply_rotation_to_node(transform_state, mesh_instance)
+			# Get rotation from transform state (includes surface alignment + manual offset)
+			var surface_transform = Transform3D(Basis.from_euler(transform_state.surface_alignment_rotation), Vector3.ZERO)
+			var manual_transform = Transform3D(Basis.from_euler(transform_state.manual_rotation_offset), Vector3.ZERO)
+			var combined_transform = surface_transform * manual_transform
+			final_rotation = combined_transform.basis.get_euler()
 		
 		# Apply random Y rotation if enabled
 		if settings.get("random_rotation", false):
 			var random_y_rotation = randf_range(0.0, TAU)  # Full 360 degrees in radians
-			mesh_instance.rotate_y(random_y_rotation)
+			final_rotation.y += random_y_rotation
 			PluginLogger.debug("UtilityManager", "Applied random Y rotation: " + str(rad_to_deg(random_y_rotation)) + " degrees")
 		
 		# Apply scale (assume uniform scale from ScaleManager)
@@ -230,9 +239,9 @@ static func place_mesh_in_scene(mesh: Mesh, position: Vector3, settings: Diction
 		PluginLogger.info("UtilityManager", "Applying scale multiplier: " + str(scale_multiplier) + " (transform_state: " + ("present" if transform_state else "null") + ")")
 		var final_scale = mesh_instance.scale * scale_multiplier
 		
-		# Apply scale immediately without smooth transitions (newly placed objects should snap to final scale)
+		# Apply all transforms immediately without smooth transitions (newly placed objects should snap to final state)
 		const SmoothTransformManager = preload("res://addons/simpleassetplacer/core/smooth_transform_manager.gd")
-		SmoothTransformManager.apply_transform_immediately(mesh_instance, mesh_instance.global_position, mesh_instance.rotation, final_scale)
+		SmoothTransformManager.apply_transform_immediately(mesh_instance, position, final_rotation, final_scale)
 		
 		PluginLogger.info("UtilityManager", "Successfully placed mesh as: " + unique_name + " with final scale: " + str(mesh_instance.scale))
 		return mesh_instance

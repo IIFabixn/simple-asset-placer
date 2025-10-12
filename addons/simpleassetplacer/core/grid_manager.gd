@@ -1,7 +1,20 @@
 @tool
-extends RefCounted
+extends "res://addons/simpleassetplacer/core/instance_manager_base.gd"
 
 class_name GridManager
+
+# === SINGLETON INSTANCE ===
+
+static var _instance: GridManager = null
+
+static func _set_instance(instance: InstanceManagerBase) -> void:
+	_instance = instance as GridManager
+
+static func _get_instance() -> InstanceManagerBase:
+	return _instance
+
+static func has_instance() -> bool:
+	return _instance != null and is_instance_valid(_instance)
 
 """
 GRID MANAGER
@@ -20,6 +33,8 @@ ARCHITECTURE POSITION: Specialized manager for grid overlays
 - Used by TransformationCoordinator during frame processing
 - Delegates to OverlayManager for actual grid rendering
 - Tracks grid state to minimize redundant updates
+
+PHASE 5.2: Converted to instance-based architecture with hybrid static pattern
 
 USED BY: TransformationCoordinator
 USES: OverlayManager, PositionManager, NodeUtils, PluginLogger
@@ -42,10 +57,23 @@ const TransformState = preload("res://addons/simpleassetplacer/core/transform_st
 
 # === GRID STATE TRACKING ===
 
-# Grid overlay tracking
-static var last_grid_center: Vector3 = Vector3.ZERO
-static var last_grid_height: float = 0.0  # Track height offset for grid updates
-static var grid_update_threshold: float = 5.0  # Only update grid when object moves this far
+# Instance variables (Phase 5.2: Instance-based architecture)
+var __last_grid_center: Vector3 = Vector3.ZERO
+var __last_grid_height: float = 0.0
+var __grid_update_threshold: float = 5.0
+
+# Static properties forwarding to instance (Phase 5.2: Hybrid pattern)
+static var last_grid_center: Vector3:
+	get: return _get_instance().__last_grid_center if has_instance() else Vector3.ZERO
+	set(value): if has_instance(): _get_instance().__last_grid_center = value
+
+static var last_grid_height: float:
+	get: return _get_instance().__last_grid_height if has_instance() else 0.0
+	set(value): if has_instance(): _get_instance().__last_grid_height = value
+
+static var grid_update_threshold: float:
+	get: return _get_instance().__grid_update_threshold if has_instance() else 5.0
+	set(value): if has_instance(): _get_instance().__grid_update_threshold = value
 
 ## MAIN UPDATE FUNCTION
 

@@ -1,5 +1,5 @@
 @tool
-extends RefCounted
+extends InstanceManagerBase
 
 class_name TransformationCoordinator
 
@@ -31,6 +31,22 @@ USES: ModeStateMachine, PlacementModeHandler, TransformModeHandler, GridManager,
       SettingsManager, PlacementStrategyManager, PluginLogger
 """
 
+# Import base class
+const InstanceManagerBase = preload("res://addons/simpleassetplacer/core/instance_manager_base.gd")
+
+# === SINGLETON INSTANCE ===
+
+static var _instance: TransformationCoordinator = null
+
+static func _set_instance(instance: InstanceManagerBase) -> void:
+	_instance = instance as TransformationCoordinator
+
+static func _get_instance() -> InstanceManagerBase:
+	return _instance
+
+static func has_instance() -> bool:
+	return _instance != null and is_instance_valid(_instance)
+
 # Import utilities
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
 const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
@@ -61,30 +77,63 @@ const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placeme
 # Import state
 const TransformState = preload("res://addons/simpleassetplacer/core/transform_state.gd")
 
-# === COORDINATOR STATE ===
+# === COORDINATOR STATE (INSTANCE-BASED) ===
+
+# Instance variables (real data storage)
+var _transform_state: TransformState = null
+var _placement_data: Dictionary = {}
+var _transform_data: Dictionary = {}
+var _settings: Dictionary = {}
+var _dock_reference = null
+var _undo_redo: EditorUndoRedoManager = null
+var _placement_end_callback: Callable
+var _mesh_placed_callback: Callable
+var _focus_grab_counter: int = 0
+
+# === STATIC PROPERTIES (BACKWARD COMPATIBILITY) ===
 
 # Unified transform state
-static var transform_state: TransformState = null
+static var transform_state: TransformState:
+	get: return _get_instance()._transform_state if has_instance() else null
+	set(value): if has_instance(): _get_instance()._transform_state = value
 
 # Mode-specific data (managed by mode handlers, stored here)
-static var placement_data: Dictionary = {}
-static var transform_data: Dictionary = {}
+static var placement_data: Dictionary:
+	get: return _get_instance()._placement_data if has_instance() else {}
+	set(value): if has_instance(): _get_instance()._placement_data = value
+
+static var transform_data: Dictionary:
+	get: return _get_instance()._transform_data if has_instance() else {}
+	set(value): if has_instance(): _get_instance()._transform_data = value
 
 # Settings reference
-static var settings: Dictionary = {}
+static var settings: Dictionary:
+	get: return _get_instance()._settings if has_instance() else {}
+	set(value): if has_instance(): _get_instance()._settings = value
 
 # Dock reference (for UI updates)
-static var dock_reference = null
+static var dock_reference:
+	get: return _get_instance()._dock_reference if has_instance() else null
+	set(value): if has_instance(): _get_instance()._dock_reference = value
 
 # Undo/Redo manager
-static var undo_redo: EditorUndoRedoManager = null
+static var undo_redo: EditorUndoRedoManager:
+	get: return _get_instance()._undo_redo if has_instance() else null
+	set(value): if has_instance(): _get_instance()._undo_redo = value
 
 # Callbacks
-static var placement_end_callback: Callable
-static var mesh_placed_callback: Callable
+static var placement_end_callback: Callable:
+	get: return _get_instance()._placement_end_callback if has_instance() else Callable()
+	set(value): if has_instance(): _get_instance()._placement_end_callback = value
+
+static var mesh_placed_callback: Callable:
+	get: return _get_instance()._mesh_placed_callback if has_instance() else Callable()
+	set(value): if has_instance(): _get_instance()._mesh_placed_callback = value
 
 # Focus management
-static var focus_grab_counter: int = 0  # Counter for repeated focus grabs
+static var focus_grab_counter: int:
+	get: return _get_instance()._focus_grab_counter if has_instance() else 0
+	set(value): if has_instance(): _get_instance()._focus_grab_counter = value
 
 ## MODE CONTROL (Public API)
 
@@ -442,12 +491,16 @@ static func set_mesh_placed_callback(callback: Callable) -> void:
 
 ## CLEANUP
 
-static func cleanup() -> void:
-	"""Clean up all manager resources"""
+static func cleanup_all() -> void:
+	"""Clean up all manager resources (static wrapper for backward compatibility)"""
 	exit_any_mode()
 	OverlayManager.cleanup_all_overlays()
 	PreviewManager.cleanup_preview()
 	GridManager.cleanup_grid()
+
+func cleanup() -> void:
+	"""Override from InstanceManagerBase - called when instance is being destroyed"""
+	cleanup_all()
 
 ## INTERNAL HELPERS
 

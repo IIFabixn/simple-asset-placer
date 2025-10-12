@@ -1,7 +1,23 @@
 @tool
-extends RefCounted
+extends InstanceManagerBase
 
 class_name OverlayManager
+
+# Import base class
+const InstanceManagerBase = preload("res://addons/simpleassetplacer/core/instance_manager_base.gd")
+
+# === SINGLETON INSTANCE ===
+
+static var _instance: OverlayManager = null
+
+static func _set_instance(instance: InstanceManagerBase) -> void:
+	_instance = instance as OverlayManager
+
+static func _get_instance() -> InstanceManagerBase:
+	return _instance
+
+static func has_instance() -> bool:
+	return _instance != null and is_instance_valid(_instance)
 
 # Forward reference to ModeStateMachine for Mode enum
 const ModeStateMachine = preload("res://addons/simpleassetplacer/core/mode_state_machine.gd")
@@ -35,17 +51,53 @@ DEPENDS ON: Godot UI system, EditorInterface for overlay containers
 # Preload the status overlay scene
 const StatusOverlayScene = preload("res://addons/simpleassetplacer/ui/status_overlay.tscn")
 
+# === INSTANCE VARIABLES ===
+
 # Overlay references
-static var main_overlay: Control = null
-static var status_overlay: CanvasLayer = null  # Now loaded from scene as CanvasLayer
-static var toolbar_buttons: Control = null  # Toolbar buttons in 3D viewport menu
-static var grid_overlay: Node3D = null  # 3D grid visualization (main grid)
-static var half_step_grid_overlay: Node3D = null  # 3D half-step grid visualization (red)
+var _main_overlay: Control = null
+var _status_overlay: CanvasLayer = null
+var _toolbar_buttons: Control = null
+var _grid_overlay: Node3D = null
+var _half_step_grid_overlay: Node3D = null
 
 # Overlay state
-static var overlays_initialized: bool = false
-static var current_mode: int = 0  # ModeStateMachine.Mode (using int for compatibility)
-static var show_overlays: bool = true
+var _overlays_initialized: bool = false
+var _current_mode: int = 0
+var _show_overlays: bool = true
+
+# === STATIC PROPERTIES (BACKWARD COMPATIBILITY) ===
+
+static var main_overlay: Control:
+	get: return _get_instance()._main_overlay if has_instance() else null
+	set(value): if has_instance(): _get_instance()._main_overlay = value
+
+static var status_overlay: CanvasLayer:
+	get: return _get_instance()._status_overlay if has_instance() else null
+	set(value): if has_instance(): _get_instance()._status_overlay = value
+
+static var toolbar_buttons: Control:
+	get: return _get_instance()._toolbar_buttons if has_instance() else null
+	set(value): if has_instance(): _get_instance()._toolbar_buttons = value
+
+static var grid_overlay: Node3D:
+	get: return _get_instance()._grid_overlay if has_instance() else null
+	set(value): if has_instance(): _get_instance()._grid_overlay = value
+
+static var half_step_grid_overlay: Node3D:
+	get: return _get_instance()._half_step_grid_overlay if has_instance() else null
+	set(value): if has_instance(): _get_instance()._half_step_grid_overlay = value
+
+static var overlays_initialized: bool:
+	get: return _get_instance()._overlays_initialized if has_instance() else false
+	set(value): if has_instance(): _get_instance()._overlays_initialized = value
+
+static var current_mode: int:
+	get: return _get_instance()._current_mode if has_instance() else 0
+	set(value): if has_instance(): _get_instance()._current_mode = value
+
+static var show_overlays: bool:
+	get: return _get_instance()._show_overlays if has_instance() else true
+	set(value): if has_instance(): _get_instance()._show_overlays = value
 
 ## Core Overlay Management
 

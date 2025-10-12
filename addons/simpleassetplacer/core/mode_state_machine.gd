@@ -1,7 +1,20 @@
 @tool
-extends RefCounted
+extends "res://addons/simpleassetplacer/core/instance_manager_base.gd"
 
 class_name ModeStateMachine
+
+# === SINGLETON INSTANCE ===
+
+static var _instance: ModeStateMachine = null
+
+static func _set_instance(instance: InstanceManagerBase) -> void:
+	_instance = instance as ModeStateMachine
+
+static func _get_instance() -> InstanceManagerBase:
+	return _instance
+
+static func has_instance() -> bool:
+	return _instance != null and is_instance_valid(_instance)
 
 """
 MODE STATE MACHINE
@@ -19,6 +32,8 @@ ARCHITECTURE POSITION: Core state manager
 - Used by TransformationCoordinator for mode control
 - Provides single source of truth for current mode
 - No business logic - pure state management
+
+PHASE 5.2: Converted to instance-based architecture with hybrid static pattern
 
 USED BY: TransformationCoordinator, mode handlers
 USES: PluginLogger, PluginConstants
@@ -38,8 +53,13 @@ enum Mode {
 
 # === STATE ===
 
-# Current operation mode
-static var current_mode: Mode = Mode.NONE
+# Instance variable (Phase 5.2: Instance-based architecture)
+var __current_mode: Mode = Mode.NONE
+
+# Static property forwarding to instance (Phase 5.2: Hybrid pattern)
+static var current_mode: Mode:
+	get: return _get_instance().__current_mode if has_instance() else Mode.NONE
+	set(value): if has_instance(): _get_instance().__current_mode = value
 
 ## STATE QUERIES
 

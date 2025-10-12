@@ -1,7 +1,20 @@
 @tool
-extends RefCounted
+extends "res://addons/simpleassetplacer/core/instance_manager_base.gd"
 
 class_name PositionManager
+
+# === SINGLETON INSTANCE ===
+
+static var _instance: PositionManager = null
+
+static func _set_instance(instance: InstanceManagerBase) -> void:
+	_instance = instance as PositionManager
+
+static func _get_instance() -> InstanceManagerBase:
+	return _instance
+
+static func has_instance() -> bool:
+	return _instance != null and is_instance_valid(_instance)
 
 """
 3D POSITIONING AND COLLISION SYSTEM (REFACTORED - STATELESS)
@@ -24,6 +37,7 @@ ARCHITECTURE POSITION: Pure calculation service with NO state storage
 - Focused solely on position math
 
 REFACTORED: State moved to TransformState
+PHASE 5.2: Converted to instance-based architecture with hybrid static pattern
 
 USED BY: TransformationManager for positioning calculations
 DEPENDS ON: TransformState, PlacementStrategyManager, IncrementCalculator
@@ -36,16 +50,43 @@ const PlacementStrategy = preload("res://addons/simpleassetplacer/placement/plac
 const IncrementCalculator = preload("res://addons/simpleassetplacer/utils/increment_calculator.gd")
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
 
-# Configuration settings (not state - these are configuration values)
-static var height_step_size: float = 0.1
-static var collision_mask: int = 1
-static var use_half_step: bool = false
-static var align_with_normal: bool = false
-static var snap_to_ground: bool = true
+# Instance variables (Phase 5.2: Instance-based architecture)
+var __height_step_size: float = 0.1
+var __collision_mask: int = 1
+var __use_half_step: bool = false
+var __align_with_normal: bool = false
+var __snap_to_ground: bool = true
+var __interpolation_enabled: bool = false
+var __interpolation_speed: float = 10.0
 
-# Position interpolation settings (not state)
-static var interpolation_enabled: bool = false
-static var interpolation_speed: float = 10.0
+# Static properties forwarding to instance (Phase 5.2: Hybrid pattern)
+static var height_step_size: float:
+	get: return _get_instance().__height_step_size if has_instance() else 0.1
+	set(value): if has_instance(): _get_instance().__height_step_size = value
+
+static var collision_mask: int:
+	get: return _get_instance().__collision_mask if has_instance() else 1
+	set(value): if has_instance(): _get_instance().__collision_mask = value
+
+static var use_half_step: bool:
+	get: return _get_instance().__use_half_step if has_instance() else false
+	set(value): if has_instance(): _get_instance().__use_half_step = value
+
+static var align_with_normal: bool:
+	get: return _get_instance().__align_with_normal if has_instance() else false
+	set(value): if has_instance(): _get_instance().__align_with_normal = value
+
+static var snap_to_ground: bool:
+	get: return _get_instance().__snap_to_ground if has_instance() else true
+	set(value): if has_instance(): _get_instance().__snap_to_ground = value
+
+static var interpolation_enabled: bool:
+	get: return _get_instance().__interpolation_enabled if has_instance() else false
+	set(value): if has_instance(): _get_instance().__interpolation_enabled = value
+
+static var interpolation_speed: float:
+	get: return _get_instance().__interpolation_speed if has_instance() else 10.0
+	set(value): if has_instance(): _get_instance().__interpolation_speed = value
 
 ## Core Position Management (REFACTORED)
 

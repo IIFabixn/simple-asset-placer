@@ -1,7 +1,10 @@
 @tool
-extends RefCounted
+extends InstanceManagerBase
 
 class_name InputHandler
+
+# Import base class
+const InstanceManagerBase = preload("res://addons/simpleassetplacer/core/instance_manager_base.gd")
 
 """
 CENTRALIZED INPUT DETECTION SYSTEM
@@ -25,77 +28,154 @@ USED BY: TransformationManager for all input queries
 DEPENDS ON: User settings for key mappings, Godot Input system
 """
 
-# Current frame input state
-static var current_keys: Dictionary = {}
-static var current_mouse: Dictionary = {}
-static var current_actions: Dictionary = {}
+# === SINGLETON INSTANCE ===
 
-# Settings reference for key mappings
-static var settings: Dictionary = {}
+static var _instance: InputHandler = null
 
-# Key state tracking for edge detection (double-buffered for swap optimization)
-static var previous_keys: Dictionary = {}
-static var previous_mouse: Dictionary = {}
-# Swap buffers - avoids duplicate() allocation every frame
-static var _keys_buffer_a: Dictionary = {}
-static var _keys_buffer_b: Dictionary = {}
-static var _mouse_buffer_a: Dictionary = {}
-static var _mouse_buffer_b: Dictionary = {}
-static var _use_buffer_a: bool = true  # Track which buffer is "current"
+static func _set_instance(instance: InstanceManagerBase) -> void:
+	_instance = instance as InputHandler
 
-# Grace period tracking for tap vs hold detection
-static var key_press_times: Dictionary = {}  # Track when each key was pressed
-static var key_tap_grace_period: float = 0.15  # 150ms to distinguish tap from hold
-static var pending_taps: Dictionary = {}  # Keys that might be taps, waiting for release
+static func _get_instance() -> InstanceManagerBase:
+	return _instance
 
-# Hold-to-repeat tracking for action keys
-static var active_repeat_key: String = ""  # Single key currently repeating (only one at a time)
-static var active_repeat_modifiers: Dictionary = {}  # Modifier state when repeat started
-static var wheel_interrupted_keys: Dictionary = {}  # Keys interrupted by wheel, require re-press
-static var repeat_intervals: Dictionary = {
-	"rotation": 0.1,  # 100ms for responsive rotation
-	"scale": 0.08,    # 80ms for smooth scaling
-	"height": 0.08,   # 80ms for height adjustment
-	"position": 0.05  # 50ms for smooth movement
+static func has_instance() -> bool:
+	return _instance != null and is_instance_valid(_instance)
+
+# === INSTANCE VARIABLES ===
+
+# Current frame input state (private instance storage)
+var __current_keys: Dictionary = {}
+var __current_mouse: Dictionary = {}
+var __current_actions: Dictionary = {}
+var __settings: Dictionary = {}
+var __previous_keys: Dictionary = {}
+var __previous_mouse: Dictionary = {}
+var __keys_buffer_a: Dictionary = {}
+var __keys_buffer_b: Dictionary = {}
+var __mouse_buffer_a: Dictionary = {}
+var __mouse_buffer_b: Dictionary = {}
+var __use_buffer_a: bool = true
+
+# === STATIC PROPERTIES (BACKWARD COMPATIBILITY) ===
+
+static var current_keys: Dictionary:
+	get: return _get_instance().__current_keys if has_instance() else {}
+
+static var current_mouse: Dictionary:
+	get: return _get_instance().__current_mouse if has_instance() else {}
+
+static var current_actions: Dictionary:
+	get: return _get_instance().__current_actions if has_instance() else {}
+
+static var settings: Dictionary:
+	get: return _get_instance().__settings if has_instance() else {}
+	set(value): if has_instance(): _get_instance().__settings = value
+
+static var previous_keys: Dictionary:
+	get: return _get_instance().__previous_keys if has_instance() else {}
+
+static var previous_mouse: Dictionary:
+	get: return _get_instance().__previous_mouse if has_instance() else {}
+
+static var _keys_buffer_a: Dictionary:
+	get: return _get_instance().__keys_buffer_a if has_instance() else {}
+
+static var _keys_buffer_b: Dictionary:
+	get: return _get_instance().__keys_buffer_b if has_instance() else {}
+
+static var _mouse_buffer_a: Dictionary:
+	get: return _get_instance().__mouse_buffer_a if has_instance() else {}
+
+static var _mouse_buffer_b: Dictionary:
+	get: return _get_instance().__mouse_buffer_b if has_instance() else {}
+
+static var _use_buffer_a: bool:
+	get: return _get_instance().__use_buffer_a if has_instance() else true
+	set(value): if has_instance(): _get_instance().__use_buffer_a = value
+
+# Additional instance variables (tracking state)
+var __key_press_times: Dictionary = {}
+var __key_tap_grace_period: float = 0.15
+var __pending_taps: Dictionary = {}
+var __active_repeat_key: String = ""
+var __active_repeat_modifiers: Dictionary = {}
+var __wheel_interrupted_keys: Dictionary = {}
+var __repeat_intervals: Dictionary = {
+	"rotation": 0.1,
+	"scale": 0.08,
+	"height": 0.08,
+	"position": 0.05
 }
+var __cached_viewport: SubViewport = null
 
-# Viewport cache for proper mouse coordinate conversion
-static var cached_viewport: SubViewport = null
+# Static properties for backward compatibility (tracking state)
+static var key_press_times: Dictionary:
+	get: return _get_instance().__key_press_times if has_instance() else {}
+
+static var key_tap_grace_period: float:
+	get: return _get_instance().__key_tap_grace_period if has_instance() else 0.15
+
+static var pending_taps: Dictionary:
+	get: return _get_instance().__pending_taps if has_instance() else {}
+
+static var active_repeat_key: String:
+	get: return _get_instance().__active_repeat_key if has_instance() else ""
+	set(value): if has_instance(): _get_instance().__active_repeat_key = value
+
+static var active_repeat_modifiers: Dictionary:
+	get: return _get_instance().__active_repeat_modifiers if has_instance() else {}
+
+static var wheel_interrupted_keys: Dictionary:
+	get: return _get_instance().__wheel_interrupted_keys if has_instance() else {}
+
+static var repeat_intervals: Dictionary:
+	get: return _get_instance().__repeat_intervals if has_instance() else {"rotation": 0.1, "scale": 0.08, "height": 0.08, "position": 0.05}
+
+static var cached_viewport: SubViewport:
+	get: return _get_instance().__cached_viewport if has_instance() else null
+	set(value): if has_instance(): _get_instance().__cached_viewport = value
 
 ## Core Input Polling
 
 static func update_input_state(input_settings: Dictionary = {}, viewport: SubViewport = null):
 	"""Update all input state for the current frame. Call this once per frame."""
-	settings = input_settings
+	if not has_instance():
+		push_error("InputHandler.update_input_state() called but no instance exists!")
+		return
+	
+	# Get the instance once for direct access (avoid repeated getter calls)
+	var inst = _get_instance() as InputHandler
+	
+	inst.__settings = input_settings
 	
 	# Store viewport for mouse position calculations
 	if viewport:
-		cached_viewport = viewport
+		inst.__cached_viewport = viewport
 	
 	# Swap buffers instead of duplicate() - avoids per-frame allocation
 	# This optimization reduces GC pressure in hot path (called every frame)
-	if _use_buffer_a:
+	if inst.__use_buffer_a:
 		# A is current, B becomes previous
-		previous_keys = _keys_buffer_a
-		previous_mouse = _mouse_buffer_a
+		inst.__previous_keys = inst.__keys_buffer_a
+		inst.__previous_mouse = inst.__mouse_buffer_a
 		# B becomes current
-		current_keys = _keys_buffer_b
-		current_mouse = _mouse_buffer_b
+		inst.__current_keys = inst.__keys_buffer_b
+		inst.__current_mouse = inst.__mouse_buffer_b
 	else:
 		# B is current, A becomes previous
-		previous_keys = _keys_buffer_b
-		previous_mouse = _mouse_buffer_b
+		inst.__previous_keys = inst.__keys_buffer_b
+		inst.__previous_mouse = inst.__mouse_buffer_b
 		# A becomes current
-		current_keys = _keys_buffer_a
-		current_mouse = _mouse_buffer_a
+		inst.__current_keys = inst.__keys_buffer_a
+		inst.__current_mouse = inst.__mouse_buffer_a
 	
 	# Toggle buffer selection for next frame
-	_use_buffer_a = not _use_buffer_a
+	inst.__use_buffer_a = not inst.__use_buffer_a
 	
 	# Clear current state (reusing buffer)
-	current_keys.clear()
-	current_mouse.clear() 
-	current_actions.clear()
+	inst.__current_keys.clear()
+	inst.__current_mouse.clear() 
+	inst.__current_actions.clear()
 	
 	# Update key states
 	_update_key_states()
@@ -398,7 +478,8 @@ static func is_mouse_button_just_pressed(button: String) -> bool:
 			current = current_mouse.get("middle_pressed", false)
 			previous = previous_mouse.get("middle_pressed", false)
 		_: return false
-			
+	
+	# Edge detection: current is pressed AND previous was NOT pressed
 	return current and not previous
 
 static func get_mouse_position() -> Vector2:

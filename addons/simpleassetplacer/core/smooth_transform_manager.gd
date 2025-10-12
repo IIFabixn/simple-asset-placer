@@ -1,7 +1,23 @@
 @tool
-extends RefCounted
+extends InstanceManagerBase
 
 class_name SmoothTransformManager
+
+# Import base class
+const InstanceManagerBase = preload("res://addons/simpleassetplacer/core/instance_manager_base.gd")
+
+# === SINGLETON INSTANCE ===
+
+static var _instance: SmoothTransformManager = null
+
+static func _set_instance(instance: InstanceManagerBase) -> void:
+	_instance = instance as SmoothTransformManager
+
+static func _get_instance() -> InstanceManagerBase:
+	return _instance
+
+static func has_instance() -> bool:
+	return _instance != null and is_instance_valid(_instance)
 
 """
 SMOOTH TRANSFORMATION MANAGER
@@ -27,12 +43,26 @@ DEPENDS ON: Godot's Tween system and Transform3D math
 # Import utilities
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
 
-# Smooth transform data for each object
-static var _smooth_data: Dictionary = {}
+# === INSTANCE VARIABLES ===
 
-# Settings cache
-static var _smooth_enabled: bool = true
-static var _smooth_speed: float = 8.0
+# Smooth transform data for each object (private instance storage)
+var __smooth_data: Dictionary = {}
+var __smooth_enabled: bool = true
+var __smooth_speed: float = 8.0
+
+# === STATIC PROPERTIES (BACKWARD COMPATIBILITY) ===
+
+# Internal properties accessed by static functions
+static var _smooth_data: Dictionary:
+	get: return _get_instance().__smooth_data if has_instance() else {}
+
+static var _smooth_enabled: bool:
+	get: return _get_instance().__smooth_enabled if has_instance() else true
+	set(value): if has_instance(): _get_instance().__smooth_enabled = value
+
+static var _smooth_speed: float:
+	get: return _get_instance().__smooth_speed if has_instance() else 8.0
+	set(value): if has_instance(): _get_instance().__smooth_speed = value
 
 # Smooth transform data structure
 class SmoothTransform:
@@ -126,13 +156,18 @@ static func unregister_object(node: Node3D):
 
 static func clear_all_objects():
 	"""Clear all registered objects"""
-	_smooth_data.clear()
+	if has_instance():
+		_get_instance().__smooth_data.clear()
 	PluginLogger.info("SmoothTransformManager", "Cleared all smooth transform objects")
 
-static func cleanup():
-	"""Cleanup static resources (called on plugin disable)"""
+static func cleanup_all():
+	"""Cleanup static resources (static wrapper for backward compatibility)"""
 	clear_all_objects()
 	PluginLogger.debug("SmoothTransformManager", "Cleanup completed")
+
+func cleanup() -> void:
+	"""Override from InstanceManagerBase - called when instance is being destroyed"""
+	cleanup_all()
 
 ## TRANSFORM UPDATES
 

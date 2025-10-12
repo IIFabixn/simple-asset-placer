@@ -283,6 +283,11 @@ static func process_frame_input(
 			PlacementModeHandler.process_input(camera, placement_data, transform_state, settings, delta)
 		ModeStateMachine.Mode.TRANSFORM:
 			TransformModeHandler.process_input(camera, transform_data, transform_state, settings, delta)
+			# Check if transform mode wants to exit with confirmation
+			if transform_data.get("_confirm_exit", false):
+				transform_data.erase("_confirm_exit")  # Clear the flag
+				exit_transform_mode(true)  # Exit with confirmation
+				return  # Exit early - don't update overlays after mode exit
 	
 	# Update smooth transformations
 	PreviewManager.update_smooth_transforms(delta)

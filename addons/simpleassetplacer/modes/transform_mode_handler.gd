@@ -211,6 +211,9 @@ static func process_input(
 	# Handle position adjustments (WASD-style movement)
 	_process_position_input(camera, position_input, transform_state, settings)
 	
+	# Process scale input ONCE for the group (before applying to nodes)
+	_process_scale_for_group(scale_input, transform_state, settings)
+	
 	# Set half-step mode based on configured fine increment modifier
 	PositionManager.use_half_step = position_input.fine_increment_modifier_held
 	
@@ -235,11 +238,10 @@ static func process_input(
 	# Apply transformations to ALL nodes using offset-based system
 	_apply_group_transformation(transform_data, transform_state, new_center, original_center, settings, rotation_applied)
 	
-	# Handle transform confirmation
+	# Handle transform confirmation - return true to signal coordinator to exit with confirmation
 	if position_input.confirm_action:
-		# Signal to coordinator that we want to exit with confirmation
-		# This is handled by the coordinator
-		pass
+		# Return special value to signal confirmation
+		transform_data["_confirm_exit"] = true
 	
 	# Update overlays with current state (use first node as reference)
 	if target_nodes.size() > 0 and target_nodes[0]:
@@ -351,6 +353,35 @@ static func _process_position_input(
 	# Handle position reset
 	if position_input.reset_position_pressed:
 		PositionManager.reset_position(transform_state)
+
+static func _process_scale_for_group(
+	scale_input: Dictionary,
+	transform_state: TransformState,
+	settings: Dictionary
+) -> void:
+	"""Process scale input for the entire group (once per frame)
+	
+	Args:
+		scale_input: Scale input dictionary from InputHandler
+		transform_state: Transform state to modify
+		settings: Settings dictionary
+	"""
+	# Determine which increment to use based on modifiers
+	var scale_step: float
+	if scale_input.large_increment_modifier_held:
+		scale_step = settings.get("large_scale_increment", 0.5)
+	elif scale_input.fine_increment_modifier_held:
+		scale_step = settings.get("fine_scale_increment", 0.01)
+	else:
+		scale_step = settings.get("scale_increment", 0.1)
+	
+	# Update the scale multiplier in transform_state
+	if scale_input.up_pressed:
+		ScaleManager.increase_scale(transform_state, scale_step)
+	elif scale_input.down_pressed:
+		ScaleManager.decrease_scale(transform_state, scale_step)
+	elif scale_input.reset_pressed:
+		ScaleManager.reset_scale(transform_state)
 
 static func _process_rotation_for_group(
 	rotation_input: Dictionary,
@@ -486,7 +517,7 @@ static func _apply_scale_to_node(
 	original_scale: Vector3,
 	settings: Dictionary
 ) -> void:
-	"""Apply scale to a single node
+	"""Apply the current scale multiplier to a single node
 	
 	Args:
 		node: The node to scale
@@ -494,26 +525,9 @@ static func _apply_scale_to_node(
 		original_scale: Original scale of the node
 		settings: Settings dictionary
 	"""
-	var scale_input = InputHandler.get_scale_input()
-	
-	# Determine which increment to use based on modifiers
-	var scale_step: float
-	if scale_input.large_increment_modifier_held:
-		scale_step = settings.get("large_scale_increment", 0.5)
-	elif scale_input.fine_increment_modifier_held:
-		scale_step = settings.get("fine_scale_increment", 0.01)
-	else:
-		scale_step = settings.get("scale_increment", 0.1)
-	
-	if scale_input.up_pressed:
-		ScaleManager.increase_scale(transform_state, scale_step)
-		ScaleManager.apply_uniform_scale_to_node(transform_state, node, original_scale)
-	elif scale_input.down_pressed:
-		ScaleManager.decrease_scale(transform_state, scale_step)
-		ScaleManager.apply_uniform_scale_to_node(transform_state, node, original_scale)
-	elif scale_input.reset_pressed:
-		ScaleManager.reset_scale(transform_state)
-		ScaleManager.apply_uniform_scale_to_node(transform_state, node, original_scale)
+	# Simply apply the current scale multiplier to the node
+	# The scale multiplier has already been updated by _process_scale_for_group()
+	ScaleManager.apply_uniform_scale_to_node(transform_state, node, original_scale)
 
 ## STATE HELPERS
 

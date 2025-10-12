@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3 uid="uid://repnqsnpqatg"]
+[gd_scene load_steps=11 format=3 uid="uid://repnqsnpqatg"]
 
 [ext_resource type="PackedScene" uid="uid://bi526m4rgyylo" path="res://sample/building_a.tscn" id="1_m0rpm"]
 [ext_resource type="PackedScene" uid="uid://bs7orqq2mvo0n" path="res://sample/building_b.tscn" id="2_c6xj6"]
@@ -7,6 +7,8 @@
 [ext_resource type="Texture2D" uid="uid://14lix33xubj1" path="res://sample/textures/rocky_terrain/rocky_terrain_02_diff_1k.jpg" id="5_6bw2v"]
 [ext_resource type="PackedScene" uid="uid://c14fvskvwnirm" path="res://sample/building_d.tscn" id="6_kem5a"]
 [ext_resource type="PackedScene" uid="uid://b1j3bv70o8u0f" path="res://sample/assets/kenny_retro-medival-kit/barrels.glb" id="7_gxmxl"]
+[ext_resource type="PackedScene" uid="uid://80gjxvicjoio" path="res://sample/assets/kenny_retro-medival-kit/detail-crate.glb" id="8_884kg"]
+[ext_resource type="PackedScene" uid="uid://bbcojnjnk0214" path="res://sample/assets/kenny_retro-medival-kit/overhang-round-railing.glb" id="9_d4o4o"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kem5a"]
 albedo_texture = ExtResource("5_6bw2v")
@@ -40,10 +42,25 @@ transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 3, -
 transform = Transform3D(7.549784e-08, 0, -0.9999991, 0, 1, 0, 0.9999991, 0, 7.549784e-08, 3, 1.4305115e-06, 1)
 
 [node name="tower-top" parent="." instance=ExtResource("4_c6xj6")]
-transform = Transform3D(-1.955048e-07, 5.1815834e-07, 1.2, 9.7752405e-08, 1.2, -5.1815834e-07, -1.2, 9.775232e-08, -1.9550482e-07, 0, -0.039298058, -3)
+transform = Transform3D(-1.9550478e-07, 6.2179004e-07, 1.2, 9.7752405e-08, 1.2, -6.2179004e-07, -1.2, 9.7752306e-08, -1.9550482e-07, 0, 0, -3)
 
 [node name="building_d" parent="." instance=ExtResource("6_kem5a")]
 transform = Transform3D(-1, 0, -1.509958e-07, 0, 1, 0, 1.509958e-07, 0, -1, -4, -0.10000048, -2)
 
-[node name="barrels" type="Node3D" parent="." instance=ExtResource("7_gxmxl")]
+[node name="barrels" parent="." instance=ExtResource("7_gxmxl")]
 transform = Transform3D(1, 6.500875e-06, 5.960465e-07, -6.500875e-06, 1, 7.2849473e-09, -5.9604645e-07, -7.288822e-09, 1, 0, 0, -5)
+
+[node name="detail-crate" type="Node3D" parent="." instance=ExtResource("8_884kg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 0, -5.8)
+
+[node name="detail-crate_2" type="Node3D" parent="." instance=ExtResource("8_884kg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, -6.5)
+
+[node name="detail-crate_3" type="Node3D" parent="." instance=ExtResource("8_884kg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -6)
+
+[node name="detail-crate_4" type="Node3D" parent="." instance=ExtResource("8_884kg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 0.3, -5.8)
+
+[node name="overhang-round-railing" type="Node3D" parent="." instance=ExtResource("9_d4o4o")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.001372, -0.039298326, -6.999619)

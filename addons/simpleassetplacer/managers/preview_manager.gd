@@ -29,6 +29,7 @@ DEPENDS ON: Godot scene system, material system, resource loading, SmoothTransfo
 
 # Import smooth transform system
 const SmoothTransformManager = preload("res://addons/simpleassetplacer/core/smooth_transform_manager.gd")
+const NodeUtils = preload("res://addons/simpleassetplacer/utils/node_utils.gd")
 
 # Preview state
 static var preview_mesh: Node3D = null
@@ -166,21 +167,21 @@ static func _apply_preview_transparency_to_children(node: Node) -> void:
 static func update_preview_position(position: Vector3) -> void:
 	"""Update preview position (with optional smoothing)"""
 	current_position = position
-	if preview_mesh and is_instance_valid(preview_mesh) and preview_mesh.is_inside_tree():
+	if NodeUtils.is_valid_and_in_tree(preview_mesh):
 		# Always delegate to SmoothTransformManager - it handles enabled/disabled state
 		SmoothTransformManager.set_target_position(preview_mesh, position)
 
 static func update_preview_rotation(rotation: Vector3) -> void:
 	"""Update preview rotation (with optional smoothing)"""
 	current_rotation = rotation
-	if preview_mesh and is_instance_valid(preview_mesh) and preview_mesh.is_inside_tree():
+	if NodeUtils.is_valid_and_in_tree(preview_mesh):
 		# Always delegate to SmoothTransformManager - it handles enabled/disabled state
 		SmoothTransformManager.set_target_rotation(preview_mesh, rotation)
 
 static func update_preview_scale(scale: Vector3) -> void:
 	"""Update preview scale (with optional smoothing)"""
 	current_scale = scale
-	if preview_mesh and is_instance_valid(preview_mesh) and preview_mesh.is_inside_tree():
+	if NodeUtils.is_valid_and_in_tree(preview_mesh):
 		# Always delegate to SmoothTransformManager - it handles enabled/disabled state
 		SmoothTransformManager.set_target_scale(preview_mesh, scale)
 
@@ -190,7 +191,7 @@ static func update_preview_transform(position: Vector3, rotation: Vector3, scale
 	current_rotation = rotation
 	current_scale = scale
 	
-	if preview_mesh and is_instance_valid(preview_mesh) and preview_mesh.is_inside_tree():
+	if NodeUtils.is_valid_and_in_tree(preview_mesh):
 		# Always delegate to SmoothTransformManager - it handles enabled/disabled state
 		SmoothTransformManager.set_target_transform(preview_mesh, position, rotation, scale)
 
@@ -237,8 +238,7 @@ static func get_preview_transform() -> Transform3D:
 
 static func set_preview_visibility(visible: bool) -> void:
 	"""Set preview visibility"""
-	if preview_mesh and is_instance_valid(preview_mesh):
-		preview_mesh.visible = visible
+	NodeUtils.safe_set_visible(preview_mesh, visible)
 
 static func set_preview_opacity(opacity: float) -> void:
 	"""Set preview opacity"""
@@ -262,11 +262,10 @@ static func set_preview_color(color: Color) -> void:
 
 static func cleanup_preview() -> void:
 	"""Clean up the current preview"""
-	if preview_mesh and is_instance_valid(preview_mesh):
+	if NodeUtils.is_valid(preview_mesh):
 		# Unregister from smooth transform manager
 		SmoothTransformManager.unregister_object(preview_mesh)
-		preview_mesh.queue_free()
-		preview_mesh = null
+		preview_mesh = NodeUtils.cleanup_and_null(preview_mesh)
 		PluginLogger.debug("PreviewManager", "Cleaned up preview")
 
 ## Configuration

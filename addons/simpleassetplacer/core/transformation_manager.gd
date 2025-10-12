@@ -29,6 +29,7 @@ DELEGATES TO: InputHandler, PositionManager, OverlayManager, RotationManager, Sc
 # Import utilities
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
 const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
+const NodeUtils = preload("res://addons/simpleassetplacer/utils/node_utils.gd")
 
 # Import specialized managers
 const InputHandler = preload("res://addons/simpleassetplacer/managers/input_handler.gd")
@@ -171,7 +172,7 @@ static func start_transform_mode(target_nodes, dock_instance = null):
 	# Filter to only valid Node3D objects
 	var valid_nodes = []
 	for node in target_nodes:
-		if node and is_instance_valid(node) and node is Node3D:
+		if NodeUtils.validate_node3d(node):
 			valid_nodes.append(node)
 	
 	if valid_nodes.is_empty():
@@ -363,7 +364,7 @@ static func _update_grid_overlay():
 			var target_nodes = transform_data.get("target_nodes", [])
 			if not target_nodes.is_empty():
 				for node in target_nodes:
-					if node and is_instance_valid(node) and node.is_inside_tree():
+					if NodeUtils.is_valid_and_in_tree(node):
 						center += node.global_position
 				center /= target_nodes.size()
 		
@@ -554,7 +555,7 @@ static func _process_placement_input(camera: Camera3D):
 	
 	# IMPORTANT: Exclude preview mesh from collision detection to prevent self-collision
 	var exclude_nodes = []
-	if PreviewManager.preview_mesh and is_instance_valid(PreviewManager.preview_mesh):
+	if NodeUtils.is_valid(PreviewManager.preview_mesh):
 		exclude_nodes.append(PreviewManager.preview_mesh)
 	
 	var world_pos = PositionManager.update_position_from_mouse(transform_state, camera, mouse_pos, 1, true, exclude_nodes)

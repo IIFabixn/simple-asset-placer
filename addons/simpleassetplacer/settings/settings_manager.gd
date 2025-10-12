@@ -301,6 +301,97 @@ static func set_key_binding(action_name: String, key: String) -> void:
 
 ## Validation
 
+static func validate_setting(key: String, value: Variant) -> Dictionary:
+	"""
+	Validate a single setting value.
+	
+	Returns: {valid: bool, error: String, clamped_value: Variant}
+	- valid: Whether the value is acceptable
+	- error: Human-readable error message (empty if valid)
+	- clamped_value: Value clamped to valid range (if applicable)
+	"""
+	var result = {"valid": true, "error": "", "clamped_value": value}
+	
+	# Numeric range validation
+	match key:
+		"height_step_size", "position_increment":
+			if value is float or value is int:
+				if value <= 0.0:
+					result["valid"] = false
+					result["error"] = "%s must be greater than 0 (got %s)" % [key, str(value)]
+					result["clamped_value"] = 0.1  # Safe minimum
+		
+		"rotation_increment":
+			if value is float or value is int:
+				if value <= 0.0:
+					result["valid"] = false
+					result["error"] = "rotation_increment must be greater than 0 (got %s)" % str(value)
+					result["clamped_value"] = 1.0  # Safe minimum
+		
+		"scale_increment":
+			if value is float or value is int:
+				if value <= 0.0:
+					result["valid"] = false
+					result["error"] = "scale_increment must be greater than 0 (got %s)" % str(value)
+					result["clamped_value"] = 0.1  # Safe minimum
+		
+		"grid_size", "snap_step":
+			if value is float or value is int:
+				if value <= 0.0:
+					result["valid"] = false
+					result["error"] = "%s must be greater than 0 (got %s)" % [key, str(value)]
+					result["clamped_value"] = 1.0  # Safe default
+		
+		"preview_opacity":
+			if value is float or value is int:
+				if value < 0.0 or value > 1.0:
+					result["valid"] = false
+					result["error"] = "preview_opacity must be between 0.0 and 1.0 (got %s)" % str(value)
+					result["clamped_value"] = clampf(value, 0.0, 1.0)
+		
+		"smooth_transform_speed":
+			if value is float or value is int:
+				if value <= 0.0:
+					result["valid"] = false
+					result["error"] = "smooth_transform_speed must be greater than 0 (got %s)" % str(value)
+					result["clamped_value"] = 1.0  # Safe minimum
+				elif value > 100.0:
+					result["valid"] = false
+					result["error"] = "smooth_transform_speed must be 100 or less (got %s)" % str(value)
+					result["clamped_value"] = 100.0  # Safe maximum
+	
+	return result
+
+static func validate_and_set_plugin_setting(key: String, value: Variant, auto_clamp: bool = true) -> bool:
+	"""
+	Validate and set a plugin setting.
+	
+	Args:
+		key: Setting key
+		value: Setting value
+		auto_clamp: If true, automatically clamp invalid values to valid range
+	
+	Returns: True if value was valid or successfully clamped, False otherwise
+	"""
+	var validation = validate_setting(key, value)
+	
+	if validation["valid"]:
+		# Value is valid, set it directly
+		set_plugin_setting(key, value)
+		return true
+	else:
+		# Value is invalid
+		PluginLogger.warning(PluginConstants.COMPONENT_MAIN, "Settings validation: " + validation["error"])
+		
+		if auto_clamp:
+			# Use clamped value
+			PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Auto-clamping %s to %s" % [key, str(validation["clamped_value"])])
+			set_plugin_setting(key, validation["clamped_value"])
+			return true
+		else:
+			# Reject invalid value
+			return false
+
 static func validate_settings() -> bool:
 	"""Validate current settings (check for conflicts, invalid values, etc.)"""
 	var errors: Array[String] = []
@@ -336,14 +427,42 @@ static func validate_settings() -> bool:
 			else:
 				key_bindings[key] = action
 	
-	# Validate numeric ranges
-	var opacity = settings.get("preview_opacity", 0.6)
-	if opacity < 0.0 or opacity > 1.0:
-		errors.append("Preview opacity must be between 0.0 and 1.0")
+	# Validate numeric ranges using new validation helpers
+	var numeric_settings = [
+		"height_step_size",
+		"rotation_increment",
+		"scale_increment",
+		"position_increment",
+		"grid_size",
+		"snap_step",
+		"preview_opacity",
+		"smooth_transform_speed"
+	]
 	
-	var grid_size = settings.get("grid_size", 1.0)
-	if grid_size <= 0.0:
-		errors.append("Grid size must be positive")
+	for setting_key in numeric_settings:
+		if settings.has(setting_key):
+			var validation = validate_setting(setting_key, settings[setting_key])
+			if not validation["valid"]:
+				errors.append(validation["error"])
+	
+	# Validate boolean settings exist and are boolean type
+	var boolean_settings = [
+		"snap_enabled",
+		"snap_to_grid",
+		"randomize_rotation",
+		"randomize_scale",
+		"show_grid",
+		"show_overlay",
+		"use_surface_normal",
+		"auto_select_placed",
+		"smooth_transforms"
+	]
+	
+	for setting_key in boolean_settings:
+		if settings.has(setting_key):
+			var value = settings[setting_key]
+			if not (value is bool):
+				errors.append("%s must be a boolean (got %s)" % [setting_key, type_string(typeof(value))])
 	
 	# Log errors
 	if errors.size() > 0:

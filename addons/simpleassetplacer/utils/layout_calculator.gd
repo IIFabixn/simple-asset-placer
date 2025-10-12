@@ -22,6 +22,16 @@ ARCHITECTURE POSITION: Pure calculation utility with no state
 USED BY: AssetPlacerDock, ModelLibraryBrowser, MeshLibraryBrowser
 """
 
+## Thumbnail Size Constants
+
+const THUMBNAIL_SIZE_MIN: int = 48       # Minimum viable thumbnail size
+const THUMBNAIL_SIZE_SMALL: int = 64     # Compact view (4-5 columns in typical dock)
+const THUMBNAIL_SIZE_MEDIUM: int = 80    # Balanced view (3-4 columns)
+const THUMBNAIL_SIZE_LARGE: int = 96     # Comfortable view (2-3 columns)
+const THUMBNAIL_SIZE_MAX: int = 112      # Maximum size for detail view
+
+const THUMBNAIL_SIZE_DEFAULT: int = THUMBNAIL_SIZE_SMALL  # Default starting size
+
 ## Grid Layout Calculations
 
 static func calculate_grid_columns(available_width: float, item_size: int, item_spacing: int = 12, safety_margin: int = 20) -> int:
@@ -29,59 +39,76 @@ static func calculate_grid_columns(available_width: float, item_size: int, item_
 	
 	Args:
 		available_width: Total width available for the grid
-		item_size: Width of each grid item (thumbnail size)
+		item_size: Width of each grid item (base thumbnail size, margins added internally)
 		item_spacing: Spacing between items
 		safety_margin: Extra margin to prevent edge overflow
 	
 	Returns:
 		Number of columns that fit (minimum 1)
+	
+	Note: Automatically adds 16px for internal item margins to item_size
 	"""
 	if available_width <= 0 or item_size <= 0:
 		return 1
 	
-	var columns = 1
-	var item_width = item_size + 16  # Item size + internal margins
-	var total_width_needed = item_width
+	# Item width includes the base size + internal margins (padding, borders, etc.)
+	var item_width = item_size + 16
 	
-	# Keep adding columns while they fit (with safety margin)
-	while total_width_needed + item_spacing + item_width <= available_width - safety_margin:
-		columns += 1
-		total_width_needed += item_spacing + item_width
+	# Calculate how many items fit with spacing
+	# Formula: (available_width - safety_margin) / (item_width + spacing)
+	var usable_width = available_width - safety_margin
+	var total_item_width = item_width + item_spacing
 	
+	var columns = int(usable_width / total_item_width)
+	
+	# Ensure at least 1 column
 	return max(1, columns)
 
-static func calculate_responsive_thumbnail_size(dock_width: float, min_size: int = 64, max_size: int = 128) -> int:
+static func calculate_responsive_thumbnail_size(
+	dock_width: float, 
+	min_size: int = THUMBNAIL_SIZE_MIN, 
+	max_size: int = THUMBNAIL_SIZE_MAX
+) -> int:
 	"""Calculate responsive thumbnail size based on dock width
+	
+	Optimized for multi-column layouts with reasonable thumbnail sizes.
 	
 	Args:
 		dock_width: Width of the dock or container
-		min_size: Minimum thumbnail size
-		max_size: Maximum thumbnail size
+		min_size: Minimum thumbnail size (default: 48px)
+		max_size: Maximum thumbnail size (default: 112px)
 	
 	Returns:
 		Optimal thumbnail size within bounds
+	
+	Width Breakpoints:
+		< 250px  : 48px (minimum, 2-3 columns)
+		250-350px: 64px (small, 3-4 columns)
+		350-450px: 80px (medium, 3-4 columns)
+		450-550px: 96px (large, 3-4 columns)
+		> 550px  : 112px (max, 4-5 columns)
 	"""
 	if dock_width <= 0:
 		return min_size
 	
-	# Calculate based on width ranges
+	# Calculate based on optimized width ranges for multi-column layouts
 	var thumbnail_size = min_size
 	
-	if dock_width < 300:
-		# Very narrow: use minimum size
-		thumbnail_size = min_size
-	elif dock_width < 400:
-		# Narrow: use 80px
-		thumbnail_size = 80
-	elif dock_width < 500:
-		# Medium: use 96px
-		thumbnail_size = 96
-	elif dock_width < 600:
-		# Medium-wide: use 112px
-		thumbnail_size = 112
+	if dock_width < 250:
+		# Very narrow: minimum size for 2-3 columns
+		thumbnail_size = THUMBNAIL_SIZE_MIN
+	elif dock_width < 350:
+		# Narrow: small size for 3-4 columns
+		thumbnail_size = THUMBNAIL_SIZE_SMALL
+	elif dock_width < 450:
+		# Medium: balanced size for 3-4 columns
+		thumbnail_size = THUMBNAIL_SIZE_MEDIUM
+	elif dock_width < 550:
+		# Medium-wide: comfortable size for 3-4 columns
+		thumbnail_size = THUMBNAIL_SIZE_LARGE
 	else:
-		# Wide: use maximum size
-		thumbnail_size = max_size
+		# Wide: maximum size for 4-5 columns
+		thumbnail_size = THUMBNAIL_SIZE_MAX
 	
 	return clampi(thumbnail_size, min_size, max_size)
 
@@ -168,3 +195,61 @@ static func calculate_centered_offset(container_size: float, content_size: float
 		return 0.0
 	
 	return (container_size - content_size) / 2.0
+
+static func clamp_thumbnail_size(size: int, min_size: int = THUMBNAIL_SIZE_MIN, max_size: int = THUMBNAIL_SIZE_MAX) -> int:
+	"""Clamp thumbnail size to valid range
+	
+	Ensures thumbnail size stays within reasonable bounds for UI layout.
+	
+	Args:
+		size: Desired thumbnail size
+		min_size: Minimum allowed size (default: 48px)
+		max_size: Maximum allowed size (default: 112px)
+	
+	Returns:
+		Clamped thumbnail size
+	"""
+	return clampi(size, min_size, max_size)
+
+static func get_nearest_standard_thumbnail_size(size: int) -> int:
+	"""Get the nearest standard thumbnail size
+	
+	Snaps to standard sizes for consistent UI experience.
+	
+	Args:
+		size: Desired thumbnail size
+	
+	Returns:
+		Nearest standard thumbnail size (48, 64, 80, 96, or 112)
+	"""
+	var sizes = [THUMBNAIL_SIZE_MIN, THUMBNAIL_SIZE_SMALL, THUMBNAIL_SIZE_MEDIUM, THUMBNAIL_SIZE_LARGE, THUMBNAIL_SIZE_MAX]
+	var nearest = sizes[0]
+	var min_diff = abs(size - nearest)
+	
+	for standard_size in sizes:
+		var diff = abs(size - standard_size)
+		if diff < min_diff:
+			min_diff = diff
+			nearest = standard_size
+	
+	return nearest
+
+static func truncate_text(text: String, max_length: int = 20, ellipsis: String = "...") -> String:
+	"""Truncate text to maximum length with ellipsis
+	
+	Useful for preventing UI overflow from long category names or labels.
+	
+	Args:
+		text: Text to truncate
+		max_length: Maximum length before truncation (default: 20)
+		ellipsis: String to append when truncated (default: "...")
+	
+	Returns:
+		Truncated text with ellipsis if needed
+	"""
+	if text.length() <= max_length:
+		return text
+	
+	# Keep room for ellipsis
+	var truncate_at = max(1, max_length - ellipsis.length())
+	return text.substr(0, truncate_at) + ellipsis

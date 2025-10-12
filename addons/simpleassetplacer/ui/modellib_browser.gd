@@ -15,7 +15,7 @@ var filter_options: OptionButton
 var items_grid: GridContainer
 var scroll_container: ScrollContainer
 var discovered_assets: Array = []
-var thumbnail_size: int = 64
+var thumbnail_size: int = LayoutCalculator.THUMBNAIL_SIZE_DEFAULT  # Use optimized default size
 var selected_item: AssetThumbnailItem = null
 var current_search_text: String = ""
 var current_category_filter: String = ""
@@ -35,19 +35,20 @@ func setup_ui():
 	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(vbox)
 	
-	# Category filter with manage button
+	# Category filter with manage button (side-by-side)
 	var category_hbox = HBoxContainer.new()
 	vbox.add_child(category_hbox)
 	
 	category_filter = OptionButton.new()
 	category_filter.add_item("All Categories")
 	category_filter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	category_filter.clip_text = true  # Enable text clipping for long names
 	category_hbox.add_child(category_filter)
 	
 	manage_tags_button = Button.new()
 	manage_tags_button.text = "Manage Tags..."
 	manage_tags_button.tooltip_text = "Open advanced tag management dialog for bulk operations"
-	manage_tags_button.custom_minimum_size = Vector2(110, 0)
+	manage_tags_button.size_flags_horizontal = Control.SIZE_SHRINK_END  # Shrink to content
 	manage_tags_button.pressed.connect(_on_manage_tags_pressed)
 	category_hbox.add_child(manage_tags_button)
 	
@@ -91,8 +92,9 @@ func set_category_manager(manager: CategoryManager):
 func update_grid_columns(available_width: float):
 	if items_grid:
 		# Use LayoutCalculator for consistent grid calculation
-		var columns = LayoutCalculator.calculate_grid_columns(available_width - 48, thumbnail_size + 20, 12, 20)
-		items_grid.columns = min(columns, 3)  # Max 3 columns for model items
+		# Calculate columns based on actual thumbnail size (margins added internally)
+		var columns = LayoutCalculator.calculate_grid_columns(available_width - 48, thumbnail_size, 12, 20)
+		items_grid.columns = columns  # Fully adaptive - no artificial limit
 
 func update_thumbnail_size(new_size: int):
 	thumbnail_size = new_size
@@ -377,12 +379,17 @@ func populate_category_filter():
 		
 		for cat_info in folder_category_paths:
 			# Display full path, but store leaf name for matching
-			category_filter.add_item("  " + cat_info["display"])
+			var display_text = "  " + cat_info["display"]
+			category_filter.add_item(display_text)
+			var item_index = category_filter.get_item_count() - 1
 			# Store the leaf name in metadata for filtering
-			category_filter.set_item_metadata(category_filter.get_item_count() - 1, cat_info["match"])
+			category_filter.set_item_metadata(item_index, cat_info["match"])
+			# Add tooltip for long names to show full path
+			if display_text.length() > 25:
+				category_filter.set_item_tooltip(item_index, cat_info["display"])
 			# Check if this matches the last selected category
 			if cat_info["match"] == last_category:
-				last_category_index = category_filter.get_item_count() - 1
+				last_category_index = item_index
 	
 	# Get custom tags (only show tags that have at least one non-ignored asset)
 	var all_custom_tags = category_manager.get_all_custom_tags()
@@ -406,10 +413,15 @@ func populate_category_filter():
 		category_filter.set_item_disabled(category_filter.get_item_count() - 1, true)
 		
 		for tag in custom_tags:
-			category_filter.add_item("  " + tag)
+			var display_text = "  " + tag
+			category_filter.add_item(display_text)
+			var item_index = category_filter.get_item_count() - 1
+			# Add tooltip for long tag names
+			if display_text.length() > 25:
+				category_filter.set_item_tooltip(item_index, tag)
 			# Check if this matches the last selected category
 			if tag == last_category:
-				last_category_index = category_filter.get_item_count() - 1
+				last_category_index = item_index
 	
 	# Restore last category selection if found
 	if last_category_index > 0:

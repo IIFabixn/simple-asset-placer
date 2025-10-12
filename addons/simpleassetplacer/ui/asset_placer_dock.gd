@@ -31,7 +31,7 @@ var meshlib_browser: MeshLibraryBrowser
 var modellib_browser: ModelLibraryBrowser
 var placement_settings: PlacementSettings
 var settings_tab: Control
-var thumbnail_size: int = 64
+var thumbnail_size: int = LayoutCalculator.THUMBNAIL_SIZE_DEFAULT  # Use optimized default size
 
 # Asset Management
 var discovered_assets: Array = []
@@ -49,7 +49,7 @@ func _ready():
 	discover_assets()
 
 func setup_ui():
-	set_custom_minimum_size(Vector2(200, 400))
+	set_custom_minimum_size(Vector2(260, 400))  # Match browser minimum width for consistent layout
 	
 	# Use anchors and offsets to fill the entire available space
 	var main_margin = MarginContainer.new()

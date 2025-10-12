@@ -10,7 +10,7 @@ signal context_menu_requested(asset_item: AssetThumbnailItem, position: Vector2)
 var meshlib: MeshLibrary
 var item_id: int
 var asset_info: Dictionary
-var thumbnail_size: int = 64
+var thumbnail_size: int = LayoutCalculator.THUMBNAIL_SIZE_DEFAULT  # Use optimized default size
 var is_selected: bool = false
 var thumbnail_rect: TextureRect
 var label: Label
@@ -20,7 +20,7 @@ var ui_setup_complete: bool = false
 var category_manager = null
 
 # Constructor for MeshLibrary items
-func _init(p_meshlib: MeshLibrary = null, p_item_id: int = -1, p_thumbnail_size: int = 64):
+func _init(p_meshlib: MeshLibrary = null, p_item_id: int = -1, p_thumbnail_size: int = LayoutCalculator.THUMBNAIL_SIZE_DEFAULT):
 	if p_meshlib != null:
 		meshlib = p_meshlib
 		item_id = p_item_id
@@ -29,7 +29,7 @@ func _init(p_meshlib: MeshLibrary = null, p_item_id: int = -1, p_thumbnail_size:
 		setup_ui()
 
 # Alternative constructor for asset items
-static func create_for_asset(p_asset_info: Dictionary, p_thumbnail_size: int = 64) -> AssetThumbnailItem:
+static func create_for_asset(p_asset_info: Dictionary, p_thumbnail_size: int = LayoutCalculator.THUMBNAIL_SIZE_DEFAULT) -> AssetThumbnailItem:
 	var item = AssetThumbnailItem.new()
 	item.asset_info = p_asset_info
 	item.thumbnail_size = p_thumbnail_size

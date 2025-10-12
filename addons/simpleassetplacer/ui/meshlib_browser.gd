@@ -6,6 +6,7 @@ class_name MeshLibraryBrowser
 const AssetThumbnailItem = preload("res://addons/simpleassetplacer/ui/asset_thumbnail_item.gd")
 const CategoryManager = preload("res://addons/simpleassetplacer/managers/category_manager.gd")
 const TagManagementDialog = preload("res://addons/simpleassetplacer/ui/tag_management_dialog.gd")
+const LayoutCalculator = preload("res://addons/simpleassetplacer/utils/layout_calculator.gd")
 
 signal meshlib_item_selected(meshlib: MeshLibrary, item_id: int)
 
@@ -81,10 +82,9 @@ func set_category_manager(manager: CategoryManager):
 
 func update_grid_columns(available_width: float):
 	if items_grid:
-		# Calculate columns based on available width
-		var item_width = thumbnail_size + 36  # Thumbnail + padding + text + margins
-		var new_columns = max(1, int((available_width - 48) / item_width))
-		items_grid.columns = min(new_columns, 3)  # Max 3 columns for meshlib items
+		# Use LayoutCalculator for consistent grid calculation
+		var columns = LayoutCalculator.calculate_grid_columns(available_width - 48, thumbnail_size + 20, 12, 20)
+		items_grid.columns = min(columns, 3)  # Max 3 columns for meshlib items
 
 func update_thumbnail_size(new_size: int):
 	thumbnail_size = new_size

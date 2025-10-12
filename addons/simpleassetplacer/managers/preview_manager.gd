@@ -57,15 +57,15 @@ static func update_smooth_transforms(delta: float):
 
 static func start_preview_mesh(mesh: Mesh, settings: Dictionary = {}):
 	"""Start preview with a mesh"""
-	if not mesh:
-		PluginLogger.error("PreviewManager", "Cannot start preview - no mesh provided")
+	if not mesh or not is_instance_valid(mesh):
+		PluginLogger.error("PreviewManager", "Cannot start preview - invalid mesh provided")
 		return
 	
 	cleanup_preview()
 	
 	var current_scene = EditorInterface.get_edited_scene_root()
-	if not current_scene:
-		PluginLogger.error("PreviewManager", "No scene available for preview")
+	if not current_scene or not is_instance_valid(current_scene):
+		PluginLogger.error("PreviewManager", "No valid scene available for preview")
 		return
 	
 	# Create preview mesh instance
@@ -93,20 +93,23 @@ static func start_preview_mesh(mesh: Mesh, settings: Dictionary = {}):
 
 static func start_preview_asset(asset_path: String, settings: Dictionary = {}):
 	"""Start preview with an asset file"""
-	if asset_path == "":
-		PluginLogger.error("PreviewManager", "Cannot start preview - no asset path provided")
+	if asset_path == "" or not FileAccess.file_exists(asset_path):
+		PluginLogger.error("PreviewManager", "Cannot start preview - invalid asset path: " + asset_path)
 		return
 	
+	if not asset_path.begins_with("res://"):
+		PluginLogger.warning("PreviewManager", "Asset path should start with res://: " + asset_path)
+	
 	var asset = load(asset_path)
-	if not asset:
+	if not asset or not is_instance_valid(asset):
 		PluginLogger.error("PreviewManager", "Failed to load asset: " + asset_path)
 		return
 	
 	cleanup_preview()
 	
 	var current_scene = EditorInterface.get_edited_scene_root()
-	if not current_scene:
-		PluginLogger.error("PreviewManager", "No scene available for preview")
+	if not current_scene or not is_instance_valid(current_scene):
+		PluginLogger.error("PreviewManager", "No valid scene available for preview")
 		return
 	
 	var preview_node = null

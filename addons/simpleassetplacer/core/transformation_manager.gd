@@ -168,13 +168,14 @@ static func start_transform_mode(target_nodes, dock_instance = null):
 	if target_nodes.is_empty():
 		return
 	
-	# Filter to only Node3D objects
+	# Filter to only valid Node3D objects
 	var valid_nodes = []
 	for node in target_nodes:
-		if node is Node3D:
+		if node and is_instance_valid(node) and node is Node3D:
 			valid_nodes.append(node)
 	
 	if valid_nodes.is_empty():
+		PluginLogger.warning("TransformationManager", "No valid Node3D objects to transform")
 		return
 	
 	# Exit any existing mode first  
@@ -191,14 +192,22 @@ static func start_transform_mode(target_nodes, dock_instance = null):
 	# Store transform data for all nodes
 	var original_transforms = {}
 	for node in valid_nodes:
-		original_transforms[node] = node.transform
+		if is_instance_valid(node):
+			original_transforms[node] = node.transform
 	
 	# Calculate center position of all nodes for positioning reference
 	var center_pos = Vector3.ZERO
+	var node_count = 0
 	for node in valid_nodes:
-		if node.is_inside_tree():
+		if is_instance_valid(node) and node.is_inside_tree():
 			center_pos += node.global_position
-	center_pos /= valid_nodes.size()
+			node_count += 1
+	
+	if node_count == 0:
+		PluginLogger.error("TransformationManager", "No nodes in tree to transform")
+		return
+	
+	center_pos /= node_count
 	
 	# Calculate each node's offset from the original center (store once, use every frame)
 	var node_offsets = {}
@@ -402,11 +411,17 @@ static func _configure_smooth_transforms(settings_dict: Dictionary):
 
 static func process_frame_input(camera: Camera3D, input_settings: Dictionary = {}, delta: float = 1.0/60.0):
 	"""Process input for the current frame - coordinate with InputHandler"""
+	# Null check camera
+	if not camera or not is_instance_valid(camera):
+		return
+	
 	# Store current settings for TAB key and other operations
 	settings = input_settings
 	
 	# Get the 3D viewport for proper mouse coordinate conversion
 	var viewport_3d = EditorInterface.get_editor_viewport_3d(0)
+	if not viewport_3d:
+		return
 	
 	# Update input system with viewport context
 	InputHandler.update_input_state(input_settings, viewport_3d)

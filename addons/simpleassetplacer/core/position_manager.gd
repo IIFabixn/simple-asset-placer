@@ -63,8 +63,13 @@ static func update_position_from_mouse(state: TransformState, camera: Camera3D, 
 	Returns:
 		Calculated world position
 	"""
-	if not camera:
+	if not camera or not is_instance_valid(camera):
+		PluginLogger.warning("PositionManager", "Invalid camera reference")
 		return state.position
+	
+	if not state:
+		PluginLogger.error("PositionManager", "Invalid TransformState reference")
+		return Vector3.ZERO
 	
 	# Create ray from camera through mouse position
 	var from = camera.project_ray_origin(mouse_pos)
@@ -76,9 +81,10 @@ static func update_position_from_mouse(state: TransformState, camera: Camera3D, 
 	# Use strategy manager to calculate position with exclusions
 	var result: PlacementStrategy.PlacementResult = PlacementStrategyManager.calculate_position(from, to, exclude_config)
 	
-	# Check if we got a valid result
-	if result.position == Vector3.INF:
+	# Check if we got a valid result (null check added)
+	if not result or result.position == Vector3.INF:
 		# Invalid result - keep current position
+		PluginLogger.debug("PositionManager", "Invalid placement result, keeping current position")
 		return state.position
 	
 	var new_pos = result.position

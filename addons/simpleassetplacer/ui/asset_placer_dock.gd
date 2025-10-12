@@ -13,6 +13,7 @@ const PlacementSettings = preload("res://addons/simpleassetplacer/ui/placement_s
 const AssetThumbnailItem = preload("res://addons/simpleassetplacer/ui/asset_thumbnail_item.gd")
 const CategoryManager = preload("res://addons/simpleassetplacer/managers/category_manager.gd")
 const SettingsDefinition = preload("res://addons/simpleassetplacer/settings/settings_definition.gd")
+const LayoutCalculator = preload("res://addons/simpleassetplacer/utils/layout_calculator.gd")
 
 signal asset_selected(asset_path: String, mesh_resource: Resource, settings: Dictionary)
 signal meshlib_item_selected(meshlib: MeshLibrary, item_id: int, settings: Dictionary)
@@ -172,19 +173,7 @@ func _on_dock_resized():
 	# Adjust grid columns based on available width - fully adaptive
 	if grid_container:
 		var available_width = get_rect().size.x - 60  # Account for scroll margins
-		var item_width = thumbnail_size + 16  # AssetThumbnailItem width (thumbnail + margins)
-		var spacing = 12  # Grid separation - match grid_container settings
-		
-		# Calculate how many columns can fit with proper spacing
-		var columns_that_fit = 1
-		var total_width_needed = item_width
-		
-		# Keep adding columns while they fit (with 20px buffer for safety)
-		while total_width_needed + spacing + item_width <= available_width - 20:
-			columns_that_fit += 1
-			total_width_needed += spacing + item_width
-		
-		grid_container.columns = max(1, columns_that_fit)
+		grid_container.columns = LayoutCalculator.calculate_grid_columns(available_width, thumbnail_size)
 	
 	# Also update both browser grids
 	if meshlib_browser:
@@ -196,31 +185,8 @@ func update_responsive_sizes():
 	var dock_width = get_rect().size.x
 	var old_thumbnail_size = thumbnail_size
 	
-	# Calculate optimal thumbnail size within 64-128px range based on available space
-	var available_width = dock_width - 60  # Account for scroll margins
-	var grid_spacing = 12   # Space between grid items - match grid_container settings
-	
-	# Start with minimum size and see how many columns we can fit
-	var best_thumbnail_size = 64
-	var best_columns = 1
-	
-	# Test different thumbnail sizes to find the best fit
-	for test_size in range(64, 129, 8):  # Test in 8px increments from 64 to 128
-		var test_item_width = test_size + 16  # AssetThumbnailItem width calculation
-		var columns = 1
-		var total_width = test_item_width
-		
-		# Calculate how many columns fit with this thumbnail size (with 20px buffer)
-		while total_width + grid_spacing + test_item_width <= available_width - 20:
-			columns += 1
-			total_width += grid_spacing + test_item_width
-		
-		# Prefer more columns, but not at the expense of too-small thumbnails
-		if columns > best_columns or (columns == best_columns and test_size > best_thumbnail_size):
-			best_thumbnail_size = test_size
-			best_columns = columns
-	
-	thumbnail_size = clamp(best_thumbnail_size, 64, 128)
+	# Use LayoutCalculator for responsive thumbnail sizing
+	thumbnail_size = LayoutCalculator.calculate_responsive_thumbnail_size(dock_width)
 	
 	# Only refresh if size actually changed
 	if old_thumbnail_size != thumbnail_size:

@@ -81,6 +81,8 @@ static func initialize():
 	hidden_container.name = "ThumbnailGeneratorContainer"
 	
 	# Add to editor but in a way that's completely isolated
+	# Note: EditorInterface is acceptable here as this is a specialized thumbnail utility
+	# that needs direct editor access for viewport management
 	var main_screen = EditorInterface.get_editor_main_screen()
 	if not main_screen:
 		PluginLogger.error(PluginConstants.COMPONENT_THUMBNAIL, "Could not get editor main screen!")

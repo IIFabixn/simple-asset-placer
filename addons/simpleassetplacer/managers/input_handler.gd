@@ -1,10 +1,9 @@
 @tool
-extends InstanceManagerBase
+extends RefCounted
 
 class_name InputHandler
 
-# Import base class
-const InstanceManagerBase = preload("res://addons/simpleassetplacer/core/instance_manager_base.gd")
+const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
 
 """
 CENTRALIZED INPUT DETECTION SYSTEM
@@ -28,197 +27,120 @@ USED BY: TransformationManager for all input queries
 DEPENDS ON: User settings for key mappings, Godot Input system
 """
 
-# === SINGLETON INSTANCE ===
+# === SERVICE REGISTRY ===
 
-static var _instance: InputHandler = null
+var _services: ServiceRegistry
 
-static func _set_instance(instance: InstanceManagerBase) -> void:
-	_instance = instance as InputHandler
-
-static func _get_instance() -> InstanceManagerBase:
-	return _instance
-
-static func has_instance() -> bool:
-	return _instance != null and is_instance_valid(_instance)
+func _init(services: ServiceRegistry):
+	_services = services
 
 # === INSTANCE VARIABLES ===
 
 # Current frame input state (private instance storage)
-var __current_keys: Dictionary = {}
-var __current_mouse: Dictionary = {}
-var __current_actions: Dictionary = {}
-var __settings: Dictionary = {}
-var __previous_keys: Dictionary = {}
-var __previous_mouse: Dictionary = {}
-var __keys_buffer_a: Dictionary = {}
-var __keys_buffer_b: Dictionary = {}
-var __mouse_buffer_a: Dictionary = {}
-var __mouse_buffer_b: Dictionary = {}
-var __use_buffer_a: bool = true
-
-# === STATIC PROPERTIES (BACKWARD COMPATIBILITY) ===
-
-static var current_keys: Dictionary:
-	get: return _get_instance().__current_keys if has_instance() else {}
-
-static var current_mouse: Dictionary:
-	get: return _get_instance().__current_mouse if has_instance() else {}
-
-static var current_actions: Dictionary:
-	get: return _get_instance().__current_actions if has_instance() else {}
-
-static var settings: Dictionary:
-	get: return _get_instance().__settings if has_instance() else {}
-	set(value): if has_instance(): _get_instance().__settings = value
-
-static var previous_keys: Dictionary:
-	get: return _get_instance().__previous_keys if has_instance() else {}
-
-static var previous_mouse: Dictionary:
-	get: return _get_instance().__previous_mouse if has_instance() else {}
-
-static var _keys_buffer_a: Dictionary:
-	get: return _get_instance().__keys_buffer_a if has_instance() else {}
-
-static var _keys_buffer_b: Dictionary:
-	get: return _get_instance().__keys_buffer_b if has_instance() else {}
-
-static var _mouse_buffer_a: Dictionary:
-	get: return _get_instance().__mouse_buffer_a if has_instance() else {}
-
-static var _mouse_buffer_b: Dictionary:
-	get: return _get_instance().__mouse_buffer_b if has_instance() else {}
-
-static var _use_buffer_a: bool:
-	get: return _get_instance().__use_buffer_a if has_instance() else true
-	set(value): if has_instance(): _get_instance().__use_buffer_a = value
+var _current_keys: Dictionary = {}
+var _current_mouse: Dictionary = {}
+var _current_actions: Dictionary = {}
+var _settings: Dictionary = {}
+var _previous_keys: Dictionary = {}
+var _previous_mouse: Dictionary = {}
+var _keys_buffer_a: Dictionary = {}
+var _keys_buffer_b: Dictionary = {}
+var _mouse_buffer_a: Dictionary = {}
+var _mouse_buffer_b: Dictionary = {}
+var _use_buffer_a: bool = true
 
 # Additional instance variables (tracking state)
-var __key_press_times: Dictionary = {}
-var __key_tap_grace_period: float = 0.15
-var __pending_taps: Dictionary = {}
-var __active_repeat_key: String = ""
-var __active_repeat_modifiers: Dictionary = {}
-var __wheel_interrupted_keys: Dictionary = {}
-var __repeat_intervals: Dictionary = {
+var _key_press_times: Dictionary = {}
+var _key_tap_grace_period: float = 0.15
+var _pending_taps: Dictionary = {}
+var _active_repeat_key: String = ""
+var _active_repeat_modifiers: Dictionary = {}
+var _wheel_interrupted_keys: Dictionary = {}
+var _repeat_intervals: Dictionary = {
 	"rotation": 0.1,
 	"scale": 0.08,
 	"height": 0.08,
 	"position": 0.05
 }
-var __cached_viewport: SubViewport = null
-
-# Static properties for backward compatibility (tracking state)
-static var key_press_times: Dictionary:
-	get: return _get_instance().__key_press_times if has_instance() else {}
-
-static var key_tap_grace_period: float:
-	get: return _get_instance().__key_tap_grace_period if has_instance() else 0.15
-
-static var pending_taps: Dictionary:
-	get: return _get_instance().__pending_taps if has_instance() else {}
-
-static var active_repeat_key: String:
-	get: return _get_instance().__active_repeat_key if has_instance() else ""
-	set(value): if has_instance(): _get_instance().__active_repeat_key = value
-
-static var active_repeat_modifiers: Dictionary:
-	get: return _get_instance().__active_repeat_modifiers if has_instance() else {}
-
-static var wheel_interrupted_keys: Dictionary:
-	get: return _get_instance().__wheel_interrupted_keys if has_instance() else {}
-
-static var repeat_intervals: Dictionary:
-	get: return _get_instance().__repeat_intervals if has_instance() else {"rotation": 0.1, "scale": 0.08, "height": 0.08, "position": 0.05}
-
-static var cached_viewport: SubViewport:
-	get: return _get_instance().__cached_viewport if has_instance() else null
-	set(value): if has_instance(): _get_instance().__cached_viewport = value
+var _cached_viewport: SubViewport = null
 
 ## Core Input Polling
 
-static func update_input_state(input_settings: Dictionary = {}, viewport: SubViewport = null):
+func update_input_state(input_settings: Dictionary = {}, viewport: SubViewport = null):
 	"""Update all input state for the current frame. Call this once per frame."""
-	if not has_instance():
-		push_error("InputHandler.update_input_state() called but no instance exists!")
-		return
-	
-	# Get the instance once for direct access (avoid repeated getter calls)
-	var inst = _get_instance() as InputHandler
-	
-	inst.__settings = input_settings
+	_settings = input_settings
 	
 	# Store viewport for mouse position calculations
 	if viewport:
-		inst.__cached_viewport = viewport
+		_cached_viewport = viewport
 	
 	# Swap buffers instead of duplicate() - avoids per-frame allocation
 	# This optimization reduces GC pressure in hot path (called every frame)
-	if inst.__use_buffer_a:
+	if _use_buffer_a:
 		# A is current, B becomes previous
-		inst.__previous_keys = inst.__keys_buffer_a
-		inst.__previous_mouse = inst.__mouse_buffer_a
+		_previous_keys = _keys_buffer_a
+		_previous_mouse = _mouse_buffer_a
 		# B becomes current
-		inst.__current_keys = inst.__keys_buffer_b
-		inst.__current_mouse = inst.__mouse_buffer_b
+		_current_keys = _keys_buffer_b
+		_current_mouse = _mouse_buffer_b
 	else:
 		# B is current, A becomes previous
-		inst.__previous_keys = inst.__keys_buffer_b
-		inst.__previous_mouse = inst.__mouse_buffer_b
+		_previous_keys = _keys_buffer_b
+		_previous_mouse = _mouse_buffer_b
 		# A becomes current
-		inst.__current_keys = inst.__keys_buffer_a
-		inst.__current_mouse = inst.__mouse_buffer_a
+		_current_keys = _keys_buffer_a
+		_current_mouse = _mouse_buffer_a
 	
 	# Toggle buffer selection for next frame
-	inst.__use_buffer_a = not inst.__use_buffer_a
+	_use_buffer_a = not _use_buffer_a
 	
 	# Clear current state (reusing buffer)
-	inst.__current_keys.clear()
-	inst.__current_mouse.clear() 
-	inst.__current_actions.clear()
+	_current_keys.clear()
+	_current_mouse.clear() 
+	_current_actions.clear()
 	
 	# Update key states
 	_update_key_states()
 	_update_mouse_states()
 	_update_action_states()
 
-static func _update_key_states():
+func _update_key_states():
 	"""Update all key states based on current settings"""
 	var current_time = Time.get_ticks_msec() / 1000.0  # Convert to seconds
 	
 	# Core navigation keys - use universal modifier support
-	current_keys["tab"] = _check_key_with_modifiers(settings.get("transform_mode_key", "TAB"))
-	current_keys["confirm"] = _check_key_with_modifiers(settings.get("confirm_action_key", "ENTER"))
-	current_keys["escape"] = Input.is_key_pressed(KEY_ESCAPE)
-	current_keys["shift"] = Input.is_key_pressed(KEY_SHIFT)
-	current_keys["ctrl"] = Input.is_key_pressed(KEY_CTRL)
-	current_keys["alt"] = Input.is_key_pressed(KEY_ALT)
+	_current_keys["tab"] = _check_key_with_modifiers(_settings.get("transform_mode_key", "TAB"))
+	_current_keys["confirm"] = _check_key_with_modifiers(_settings.get("confirm_action_key", "ENTER"))
+	_current_keys["escape"] = Input.is_key_pressed(KEY_ESCAPE)
+	_current_keys["shift"] = Input.is_key_pressed(KEY_SHIFT)
+	_current_keys["ctrl"] = Input.is_key_pressed(KEY_CTRL)
+	_current_keys["alt"] = Input.is_key_pressed(KEY_ALT)
 	
 	# Configurable modifier keys
-	current_keys["reverse_modifier"] = _check_key_with_modifiers(settings.get("reverse_modifier_key", "SHIFT"))
-	current_keys["large_increment_modifier"] = _check_key_with_modifiers(settings.get("large_increment_modifier_key", "ALT"))
-	current_keys["fine_increment_modifier"] = _check_key_with_modifiers(settings.get("fine_increment_modifier_key", "CTRL"))
+	_current_keys["reverse_modifier"] = _check_key_with_modifiers(_settings.get("reverse_modifier_key", "SHIFT"))
+	_current_keys["large_increment_modifier"] = _check_key_with_modifiers(_settings.get("large_increment_modifier_key", "ALT"))
+	_current_keys["fine_increment_modifier"] = _check_key_with_modifiers(_settings.get("fine_increment_modifier_key", "CTRL"))
 	
 	# Settings-based keys - use universal modifier support
-	current_keys["cancel"] = _check_key_with_modifiers(settings.get("cancel_key", "ESCAPE"))
-	var height_up_key = settings.get("height_up_key", "Q")
-	var height_down_key = settings.get("height_down_key", "E")
-	var reset_height_key = settings.get("reset_height_key", "R")
-	current_keys["height_up"] = _check_key_with_modifiers(height_up_key)
-	current_keys["height_down"] = _check_key_with_modifiers(height_down_key)
-	current_keys["reset_height"] = _check_key_with_modifiers(reset_height_key)
+	_current_keys["cancel"] = _check_key_with_modifiers(_settings.get("cancel_key", "ESCAPE"))
+	var height_up_key = _settings.get("height_up_key", "Q")
+	var height_down_key = _settings.get("height_down_key", "E")
+	var reset_height_key = _settings.get("reset_height_key", "R")
+	_current_keys["height_up"] = _check_key_with_modifiers(height_up_key)
+	_current_keys["height_down"] = _check_key_with_modifiers(height_down_key)
+	_current_keys["reset_height"] = _check_key_with_modifiers(reset_height_key)
 	
 	# Position adjustment keys - use universal modifier support
-	var position_left_key = settings.get("position_left_key", "A")
-	var position_right_key = settings.get("position_right_key", "D")
-	var position_forward_key = settings.get("position_forward_key", "W")
-	var position_backward_key = settings.get("position_backward_key", "S")
-	var reset_position_key = settings.get("reset_position_key", "G")
-	current_keys["position_left"] = _check_key_with_modifiers(position_left_key)
-	current_keys["position_right"] = _check_key_with_modifiers(position_right_key)
-	current_keys["position_forward"] = _check_key_with_modifiers(position_forward_key)
-	current_keys["position_backward"] = _check_key_with_modifiers(position_backward_key)
-	current_keys["reset_position"] = _check_key_with_modifiers(reset_position_key)
+	var position_left_key = _settings.get("position_left_key", "A")
+	var position_right_key = _settings.get("position_right_key", "D")
+	var position_forward_key = _settings.get("position_forward_key", "W")
+	var position_backward_key = _settings.get("position_backward_key", "S")
+	var reset_position_key = _settings.get("reset_position_key", "G")
+	_current_keys["position_left"] = _check_key_with_modifiers(position_left_key)
+	_current_keys["position_right"] = _check_key_with_modifiers(position_right_key)
+	_current_keys["position_forward"] = _check_key_with_modifiers(position_forward_key)
+	_current_keys["position_backward"] = _check_key_with_modifiers(position_backward_key)
+	_current_keys["reset_position"] = _check_key_with_modifiers(reset_position_key)
 	
 	# Track key press times for grace period
 	_track_key_press_time("height_up", current_time)
@@ -231,10 +153,10 @@ static func _update_key_states():
 	_track_key_press_time("reset_position", current_time)
 	
 	# Rotation keys - use universal modifier support
-	current_keys["rotate_x"] = _check_key_with_modifiers(settings.get("rotate_x_key", "X"))
-	current_keys["rotate_y"] = _check_key_with_modifiers(settings.get("rotate_y_key", "Y"))
-	current_keys["rotate_z"] = _check_key_with_modifiers(settings.get("rotate_z_key", "Z"))
-	current_keys["reset_rotation"] = _check_key_with_modifiers(settings.get("reset_rotation_key", "T"))
+	_current_keys["rotate_x"] = _check_key_with_modifiers(_settings.get("rotate_x_key", "X"))
+	_current_keys["rotate_y"] = _check_key_with_modifiers(_settings.get("rotate_y_key", "Y"))
+	_current_keys["rotate_z"] = _check_key_with_modifiers(_settings.get("rotate_z_key", "Z"))
+	_current_keys["reset_rotation"] = _check_key_with_modifiers(_settings.get("reset_rotation_key", "T"))
 	
 	# Track rotation key press times for grace period
 	_track_key_press_time("rotate_x", current_time)
@@ -242,33 +164,33 @@ static func _update_key_states():
 	_track_key_press_time("rotate_z", current_time)
 	
 	# Scale keys - use universal modifier support
-	var scale_up_key = settings.get("scale_up_key", "PAGE_UP")
-	var scale_down_key = settings.get("scale_down_key", "PAGE_DOWN") 
-	var scale_reset_key = settings.get("scale_reset_key", "HOME")
-	current_keys["scale_up"] = _check_key_with_modifiers(scale_up_key)
-	current_keys["scale_down"] = _check_key_with_modifiers(scale_down_key)
-	current_keys["reset_scale"] = _check_key_with_modifiers(scale_reset_key)
+	var scale_up_key = _settings.get("scale_up_key", "PAGE_UP")
+	var scale_down_key = _settings.get("scale_down_key", "PAGE_DOWN") 
+	var scale_reset_key = _settings.get("scale_reset_key", "HOME")
+	_current_keys["scale_up"] = _check_key_with_modifiers(scale_up_key)
+	_current_keys["scale_down"] = _check_key_with_modifiers(scale_down_key)
+	_current_keys["reset_scale"] = _check_key_with_modifiers(scale_reset_key)
 	
 	# Track scale key press times for grace period
 	_track_key_press_time("scale_up", current_time)
 	_track_key_press_time("scale_down", current_time)
 	
 	# Asset cycling keys - support both direct key and modifier combinations
-	var cycle_next_key = settings.get("cycle_next_asset_key", "BRACKETRIGHT")
-	var cycle_prev_key = settings.get("cycle_previous_asset_key", "BRACKETLEFT")
-	current_keys["cycle_next_asset"] = _check_key_with_modifiers(cycle_next_key)
-	current_keys["cycle_previous_asset"] = _check_key_with_modifiers(cycle_prev_key)
+	var cycle_next_key = _settings.get("cycle_next_asset_key", "BRACKETRIGHT")
+	var cycle_prev_key = _settings.get("cycle_previous_asset_key", "BRACKETLEFT")
+	_current_keys["cycle_next_asset"] = _check_key_with_modifiers(cycle_next_key)
+	_current_keys["cycle_previous_asset"] = _check_key_with_modifiers(cycle_prev_key)
 	
 	# Placement mode cycling key
-	var cycle_mode_key = settings.get("cycle_placement_mode_key", "P")
-	current_keys["cycle_placement_mode"] = _check_key_with_modifiers(cycle_mode_key)
+	var cycle_mode_key = _settings.get("cycle_placement_mode_key", "P")
+	_current_keys["cycle_placement_mode"] = _check_key_with_modifiers(cycle_mode_key)
 	
 	# Track cycling key press times for tap vs hold detection
 	_track_key_press_time("cycle_next_asset", current_time)
 	_track_key_press_time("cycle_previous_asset", current_time)
 	_track_key_press_time("cycle_placement_mode", current_time)
 
-static func _check_key_with_modifiers(key_string: String) -> bool:
+func _check_key_with_modifiers(key_string: String) -> bool:
 	"""Check if key is pressed, supporting both direct keys and modifier combinations
 	Handles cases like 'BRACKETLEFT', 'CTRL+ALT+8', or pure modifiers like 'ALT', 'CTRL'
 	
@@ -356,61 +278,61 @@ static func _check_key_with_modifiers(key_string: String) -> bool:
 			return Input.is_key_pressed(keycode)
 		return false
 
-static func _track_key_press_time(key_name: String, current_time: float):
+func _track_key_press_time(key_name: String, current_time: float):
 	"""Track when a key was just pressed for tap vs hold detection"""
-	var is_pressed = current_keys.get(key_name, false)
-	var was_pressed = previous_keys.get(key_name, false)
+	var is_pressed = _current_keys.get(key_name, false)
+	var was_pressed = _previous_keys.get(key_name, false)
 	
 	# If key was just pressed this frame, record the time and mark as pending tap
 	if is_pressed and not was_pressed:
-		key_press_times[key_name] = current_time
-		pending_taps[key_name] = true
+		_key_press_times[key_name] = current_time
+		_pending_taps[key_name] = true
 	
 	# If key is still held beyond grace period, remove from pending taps
-	elif is_pressed and was_pressed and pending_taps.has(key_name):
-		var time_held = current_time - key_press_times.get(key_name, current_time)
-		if time_held > key_tap_grace_period:
-			pending_taps.erase(key_name)  # It's a hold, not a tap
+	elif is_pressed and was_pressed and _pending_taps.has(key_name):
+		var time_held = current_time - _key_press_times.get(key_name, current_time)
+		if time_held > _key_tap_grace_period:
+			_pending_taps.erase(key_name)  # It's a hold, not a tap
 	
 	# If key was released, clean up tracking
-	elif not is_pressed and key_press_times.has(key_name):
-		key_press_times.erase(key_name)
+	elif not is_pressed and _key_press_times.has(key_name):
+		_key_press_times.erase(key_name)
 		# Clear wheel interruption flag on release (allows re-press to work)
-		wheel_interrupted_keys.erase(key_name)
+		_wheel_interrupted_keys.erase(key_name)
 		# Clear active repeat if this was the repeating key
-		if active_repeat_key == key_name:
-			active_repeat_key = ""
-			active_repeat_modifiers.clear()
+		if _active_repeat_key == key_name:
+			_active_repeat_key = ""
+			_active_repeat_modifiers.clear()
 
-static func _update_mouse_states():
+func _update_mouse_states():
 	"""Update mouse state"""
 	# Get viewport-relative mouse position for proper 3D viewport raycasting
-	if cached_viewport:
-		current_mouse["position"] = cached_viewport.get_mouse_position()
+	if _cached_viewport:
+		_current_mouse["position"] = _cached_viewport.get_mouse_position()
 	else:
 		# Fallback to global position if viewport not available (shouldn't happen in normal use)
-		current_mouse["position"] = DisplayServer.mouse_get_position()
+		_current_mouse["position"] = DisplayServer.mouse_get_position()
 	
-	current_mouse["left_pressed"] = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
-	current_mouse["right_pressed"] = Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
-	current_mouse["middle_pressed"] = Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE)
+	_current_mouse["left_pressed"] = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	_current_mouse["right_pressed"] = Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+	_current_mouse["middle_pressed"] = Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE)
 
-static func _update_action_states():
+func _update_action_states():
 	"""Update Godot action states"""
-	current_actions["ui_cancel"] = Input.is_action_just_pressed("ui_cancel")
+	_current_actions["ui_cancel"] = Input.is_action_just_pressed("ui_cancel")
 
 ## Public Input Query API
 
-static func is_key_pressed(key_name: String) -> bool:
+func is_key_pressed(key_name: String) -> bool:
 	"""Check if a key is currently pressed"""
-	return current_keys.get(key_name, false)
+	return _current_keys.get(key_name, false)
 
-static func is_key_just_pressed(key_name: String) -> bool:
+func is_key_just_pressed(key_name: String) -> bool:
 	"""Check if a key was just pressed this frame (edge detection)
 	For action keys (rotation, scale, height, position), this checks if it was a 'tap' (quick press/release)
 	For other keys (tab, cancel, etc.), uses normal edge detection"""
-	var current = current_keys.get(key_name, false)
-	var previous = previous_keys.get(key_name, false)
+	var current = _current_keys.get(key_name, false)
+	var previous = _previous_keys.get(key_name, false)
 	
 	# List of keys that should use tap detection (for mouse wheel combos)
 	var tap_detection_keys = [
@@ -424,8 +346,8 @@ static func is_key_just_pressed(key_name: String) -> bool:
 	if key_name in tap_detection_keys:
 		# Check if key was just released after being in pending_taps
 		# This means it was released within the grace period = it's a tap!
-		if not current and previous and pending_taps.has(key_name):
-			pending_taps.erase(key_name)
+		if not current and previous and _pending_taps.has(key_name):
+			_pending_taps.erase(key_name)
 			return true  # This was a quick tap, perform the action
 		
 		# Key is still held or was just pressed - no action yet
@@ -434,88 +356,88 @@ static func is_key_just_pressed(key_name: String) -> bool:
 	# For all other keys (tab, cancel, etc.), use normal edge detection
 	return current and not previous
 
-static func is_key_held_for_wheel(key_name: String) -> bool:
+func is_key_held_for_wheel(key_name: String) -> bool:
 	"""Check if a key is being held long enough to be used with mouse wheel"""
 	if not is_key_pressed(key_name):
 		return false
 	
-	if not key_press_times.has(key_name):
+	if not _key_press_times.has(key_name):
 		return false
 	
 	var current_time = Time.get_ticks_msec() / 1000.0
-	var time_since_press = current_time - key_press_times[key_name]
+	var time_since_press = current_time - _key_press_times[key_name]
 	
 	# Key is held beyond grace period OR still within grace period (waiting to see if it's a tap)
 	return time_since_press >= 0.0
 
-static func is_key_just_released(key_name: String) -> bool:
+func is_key_just_released(key_name: String) -> bool:
 	"""Check if a key was just released this frame"""
-	var current = current_keys.get(key_name, false)
-	var previous = previous_keys.get(key_name, false)
+	var current = _current_keys.get(key_name, false)
+	var previous = _previous_keys.get(key_name, false)
 	return not current and previous
 
-static func is_mouse_button_pressed(button: String) -> bool:
+func is_mouse_button_pressed(button: String) -> bool:
 	"""Check mouse button state"""
 	match button:
-		"left": return current_mouse.get("left_pressed", false)
-		"right": return current_mouse.get("right_pressed", false)  
-		"middle": return current_mouse.get("middle_pressed", false)
+		"left": return _current_mouse.get("left_pressed", false)
+		"right": return _current_mouse.get("right_pressed", false)  
+		"middle": return _current_mouse.get("middle_pressed", false)
 		_: return false
 
-static func is_mouse_button_just_pressed(button: String) -> bool:
+func is_mouse_button_just_pressed(button: String) -> bool:
 	"""Check if mouse button was just pressed this frame"""
 	var current = false
 	var previous = false
 	
 	match button:
 		"left": 
-			current = current_mouse.get("left_pressed", false)
-			previous = previous_mouse.get("left_pressed", false)
+			current = _current_mouse.get("left_pressed", false)
+			previous = _previous_mouse.get("left_pressed", false)
 		"right":
-			current = current_mouse.get("right_pressed", false) 
-			previous = previous_mouse.get("right_pressed", false)
+			current = _current_mouse.get("right_pressed", false) 
+			previous = _previous_mouse.get("right_pressed", false)
 		"middle":
-			current = current_mouse.get("middle_pressed", false)
-			previous = previous_mouse.get("middle_pressed", false)
+			current = _current_mouse.get("middle_pressed", false)
+			previous = _previous_mouse.get("middle_pressed", false)
 		_: return false
 	
 	# Edge detection: current is pressed AND previous was NOT pressed
 	return current and not previous
 
-static func get_mouse_position() -> Vector2:
+func get_mouse_position() -> Vector2:
 	"""Get current mouse position"""
-	return current_mouse.get("position", Vector2.ZERO)
+	return _current_mouse.get("position", Vector2.ZERO)
 
-static func is_mouse_in_viewport() -> bool:
+func is_mouse_in_viewport() -> bool:
 	"""Check if mouse is within the 3D viewport bounds"""
-	if not cached_viewport:
+	if not _cached_viewport:
 		return false
 	
 	var mouse_pos = get_mouse_position()
-	var viewport_rect = cached_viewport.get_visible_rect()
+	var viewport_rect = _cached_viewport.get_visible_rect()
 	
 	# Check if mouse position is within viewport bounds
 	return viewport_rect.has_point(mouse_pos)
 
-static func is_action_pressed(action_name: String) -> bool:
+func is_action_pressed(action_name: String) -> bool:
 	"""Check Godot action state"""
-	return current_actions.get(action_name, false)
+	return _current_actions.get(action_name, false)
 
 ## Modifier Key Helpers
 
-static func is_reverse_modifier_held() -> bool:
+func is_reverse_modifier_held() -> bool:
 	"""Check if the configured reverse modifier key is held"""
 	return is_key_pressed("reverse_modifier")
 
-static func is_large_increment_modifier_held() -> bool:
+func is_large_increment_modifier_held() -> bool:
 	"""Check if the configured large increment modifier key is held"""
 	return is_key_pressed("large_increment_modifier")
 
-static func is_fine_increment_modifier_held() -> bool:
+func is_fine_increment_modifier_held() -> bool:
 	"""Check if the configured fine/half-step increment modifier key is held"""
 	return is_key_pressed("fine_increment_modifier")
 
-static func get_modifier_state() -> Dictionary:
+func get_modifier_state() -> Dictionary:
 	"""Get the current state of all configured increment modifiers in one call
 	
 	Returns the state of user-configured modifier keys, not raw keyboard modifiers.
@@ -535,13 +457,13 @@ static func get_modifier_state() -> Dictionary:
 
 ## Input Utility Functions
 
-static func string_to_keycode(key_string: String) -> Key:
+func string_to_keycode(key_string: String) -> Key:
 	"""Convert string key name to Godot Key enum using built-in function"""
 	return OS.find_keycode_from_string(key_string)
 
 ## Input State Queries for Managers
 
-static func get_rotation_input() -> Dictionary:
+func get_rotation_input() -> Dictionary:
 	"""Get all rotation-related input state"""
 	# Disable rotation controls when right mouse button is held (viewport navigation)
 	var right_mouse_held = is_mouse_button_pressed("right")
@@ -556,7 +478,7 @@ static func get_rotation_input() -> Dictionary:
 		"fine_increment_modifier_held": is_fine_increment_modifier_held()
 	}
 
-static func get_scale_input() -> Dictionary:
+func get_scale_input() -> Dictionary:
 	"""Get all scale-related input state"""
 	# Disable scale controls when right mouse button is held (viewport navigation)
 	var right_mouse_held = is_mouse_button_pressed("right")
@@ -570,7 +492,7 @@ static func get_scale_input() -> Dictionary:
 		"fine_increment_modifier_held": is_fine_increment_modifier_held()
 	}
 
-static func get_position_input() -> Dictionary:
+func get_position_input() -> Dictionary:
 	"""Get all position-related input state"""
 	# Disable position controls when right mouse button is held (viewport navigation)
 	var right_mouse_held = is_mouse_button_pressed("right")
@@ -591,7 +513,7 @@ static func get_position_input() -> Dictionary:
 		"fine_increment_modifier_held": is_fine_increment_modifier_held()
 	}
 
-static func get_navigation_input() -> Dictionary:
+func get_navigation_input() -> Dictionary:
 	"""Get navigation and control input state"""
 	return {
 		"tab_just_pressed": is_key_just_pressed("tab"),
@@ -599,7 +521,7 @@ static func get_navigation_input() -> Dictionary:
 		"escape_pressed": is_key_just_pressed("escape")
 	}
 
-static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
+func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 	"""Interpret mouse wheel event based on currently held action keys
 	Returns semantic action data: what should be adjusted and by how much
 	Returns empty dict if no action key is held (event should not be consumed)"""
@@ -626,19 +548,19 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 	]
 	for key in action_keys:
 		if is_key_held_for_wheel(key):
-			wheel_interrupted_keys[key] = true
+			_wheel_interrupted_keys[key] = true
 	
 	# Cancel active repeat
-	active_repeat_key = ""
-	active_repeat_modifiers.clear()
+	_active_repeat_key = ""
+	_active_repeat_modifiers.clear()
 	
 	# Check which action keys are currently held for wheel combo
 	# When wheel is used, any key that's being held (even if just pressed) can be used
 	# Height adjustment keys (Q/E)
 	if is_key_held_for_wheel("height_up") or is_key_held_for_wheel("height_down"):
 		# Remove from pending taps since wheel was used
-		pending_taps.erase("height_up")
-		pending_taps.erase("height_down")
+		_pending_taps.erase("height_up")
+		_pending_taps.erase("height_down")
 		return {
 			"action": "height",
 			"direction": wheel_direction,
@@ -648,8 +570,8 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 	# Scale adjustment keys (PAGE_UP/PAGE_DOWN)
 	if is_key_held_for_wheel("scale_up") or is_key_held_for_wheel("scale_down"):
 		# Remove from pending taps since wheel was used
-		pending_taps.erase("scale_up")
-		pending_taps.erase("scale_down")
+		_pending_taps.erase("scale_up")
+		_pending_taps.erase("scale_down")
 		return {
 			"action": "scale",
 			"direction": wheel_direction,
@@ -658,7 +580,7 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 	
 	# Rotation keys (X/Y/Z)
 	if is_key_held_for_wheel("rotate_x"):
-		pending_taps.erase("rotate_x")
+		_pending_taps.erase("rotate_x")
 		return {
 			"action": "rotation",
 			"axis": "X",
@@ -667,7 +589,7 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 			"reverse_modifier": is_reverse_modifier_held()
 		}
 	elif is_key_held_for_wheel("rotate_y"):
-		pending_taps.erase("rotate_y")
+		_pending_taps.erase("rotate_y")
 		return {
 			"action": "rotation",
 			"axis": "Y",
@@ -676,7 +598,7 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 			"reverse_modifier": is_reverse_modifier_held()
 		}
 	elif is_key_held_for_wheel("rotate_z"):
-		pending_taps.erase("rotate_z")
+		_pending_taps.erase("rotate_z")
 		return {
 			"action": "rotation",
 			"axis": "Z",
@@ -687,7 +609,7 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 	
 	# Position adjustment keys (W/A/S/D)
 	if is_key_held_for_wheel("position_forward"):
-		pending_taps.erase("position_forward")
+		_pending_taps.erase("position_forward")
 		return {
 			"action": "position",
 			"axis": "forward",
@@ -695,7 +617,7 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 			"reverse_modifier": is_reverse_modifier_held()
 		}
 	elif is_key_held_for_wheel("position_backward"):
-		pending_taps.erase("position_backward")
+		_pending_taps.erase("position_backward")
 		return {
 			"action": "position",
 			"axis": "backward",
@@ -703,7 +625,7 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 			"reverse_modifier": is_reverse_modifier_held()
 		}
 	elif is_key_held_for_wheel("position_left"):
-		pending_taps.erase("position_left")
+		_pending_taps.erase("position_left")
 		return {
 			"action": "position",
 			"axis": "left",
@@ -711,7 +633,7 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 			"reverse_modifier": is_reverse_modifier_held()
 		}
 	elif is_key_held_for_wheel("position_right"):
-		pending_taps.erase("position_right")
+		_pending_taps.erase("position_right")
 		return {
 			"action": "position",
 			"axis": "right",
@@ -724,45 +646,45 @@ static func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 
 ## Asset Cycling Input Detection
 
-static func should_cycle_next_asset() -> bool:
+func should_cycle_next_asset() -> bool:
 	"""Check if user wants to cycle to next asset (tap or hold)"""
 	return is_key_just_pressed("cycle_next_asset") or is_key_held_with_repeat("cycle_next_asset")
 
-static func should_cycle_previous_asset() -> bool:
+func should_cycle_previous_asset() -> bool:
 	"""Check if user wants to cycle to previous asset (tap or hold)"""
 	return is_key_just_pressed("cycle_previous_asset") or is_key_held_with_repeat("cycle_previous_asset")
 
-static func should_cycle_placement_mode() -> bool:
+func should_cycle_placement_mode() -> bool:
 	"""Check if user wants to cycle placement mode (collision/plane)"""
 	return is_key_just_pressed("cycle_placement_mode")
 
-static func is_key_held_with_repeat(key_name: String, repeat_delay: float = 0.15) -> bool:
+func is_key_held_with_repeat(key_name: String, repeat_delay: float = 0.15) -> bool:
 	"""Check if key is held long enough to trigger repeated actions"""
 	if not is_key_pressed(key_name):
 		return false
 	
-	if not key_press_times.has(key_name):
+	if not _key_press_times.has(key_name):
 		return false
 	
 	var current_time = Time.get_ticks_msec() / 1000.0
-	var time_since_press = current_time - key_press_times[key_name]
+	var time_since_press = current_time - _key_press_times[key_name]
 	
 	# Key must be held beyond grace period
-	if time_since_press < key_tap_grace_period:
+	if time_since_press < _key_tap_grace_period:
 		return false
 	
 	# Calculate how many repeats should have occurred
-	var time_in_repeat_phase = time_since_press - key_tap_grace_period
+	var time_in_repeat_phase = time_since_press - _key_tap_grace_period
 	var repeat_count = int(time_in_repeat_phase / repeat_delay)
 	
 	# Check if we should trigger this frame based on repeat timing
-	var next_repeat_time = key_tap_grace_period + (repeat_count * repeat_delay)
-	var time_to_next = (key_press_times[key_name] + next_repeat_time + repeat_delay) - current_time
+	var next_repeat_time = _key_tap_grace_period + (repeat_count * repeat_delay)
+	var time_to_next = (_key_press_times[key_name] + next_repeat_time + repeat_delay) - current_time
 	
 	# Trigger if we're within one frame of the next repeat
 	return time_to_next <= 0.016  # ~1 frame at 60fps
 
-static func is_action_key_held_with_repeat(key_name: String, action_type: String) -> bool:
+func is_action_key_held_with_repeat(key_name: String, action_type: String) -> bool:
 	"""
 	Check if an action key should trigger continuous actions while held.
 	
@@ -780,18 +702,18 @@ static func is_action_key_held_with_repeat(key_name: String, action_type: String
 		bool: True if the key should trigger this frame
 	"""
 	# Don't repeat if key is wheel-interrupted
-	if wheel_interrupted_keys.has(key_name):
+	if _wheel_interrupted_keys.has(key_name):
 		return false
 	
 	# Check if key is held and get timing
-	if not key_press_times.has(key_name):
+	if not _key_press_times.has(key_name):
 		return false
 	
 	var current_time = Time.get_ticks_msec() / 1000.0
-	var time_since_press = current_time - key_press_times[key_name]
+	var time_since_press = current_time - _key_press_times[key_name]
 	
 	# Key must be held beyond grace period
-	if time_since_press < key_tap_grace_period:
+	if time_since_press < _key_tap_grace_period:
 		return false
 	
 	# Get current modifier state (using configured modifier keys)
@@ -802,53 +724,47 @@ static func is_action_key_held_with_repeat(key_name: String, action_type: String
 	}
 	
 	# If this is a new repeat or different key, initialize tracking
-	if active_repeat_key != key_name:
+	if _active_repeat_key != key_name:
 		# Cancel previous repeat (only one at a time)
-		active_repeat_key = key_name
+		_active_repeat_key = key_name
 		# Avoid duplicate() - just assign values directly (small dict, 3 keys)
-		active_repeat_modifiers.clear()
-		active_repeat_modifiers["reverse_modifier"] = current_modifiers["reverse_modifier"]
-		active_repeat_modifiers["large_increment_modifier"] = current_modifiers["large_increment_modifier"]
-		active_repeat_modifiers["fine_increment_modifier"] = current_modifiers["fine_increment_modifier"]
+		_active_repeat_modifiers.clear()
+		_active_repeat_modifiers["reverse_modifier"] = current_modifiers["reverse_modifier"]
+		_active_repeat_modifiers["large_increment_modifier"] = current_modifiers["large_increment_modifier"]
+		_active_repeat_modifiers["fine_increment_modifier"] = current_modifiers["fine_increment_modifier"]
 	else:
 		# Check if modifier state changed - cancel repeat if so
-		if current_modifiers != active_repeat_modifiers:
-			active_repeat_key = ""
-			active_repeat_modifiers.clear()
+		if current_modifiers != _active_repeat_modifiers:
+			_active_repeat_key = ""
+			_active_repeat_modifiers.clear()
 			return false
 	
 	# Get repeat interval for this action type
-	var repeat_delay = repeat_intervals.get(action_type, 0.1)
+	var repeat_delay = _repeat_intervals.get(action_type, 0.1)
 	
 	# Calculate how many repeats should have occurred
-	var time_in_repeat_phase = time_since_press - key_tap_grace_period
+	var time_in_repeat_phase = time_since_press - _key_tap_grace_period
 	var repeat_count = int(time_in_repeat_phase / repeat_delay)
 	
 	# Check if we should trigger this frame based on repeat timing
-	var next_repeat_time = key_tap_grace_period + (repeat_count * repeat_delay)
-	var time_to_next = (key_press_times[key_name] + next_repeat_time + repeat_delay) - current_time
+	var next_repeat_time = _key_tap_grace_period + (repeat_count * repeat_delay)
+	var time_to_next = (_key_press_times[key_name] + next_repeat_time + repeat_delay) - current_time
 	
 	# Trigger if we're within one frame of the next repeat
 	return time_to_next <= 0.016  # ~1 frame at 60fps
 
 ## Debug and Inspection
 
-static func get_all_pressed_keys() -> Array:
+func get_all_pressed_keys() -> Array:
 	"""Get list of all currently pressed keys (for debugging)"""
 	var pressed = []
-	for key_name in current_keys:
-		if current_keys[key_name]:
+	for key_name in _current_keys:
+		if _current_keys[key_name]:
 			pressed.append(key_name)
 	return pressed
 
-static func debug_print_input_state():
+func debug_print_input_state():
 	"""Print current input state (for debugging)"""
 	var pressed = get_all_pressed_keys()
 	if not pressed.is_empty():
 		PluginLogger.debug("InputHandler", "Pressed keys: " + str(pressed))
-
-
-
-
-
-

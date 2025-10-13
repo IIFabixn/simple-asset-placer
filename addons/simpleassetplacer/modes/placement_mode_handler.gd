@@ -4,8 +4,8 @@ extends RefCounted
 class_name PlacementModeHandler
 
 """
-PLACEMENT MODE HANDLER
-======================
+PLACEMENT MODE HANDLER (FULLY INSTANCE-BASED)
+==============================================
 
 PURPOSE: Handles all placement mode logic (preview mesh, input, placement)
 
@@ -18,39 +18,40 @@ RESPONSIBILITIES:
 - Actual placement operation
 - Placement mode overlay updates
 
-ARCHITECTURE POSITION: Mode-specific handler
+ARCHITECTURE: Fully instance-based with dependency injection
 - Called by TransformationCoordinator when in placement mode
 - Manages placement_data dictionary
-- Delegates to specialist managers (PositionManager, RotationManager, etc.)
+- Receives injected manager instances via ServiceRegistry
+- NO static methods
 
 USED BY: TransformationCoordinator
 USES: PreviewManager, PositionManager, RotationManager, ScaleManager, OverlayManager,
-      InputHandler, UtilityManager, SmoothTransformManager, PluginLogger
+      InputHandler, UtilityManager, SmoothTransformManager (all via ServiceRegistry)
 """
 
 # Import utilities
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
 const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
 const NodeUtils = preload("res://addons/simpleassetplacer/utils/node_utils.gd")
-const UndoRedoHelper = preload("res://addons/simpleassetplacer/utils/undo_redo_helper.gd")
-
-# Import managers
-const InputHandler = preload("res://addons/simpleassetplacer/managers/input_handler.gd")
-const PositionManager = preload("res://addons/simpleassetplacer/core/position_manager.gd")
-const OverlayManager = preload("res://addons/simpleassetplacer/managers/overlay_manager.gd")
-const RotationManager = preload("res://addons/simpleassetplacer/core/rotation_manager.gd")
-const ScaleManager = preload("res://addons/simpleassetplacer/core/scale_manager.gd")
-const PreviewManager = preload("res://addons/simpleassetplacer/managers/preview_manager.gd")
-const UtilityManager = preload("res://addons/simpleassetplacer/managers/utility_manager.gd")
-const SmoothTransformManager = preload("res://addons/simpleassetplacer/core/smooth_transform_manager.gd")
-
-# Import state
 const TransformState = preload("res://addons/simpleassetplacer/core/transform_state.gd")
-const ModeStateMachine = preload("res://addons/simpleassetplacer/core/mode_state_machine.gd")
+const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
+
+# Dependencies (injected via ServiceRegistry)
+var _services: ServiceRegistry
+
+## Initialization
+
+func _init(services: ServiceRegistry) -> void:
+	"""Initialize with service registry
+	
+	Args:
+		services: ServiceRegistry containing all manager instances
+	"""
+	_services = services
 
 ## MODE ENTRY/EXIT
 
-static func enter_placement_mode(
+func enter_placement_mode(
 	mesh: Mesh = null,
 	meshlib: MeshLibrary = null,
 	item_id: int = -1,
@@ -85,47 +86,47 @@ static func enter_placement_mode(
 	}
 	
 	# Initialize managers for placement mode
-	OverlayManager.initialize_overlays()
-	OverlayManager.set_mode(1)  # PLACEMENT mode (compatible with both old and new enum)
+	_services.overlay_manager.initialize_overlays()
+	_services.overlay_manager.set_mode(1)  # PLACEMENT mode (compatible with both old and new enum)
 	
 	# Setup preview if we have something to place
 	if mesh:
-		PreviewManager.start_preview_mesh(mesh, settings)
+		_services.preview_manager.start_preview_mesh(mesh, settings)
 	elif meshlib and item_id >= 0:
 		var preview_mesh = meshlib.get_item_mesh(item_id)
 		if preview_mesh:
-			PreviewManager.start_preview_mesh(preview_mesh, settings)
+			_services.preview_manager.start_preview_mesh(preview_mesh, settings)
 	elif asset_path != "":
-		PreviewManager.start_preview_asset(asset_path, settings)
+		_services.preview_manager.start_preview_asset(asset_path, settings)
 	
 	# Configure position manager for placement
 	if transform_state:
-		PositionManager.configure(transform_state, settings)
+		_services.position_manager.configure(transform_state, settings)
 	
 	# Configure smooth transformations
 	var smooth_enabled = settings.get("smooth_transforms", true)
 	var smooth_speed = settings.get("smooth_transform_speed", 8.0)
-	PreviewManager.configure_smooth_transforms(smooth_enabled, smooth_speed)
-	SmoothTransformManager.configure(smooth_enabled, smooth_speed)
-	RotationManager.configure_smooth_transforms(smooth_enabled, smooth_speed)
-	ScaleManager.configure_smooth_transforms(smooth_enabled, smooth_speed)
+	_services.preview_manager.configure_smooth_transforms(smooth_enabled, smooth_speed)
+	_services.smooth_transform_manager.configure(smooth_enabled, smooth_speed)
+	_services.rotation_manager.configure_smooth_transforms(smooth_enabled, smooth_speed)
+	# Note: ScaleManager is static and doesn't need smooth transform configuration
 	
 	# Reset position manager for new placement
 	# Reset height and position offsets only if the corresponding settings are enabled
 	var reset_height = settings.get("reset_height_on_exit", false)
 	var reset_position = settings.get("reset_position_on_exit", false)
 	if transform_state:
-		PositionManager.reset_for_new_placement(transform_state, reset_height, reset_position)
+		_services.position_manager.reset_for_new_placement(transform_state, reset_height, reset_position)
 	
 	# Reset rotation for new placement (unless user wants to keep rotation)
 	if transform_state and not settings.get("keep_rotation_between_placements", false):
-		RotationManager.reset_all_rotation(transform_state)
+		_services.rotation_manager.reset_all_rotation(transform_state)
 	
 	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Started placement mode")
 	
 	return placement_data
 
-static func exit_placement_mode(
+func exit_placement_mode(
 	placement_data: Dictionary,
 	transform_state: TransformState,
 	end_callback: Callable,
@@ -140,7 +141,7 @@ static func exit_placement_mode(
 		settings: Settings dictionary for reset behavior
 	"""
 	# Clean up preview (this also unregisters from smooth transforms)
-	PreviewManager.cleanup_preview()
+	_services.preview_manager.cleanup_preview()
 	
 	# Call end callback if set
 	if end_callback.is_valid():
@@ -150,15 +151,15 @@ static func exit_placement_mode(
 	_reset_transforms_on_exit(transform_state, settings)
 	
 	# Hide and cleanup overlays
-	OverlayManager.hide_transform_overlay()
-	OverlayManager.set_mode(0)  # NONE mode (compatible with both old and new enum)
-	OverlayManager.remove_grid_overlay()
+	_services.overlay_manager.hide_transform_overlay()
+	_services.overlay_manager.set_mode(0)  # NONE mode (compatible with both old and new enum)
+	_services.overlay_manager.remove_grid_overlay()
 	
 	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Exited placement mode")
 
 ## INPUT PROCESSING
 
-static func process_input(
+func process_input(
 	camera: Camera3D,
 	placement_data: Dictionary,
 	transform_state: TransformState,
@@ -177,12 +178,12 @@ static func process_input(
 	if not camera:
 		return
 	
-	var position_input = InputHandler.get_position_input()
-	var rotation_input = InputHandler.get_rotation_input()
-	var scale_input = InputHandler.get_scale_input()
+	var position_input = _services.input_handler.get_position_input()
+	var rotation_input = _services.input_handler.get_rotation_input()
+	var scale_input = _services.input_handler.get_scale_input()
 	
 	# Set half-step mode based on configured fine increment modifier
-	PositionManager.use_half_step = position_input.fine_increment_modifier_held
+	_services.position_manager.set_use_half_step(position_input.fine_increment_modifier_held)
 	
 	# Handle height adjustments
 	_process_height_input(position_input, transform_state, settings)
@@ -195,33 +196,35 @@ static func process_input(
 	
 	# IMPORTANT: Exclude preview mesh from collision detection to prevent self-collision
 	var exclude_nodes = []
-	if NodeUtils.is_valid(PreviewManager.preview_mesh):
-		exclude_nodes.append(PreviewManager.preview_mesh)
+	var preview_mesh = _services.preview_manager.get_preview_mesh()
+	if NodeUtils.is_valid(preview_mesh):
+		exclude_nodes.append(preview_mesh)
 	
-	PositionManager.update_position_from_mouse(transform_state, camera, mouse_pos, 1, true, exclude_nodes)
+	_services.position_manager.update_position_from_mouse(transform_state, camera, mouse_pos, 1, true, exclude_nodes)
 	
 	# Get the updated position
-	var preview_pos = PositionManager.get_current_position(transform_state)
+	var preview_pos = _services.position_manager.get_current_position(transform_state)
 	
 	# Update preview position
-	PreviewManager.update_preview_position(preview_pos)
+	_services.preview_manager.update_preview_position(preview_pos)
 	
 	# Update surface normal alignment if enabled, otherwise reset it
 	if settings.get("align_with_normal", false):
-		RotationManager.align_with_surface_normal(transform_state, PositionManager.get_surface_normal(transform_state))
+		_services.rotation_manager.align_with_surface_normal(transform_state, _services.position_manager.get_surface_normal(transform_state))
 	else:
-		RotationManager.reset_surface_alignment(transform_state)
+		_services.rotation_manager.reset_surface_alignment(transform_state)
 	
 	# Handle rotation input (this will be combined with surface alignment)
 	# Don't rotate position offset - this makes rotation behave like transform mode (in-place)
-	_process_rotation_input(rotation_input, PreviewManager.preview_mesh, transform_state, settings, false)
+	# Reuse preview_mesh variable from above
+	_process_rotation_input(rotation_input, preview_mesh, transform_state, settings, false)
 	
 	# Apply the combined rotation (surface alignment + manual rotation) to the preview mesh
-	if PreviewManager.preview_mesh:
-		RotationManager.apply_rotation_to_node(transform_state, PreviewManager.preview_mesh)
+	if preview_mesh:
+		_services.rotation_manager.apply_rotation_to_node(transform_state, preview_mesh)
 	
 	# Handle scale input
-	_process_scale_input(scale_input, PreviewManager.preview_mesh, transform_state, settings)
+	_process_scale_input(scale_input, preview_mesh, transform_state, settings)
 	
 	# Handle asset cycling
 	process_asset_cycling_input(placement_data)
@@ -235,7 +238,7 @@ static func process_input(
 
 ## INPUT HELPERS
 
-static func _process_height_input(
+func _process_height_input(
 	position_input: Dictionary,
 	transform_state: TransformState,
 	settings: Dictionary
@@ -250,7 +253,7 @@ static func _process_height_input(
 	var reverse_height = position_input.reverse_modifier_held
 	
 	# Determine height step based on modifiers
-	var height_step = PositionManager.height_step_size
+	var height_step = _services.position_manager.get_height_step_size()
 	
 	# Apply Y snap step if Y snapping is enabled
 	if transform_state.snap_y_enabled:
@@ -264,14 +267,14 @@ static func _process_height_input(
 	
 	if position_input.height_up_pressed:
 		var height_change = height_step if not reverse_height else -height_step
-		PositionManager.adjust_height(transform_state, height_change)
+		_services.position_manager.adjust_height(transform_state, height_change)
 	elif position_input.height_down_pressed:
 		var height_change = -height_step if not reverse_height else height_step
-		PositionManager.adjust_height(transform_state, height_change)
+		_services.position_manager.adjust_height(transform_state, height_change)
 	elif position_input.reset_height_pressed:
-		PositionManager.reset_height(transform_state)
+		_services.position_manager.reset_height(transform_state)
 
-static func _process_position_input(
+func _process_position_input(
 	camera: Camera3D,
 	position_input: Dictionary,
 	transform_state: TransformState,
@@ -331,9 +334,9 @@ static func _process_position_input(
 	
 	# Handle position reset
 	if position_input.reset_position_pressed:
-		PositionManager.reset_position(transform_state)
+		_services.position_manager.reset_position(transform_state)
 
-static func _process_rotation_input(
+func _process_rotation_input(
 	rotation_input: Dictionary,
 	target_node: Node3D,
 	transform_state: TransformState,
@@ -366,15 +369,15 @@ static func _process_rotation_input(
 		rotation_step = -rotation_step
 	
 	if rotation_input.x_pressed:
-		RotationManager.apply_rotation_step(transform_state, target_node, "X", rotation_step, Vector3.ZERO, rotate_position_offset)
+		_services.rotation_manager.apply_rotation_step(transform_state, target_node, "X", rotation_step, Vector3.ZERO, rotate_position_offset)
 	elif rotation_input.y_pressed:
-		RotationManager.apply_rotation_step(transform_state, target_node, "Y", rotation_step, Vector3.ZERO, rotate_position_offset)
+		_services.rotation_manager.apply_rotation_step(transform_state, target_node, "Y", rotation_step, Vector3.ZERO, rotate_position_offset)
 	elif rotation_input.z_pressed:
-		RotationManager.apply_rotation_step(transform_state, target_node, "Z", rotation_step, Vector3.ZERO, rotate_position_offset)
+		_services.rotation_manager.apply_rotation_step(transform_state, target_node, "Z", rotation_step, Vector3.ZERO, rotate_position_offset)
 	elif rotation_input.reset_pressed:
-		RotationManager.reset_node_rotation(target_node)
+		_services.rotation_manager.reset_node_rotation(target_node)
 
-static func _process_scale_input(
+func _process_scale_input(
 	scale_input: Dictionary,
 	target_node: Node3D,
 	transform_state: TransformState,
@@ -401,18 +404,21 @@ static func _process_scale_input(
 		scale_step = settings.get("scale_increment", 0.1)
 	
 	if scale_input.up_pressed:
-		ScaleManager.increase_scale(transform_state, scale_step)
-		ScaleManager.apply_uniform_scale_to_node(transform_state, target_node, Vector3.ONE)
+		_services.scale_manager.increase_scale(transform_state, scale_step)
+		var new_scale = _services.scale_manager.get_scale_vector(transform_state)
+		_services.preview_manager.update_preview_scale(new_scale)
 	elif scale_input.down_pressed:
-		ScaleManager.decrease_scale(transform_state, scale_step)
-		ScaleManager.apply_uniform_scale_to_node(transform_state, target_node, Vector3.ONE)
+		_services.scale_manager.decrease_scale(transform_state, scale_step)
+		var new_scale = _services.scale_manager.get_scale_vector(transform_state)
+		_services.preview_manager.update_preview_scale(new_scale)
 	elif scale_input.reset_pressed:
-		ScaleManager.reset_scale(transform_state)
-		ScaleManager.apply_uniform_scale_to_node(transform_state, target_node, Vector3.ONE)
+		_services.scale_manager.reset_scale(transform_state)
+		var new_scale = _services.scale_manager.get_scale_vector(transform_state)
+		_services.preview_manager.update_preview_scale(new_scale)
 
 ## ASSET CYCLING
 
-static func process_asset_cycling_input(placement_data: Dictionary) -> void:
+func process_asset_cycling_input(placement_data: Dictionary) -> void:
 	"""Process asset cycling input during placement mode
 	
 	Args:
@@ -424,16 +430,16 @@ static func process_asset_cycling_input(placement_data: Dictionary) -> void:
 		return
 	
 	# Check for cycling input
-	if InputHandler.should_cycle_next_asset():
+	if _services.input_handler.should_cycle_next_asset():
 		if dock.has_method("cycle_next_asset"):
 			dock.cycle_next_asset()
-	elif InputHandler.should_cycle_previous_asset():
+	elif _services.input_handler.should_cycle_previous_asset():
 		if dock.has_method("cycle_previous_asset"):
 			dock.cycle_previous_asset()
 
 ## PLACEMENT
 
-static func place_at_current_position(
+func place_at_current_position(
 	placement_data: Dictionary,
 	transform_state: TransformState,
 	placed_callback: Callable = Callable()
@@ -448,7 +454,7 @@ static func place_at_current_position(
 	Returns:
 		Node3D: The placed node, or null if placement failed
 	"""
-	var position = PositionManager.get_current_position(transform_state)
+	var position = _services.position_manager.get_current_position(transform_state)
 	var placed_node = null
 	
 	# Debug: Log transform state scale
@@ -463,7 +469,7 @@ static func place_at_current_position(
 	var settings = placement_data.get("settings", {})
 	
 	if meshlib and item_id >= 0:
-		placed_node = UtilityManager.place_meshlib_item_in_scene(
+		placed_node = _services.utility_manager.place_meshlib_item_in_scene(
 			meshlib,
 			item_id,
 			position,
@@ -471,14 +477,14 @@ static func place_at_current_position(
 			transform_state
 		)
 	elif asset_path != "":
-		placed_node = UtilityManager.place_asset_in_scene(
+		placed_node = _services.utility_manager.place_asset_in_scene(
 			asset_path,
 			position,
 			settings,
 			transform_state
 		)
 	elif mesh:
-		placed_node = UtilityManager.place_mesh_in_scene(
+		placed_node = _services.utility_manager.place_mesh_in_scene(
 			mesh,
 			position,
 			settings,
@@ -497,9 +503,10 @@ static func place_at_current_position(
 				action_name = "Place " + placed_node.name
 			
 			# Create undo action
-			var success = UndoRedoHelper.create_placement_undo(undo_redo, placed_node, action_name)
-			if not success:
-				PluginLogger.warning("PlacementModeHandler", "Failed to create undo action for placement")
+			if _services and _services.undo_redo_helper:
+				var success = _services.undo_redo_helper.create_placement_undo(undo_redo, placed_node, action_name)
+				if not success:
+					PluginLogger.warning("PlacementModeHandler", "Failed to create undo action for placement")
 	
 	# Call placement callback
 	if placed_node and placed_callback.is_valid():
@@ -507,13 +514,13 @@ static func place_at_current_position(
 	
 	# Show feedback
 	if placed_node:
-		OverlayManager.show_status_message("Placed: " + placed_node.name, Color.GREEN, 1.0)
+		_services.overlay_manager.show_status_message("Placed: " + placed_node.name, Color.GREEN, 1.0)
 	
 	return placed_node
 
 ## NODE3D PLACEMENT
 
-static func start_from_node3d(node: Node3D, settings: Dictionary) -> Dictionary:
+func start_from_node3d(node: Node3D, settings: Dictionary) -> Dictionary:
 	"""Start placement mode from a Node3D by extracting its mesh
 	
 	Args:
@@ -523,9 +530,9 @@ static func start_from_node3d(node: Node3D, settings: Dictionary) -> Dictionary:
 	Returns:
 		Dictionary: placement_data if successful, empty dict if failed
 	"""
-	var extracted_mesh = UtilityManager.extract_mesh_from_node3d(node)
+	var extracted_mesh = _services.utility_manager.extract_mesh_from_node3d(node)
 	if extracted_mesh:
-		OverlayManager.show_status_message("Placement mode activated for: " + node.name, Color.GREEN, 2.0)
+		_services.overlay_manager.show_status_message("Placement mode activated for: " + node.name, Color.GREEN, 2.0)
 		# Return minimal placement data - coordinator will call enter_placement_mode
 		return {
 			"mesh": extracted_mesh,
@@ -535,12 +542,12 @@ static func start_from_node3d(node: Node3D, settings: Dictionary) -> Dictionary:
 			"settings": settings
 		}
 	else:
-		OverlayManager.show_status_message("Could not extract mesh from: " + node.name, Color.RED, 3.0)
+		_services.overlay_manager.show_status_message("Could not extract mesh from: " + node.name, Color.RED, 3.0)
 		return {}
 
 ## OVERLAY UPDATE
 
-static func update_overlays(placement_data: Dictionary, transform_state: TransformState) -> void:
+func update_overlays(placement_data: Dictionary, transform_state: TransformState) -> void:
 	"""Update all overlays for placement mode
 	
 	Args:
@@ -550,18 +557,18 @@ static func update_overlays(placement_data: Dictionary, transform_state: Transfo
 	var asset_path = placement_data.get("asset_path", "")
 	var current_asset_name = asset_path.get_file().get_basename() if asset_path != "" else "Mesh"
 	
-	OverlayManager.show_transform_overlay(
+	_services.overlay_manager.show_transform_overlay(
 		1,  # PLACEMENT mode (compatible with both old and new enum)
 		current_asset_name,
-		PositionManager.get_current_position(transform_state),
-		PreviewManager.get_preview_rotation(),
-		ScaleManager.get_scale(transform_state),
-		PositionManager.get_height_offset(transform_state)
+		_services.position_manager.get_current_position(transform_state),
+		_services.preview_manager.get_preview_rotation(),
+		_services.scale_manager.get_scale(transform_state),
+		_services.position_manager.get_height_offset(transform_state)
 	)
 
 ## RESET MANAGEMENT
 
-static func _reset_transforms_on_exit(transform_state: TransformState, settings: Dictionary) -> void:
+func _reset_transforms_on_exit(transform_state: TransformState, settings: Dictionary) -> void:
 	"""Reset transforms based on user settings when exiting placement mode
 	
 	Args:
@@ -573,19 +580,19 @@ static func _reset_transforms_on_exit(transform_state: TransformState, settings:
 	
 	# Reset height offset if enabled
 	if settings.get("reset_height_on_exit", false):
-		PositionManager.reset_height(transform_state)
+		_services.position_manager.reset_height(transform_state)
 	
 	# Reset position offset if enabled
 	if settings.get("reset_position_on_exit", false):
-		PositionManager.reset_position(transform_state)
+		_services.position_manager.reset_position(transform_state)
 	
 	# Reset scale if enabled
 	if settings.get("reset_scale_on_exit", false):
-		ScaleManager.reset_scale(transform_state)
+		_services.scale_manager.reset_scale(transform_state)
 	
 	# Reset rotation if enabled
 	if settings.get("reset_rotation_on_exit", false):
-		RotationManager.reset_rotation(transform_state)
+		_services.rotation_manager.reset_rotation(transform_state)
 	
 	# Always reset surface alignment when exiting modes
-	RotationManager.reset_surface_alignment(transform_state)
+	_services.rotation_manager.reset_surface_alignment(transform_state)

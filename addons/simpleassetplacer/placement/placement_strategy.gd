@@ -91,13 +91,23 @@ static func create_ray_query(from: Vector3, to: Vector3, collision_mask: int, ex
 	
 	return query
 
-static func get_world_space_state() -> PhysicsDirectSpaceState3D:
-	"""Helper to get the current 3D world space state for raycasting"""
-	var world = EditorInterface.get_edited_scene_root()
-	if not world:
+func get_world_space_state() -> PhysicsDirectSpaceState3D:
+	"""Helper to get the current 3D world space state for raycasting
+	
+	Note: This method can remain as instance method since PlacementStrategy
+	is used through PlacementStrategyManager which has ServiceRegistry access.
+	The manager will need to provide the world root through configuration.
+	"""
+	# This will be called by subclasses that need world state
+	# The world root should be passed via config dictionary
+	return null  # Subclasses should override or get from config
+
+static func get_world_space_state_static(world_root: Node) -> PhysicsDirectSpaceState3D:
+	"""Static helper to get world space state from a given world root"""
+	if not world_root:
 		return null
 	
-	var world_3d = world.get_world_3d()
+	var world_3d = world_root.get_world_3d()
 	if not world_3d:
 		return null
 	

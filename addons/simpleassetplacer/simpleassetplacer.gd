@@ -2,47 +2,48 @@
 extends EditorPlugin
 
 # Main Plugin
-# Only handles editor integration and delegates everything to TransformationCoordinator
+# Handles editor integration using instance-based architecture with ServiceRegistry
 
-# Import utilities
+# Import core infrastructure
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
 const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
-const SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
 const ErrorHandler = preload("res://addons/simpleassetplacer/utils/error_handler.gd")
+const EditorFacade = preload("res://addons/simpleassetplacer/core/editor_facade.gd")
+const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
 
-# Import specialized managers
+# Import managers
+const SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
 const InputHandler = preload("res://addons/simpleassetplacer/managers/input_handler.gd")
-const PositionManager = preload("res://addons/simpleassetplacer/core/position_manager.gd")
+const PositionManager = preload("res://addons/simpleassetplacer/managers/position_manager.gd")
 const OverlayManager = preload("res://addons/simpleassetplacer/managers/overlay_manager.gd")
-const RotationManager = preload("res://addons/simpleassetplacer/core/rotation_manager.gd")
-const ScaleManager = preload("res://addons/simpleassetplacer/core/scale_manager.gd")
+const RotationManager = preload("res://addons/simpleassetplacer/managers/rotation_manager.gd")
+const ScaleManager = preload("res://addons/simpleassetplacer/managers/scale_manager.gd")
 const PreviewManager = preload("res://addons/simpleassetplacer/managers/preview_manager.gd")
-const TransformationCoordinator = preload("res://addons/simpleassetplacer/core/transformation_coordinator.gd")
-
-# Import placement strategy system
+const SmoothTransformManager = preload("res://addons/simpleassetplacer/managers/smooth_transform_manager.gd")
+const GridManager = preload("res://addons/simpleassetplacer/managers/grid_manager.gd")
+const ModeStateMachine = preload("res://addons/simpleassetplacer/core/mode_state_machine.gd")
+const TransformApplicator = preload("res://addons/simpleassetplacer/core/transform_applicator.gd")
 const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placement/placement_strategy_manager.gd")
-
-# Import dock and utilities (keep existing)
-const AssetPlacerDock = preload("res://addons/simpleassetplacer/ui/asset_placer_dock.gd")
+const UtilityManager = preload("res://addons/simpleassetplacer/managers/utility_manager.gd")
+const CategoryManager = preload("res://addons/simpleassetplacer/managers/category_manager.gd")
 const ThumbnailGenerator = preload("res://addons/simpleassetplacer/thumbnails/thumbnail_generator.gd")
 const ThumbnailQueueManager = preload("res://addons/simpleassetplacer/thumbnails/thumbnail_queue_manager.gd")
 
-# Toolbar scene
+# Import coordinators and handlers
+const TransformationCoordinator = preload("res://addons/simpleassetplacer/core/transformation_coordinator.gd")
+const PlacementModeHandler = preload("res://addons/simpleassetplacer/modes/placement_mode_handler.gd")
+const TransformModeHandler = preload("res://addons/simpleassetplacer/modes/transform_mode_handler.gd")
+
+# Import UI
+const AssetPlacerDock = preload("res://addons/simpleassetplacer/ui/asset_placer_dock.gd")
 const ToolbarButtonsScene = preload("res://addons/simpleassetplacer/ui/toolbar_buttons.tscn")
 
 # Plugin state
 var dock: AssetPlacerDock
 var toolbar_buttons: Control = null
 
-# Manager instances (Phase 5.2: Instance-based architecture)
-var transformation_coordinator: TransformationCoordinator = null
-var overlay_manager: OverlayManager = null
-var preview_manager: PreviewManager = null
-var smooth_transform_manager: SmoothTransformManager = null
-var input_handler: InputHandler = null
-var position_manager: PositionManager = null
-var mode_state_machine: ModeStateMachine = null
-var grid_manager: GridManager = null
+# Service registry (Phase 5.2: Hybrid instance-based architecture)
+var service_registry: ServiceRegistry = null
 
 # Performance: Frame-based settings cache (Task 3.3)
 # Avoids redundant SettingsManager.get_combined_settings() calls within the same frame
@@ -84,47 +85,73 @@ func _exit_tree() -> void:
 ## System Initialization
 
 func _initialize_systems():
-	"""Initialize all manager systems"""
-	# Initialize settings manager first
+	"""Initialize all manager systems with ServiceRegistry"""
+	# Initialize settings manager first (still static)
 	SettingsManager.initialize()
 	
 	# Initialize error handler with editor interface instance
 	ErrorHandler.initialize(get_editor_interface())
 	
-	# Initialize placement strategy system
+	# Initialize placement strategy system (still static)
 	PlacementStrategyManager.initialize()
 	
-	# Create manager instances (Phase 5.2: Instance-based architecture)
-	transformation_coordinator = TransformationCoordinator.new()
-	TransformationCoordinator._set_instance(transformation_coordinator)
+	# Create ServiceRegistry
+	service_registry = ServiceRegistry.new()
 	
-	overlay_manager = OverlayManager.new()
-	OverlayManager._set_instance(overlay_manager)
+	# Create EditorFacade and register it
+	var editor_facade = EditorFacade.new(get_editor_interface())
+	service_registry.editor_facade = editor_facade
 	
-	preview_manager = PreviewManager.new()
-	PreviewManager._set_instance(preview_manager)
+	# Create manager instances (fully instance-based architecture)
 	
-	smooth_transform_manager = SmoothTransformManager.new()
-	SmoothTransformManager._set_instance(smooth_transform_manager)
+	# Input handler (instance-based with ServiceRegistry)
+	service_registry.input_handler = InputHandler.new(service_registry)
 	
-	input_handler = InputHandler.new()
-	InputHandler._set_instance(input_handler)
+	# Position manager (instance-based with ServiceRegistry)
+	service_registry.position_manager = PositionManager.new(service_registry)
 	
-	position_manager = PositionManager.new()
-	PositionManager._set_instance(position_manager)
+	# Preview manager (instance-based with ServiceRegistry)
+	service_registry.preview_manager = PreviewManager.new(service_registry)
 	
-	mode_state_machine = ModeStateMachine.new()
-	ModeStateMachine._set_instance(mode_state_machine)
+	# Overlay manager (instance-based with ServiceRegistry)
+	service_registry.overlay_manager = OverlayManager.new(service_registry)
 	
-	grid_manager = GridManager.new()
-	GridManager._set_instance(grid_manager)
+	# Rotation manager (instance-based with ServiceRegistry)
+	service_registry.rotation_manager = RotationManager.new(service_registry)
 	
-	# Initialize core systems
-	InputHandler.update_input_state({})  # Initialize with empty settings initially
-	# Note: PositionManager.configure() is called when modes are started with transform_state
-	OverlayManager.initialize_overlays()
+	# Scale manager (instance-based with ServiceRegistry, matches PositionManager and RotationManager)
+	service_registry.scale_manager = ScaleManager.new(service_registry)
 	
-	# Initialize thumbnail system
+	# Smooth transform manager (instance-based with ServiceRegistry)
+	service_registry.smooth_transform_manager = SmoothTransformManager.new(service_registry)
+	
+	# Grid manager (instance-based with ServiceRegistry)
+	service_registry.grid_manager = GridManager.new(service_registry)
+	
+	# Mode state machine (instance-based with ServiceRegistry)
+	service_registry.mode_state_machine = ModeStateMachine.new(service_registry)
+	
+	# Utility manager (instance-based with ServiceRegistry)
+	service_registry.utility_manager = UtilityManager.new(service_registry)
+	
+	# Undo/redo helper (instance-based with ServiceRegistry)
+	service_registry.undo_redo_helper = preload("res://addons/simpleassetplacer/utils/undo_redo_helper.gd").new(service_registry)
+	
+	# Category manager (instance-based with ServiceRegistry)
+	service_registry.category_manager = CategoryManager.new(service_registry)
+	
+	# Create mode handlers (instance-based with ServiceRegistry injection)
+	service_registry.placement_mode_handler = PlacementModeHandler.new(service_registry)
+	service_registry.transform_mode_handler = TransformModeHandler.new(service_registry)
+	
+	# Create transformation coordinator (instance-based with ServiceRegistry injection)
+	service_registry.transformation_coordinator = TransformationCoordinator.new(service_registry)
+	
+	# Initialize core systems via instance references
+	service_registry.input_handler.update_input_state({})  # Initialize with empty settings initially
+	service_registry.overlay_manager.initialize_overlays()
+	
+	# Initialize thumbnail system (still static)
 	ThumbnailGenerator.initialize()
 	
 	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "All systems initialized")
@@ -133,59 +160,37 @@ func _cleanup_systems():
 	"""Clean up all manager systems with error handling"""
 	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Starting system cleanup...")
 	
-	# Wrap each cleanup to prevent cascade failures
-	# Exit any active modes first
-	_safe_cleanup("TransformationCoordinator.exit_any_mode", func(): TransformationCoordinator.exit_any_mode())
+	if not service_registry:
+		PluginLogger.warning(PluginConstants.COMPONENT_MAIN, "No service registry to clean up")
+		return
 	
-	# Clean up UI and visual systems
-	_safe_cleanup("OverlayManager.cleanup_all_overlays", func(): OverlayManager.cleanup_all_overlays())
-	_safe_cleanup("PreviewManager.cleanup_preview", func(): PreviewManager.cleanup_preview())
+	# Exit any active modes first
+	if service_registry.transformation_coordinator:
+		_safe_cleanup("TransformationCoordinator.exit_any_mode", func(): service_registry.transformation_coordinator.exit_any_mode())
+	
+	# Clean up UI and visual systems via instance references
+	if service_registry.overlay_manager:
+		_safe_cleanup("OverlayManager.cleanup_all_overlays", func(): service_registry.overlay_manager.cleanup_all_overlays())
+	if service_registry.preview_manager:
+		_safe_cleanup("PreviewManager.cleanup_preview", func(): service_registry.preview_manager.cleanup_preview())
 	
 	# Clean up core systems
-	_safe_cleanup("TransformationCoordinator.cleanup_all", func(): TransformationCoordinator.cleanup_all())
-	_safe_cleanup("SmoothTransformManager.cleanup_all", func(): SmoothTransformManager.cleanup_all())
+	if service_registry.transformation_coordinator:
+		_safe_cleanup("TransformationCoordinator.cleanup", func(): service_registry.transformation_coordinator.cleanup())
+	if service_registry.smooth_transform_manager:
+		_safe_cleanup("SmoothTransformManager.cleanup_all", func(): service_registry.smooth_transform_manager.cleanup_all())
 	
-	# Clean up thumbnail systems
+	# Clean up thumbnail systems (still static)
 	_safe_cleanup("ThumbnailGenerator.cleanup", func(): ThumbnailGenerator.cleanup())
 	_safe_cleanup("ThumbnailQueueManager.cleanup", func(): ThumbnailQueueManager.cleanup())
 	
-	# Clean up placement system
+	# Clean up placement system (still static)
 	_safe_cleanup("PlacementStrategyManager.cleanup", func(): PlacementStrategyManager.cleanup())
 	
-	# Clear manager instances (Phase 5.2: Instance-based architecture)
-	if transformation_coordinator:
-		transformation_coordinator.cleanup()
-		TransformationCoordinator._set_instance(null)
-		transformation_coordinator = null
-	
-	if overlay_manager:
-		OverlayManager._set_instance(null)
-		overlay_manager = null
-	
-	if preview_manager:
-		PreviewManager._set_instance(null)
-		preview_manager = null
-	
-	if smooth_transform_manager:
-		smooth_transform_manager.cleanup()
-		SmoothTransformManager._set_instance(null)
-		smooth_transform_manager = null
-	
-	if input_handler:
-		InputHandler._set_instance(null)
-		input_handler = null
-	
-	if position_manager:
-		PositionManager._set_instance(null)
-		position_manager = null
-	
-	if mode_state_machine:
-		ModeStateMachine._set_instance(null)
-		mode_state_machine = null
-	
-	if grid_manager:
-		GridManager._set_instance(null)
-		grid_manager = null
+	# Clean up service registry
+	if service_registry:
+		service_registry.cleanup()
+		service_registry = null
 	
 	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "System cleanup completed")
 
@@ -215,15 +220,25 @@ func _setup_dock():
 	dock = AssetPlacerDock.new()
 	dock.name = "Asset Placer"
 	
+	# Inject services into dock
+	if dock.has_method("set_services"):
+		dock.set_services(service_registry)
+	
 	# Connect dock signals
 	dock.asset_selected.connect(_on_asset_selected)
 	dock.meshlib_item_selected.connect(_on_meshlib_item_selected)
+	
+	# Inject CategoryManager into dock
+	if service_registry and service_registry.category_manager:
+		dock.category_manager = service_registry.category_manager
+		service_registry.category_manager.load_config_file()
 	
 	# Add to Godot dock
 	add_control_to_dock(DOCK_SLOT_RIGHT_UL, dock)
 	
 	# Store dock reference for UI updates
-	TransformationCoordinator.dock_reference = dock
+	if service_registry and service_registry.transformation_coordinator:
+		service_registry.transformation_coordinator.set_dock_reference(dock)
 	
 	# Set PlacementSettings reference for status overlay (deferred to ensure dock is fully initialized)
 	call_deferred("_connect_placement_settings_to_overlay")
@@ -232,10 +247,10 @@ func _setup_dock():
 
 func _connect_placement_settings_to_overlay():
 	"""Connect the PlacementSettings reference to the status overlay"""
-	if dock and dock.has_method("get_placement_settings_instance"):
+	if dock and dock.has_method("get_placement_settings_instance") and service_registry and service_registry.overlay_manager:
 		var placement_settings = dock.get_placement_settings_instance()
 		if placement_settings:
-			OverlayManager.set_placement_settings_reference(placement_settings)
+			service_registry.overlay_manager.set_placement_settings_reference(placement_settings)
 			PluginLogger.info(PluginConstants.COMPONENT_DOCK, "PlacementSettings reference connected to overlay")
 
 func _cleanup_dock():
@@ -246,7 +261,8 @@ func _cleanup_dock():
 		dock = null
 	
 	# Clear dock reference
-	TransformationCoordinator.dock_reference = null
+	if service_registry and service_registry.transformation_coordinator:
+		service_registry.transformation_coordinator.set_dock_reference(null)
 
 ## Toolbar Management
 
@@ -254,6 +270,14 @@ func _setup_toolbar():
 	"""Set up the toolbar buttons in 3D viewport"""
 	if ToolbarButtonsScene:
 		toolbar_buttons = ToolbarButtonsScene.instantiate()
+		
+		# Inject services into toolbar
+		if toolbar_buttons.has_method("set_services"):
+			toolbar_buttons.set_services(service_registry)
+		
+		# Set TransformationCoordinator reference
+		if toolbar_buttons.has_method("set_transformation_coordinator"):
+			toolbar_buttons.set_transformation_coordinator(service_registry.transformation_coordinator)
 		
 		# Add to spatial editor menu container
 		add_control_to_container(CONTAINER_SPATIAL_EDITOR_MENU, toolbar_buttons)
@@ -265,11 +289,11 @@ func _setup_toolbar():
 
 func _connect_placement_settings_to_toolbar():
 	"""Connect the PlacementSettings reference to the toolbar"""
-	if dock and dock.has_method("get_placement_settings_instance") and toolbar_buttons:
+	if dock and dock.has_method("get_placement_settings_instance") and toolbar_buttons and service_registry and service_registry.overlay_manager:
 		var placement_settings = dock.get_placement_settings_instance()
 		if placement_settings and toolbar_buttons.has_method("set_placement_settings"):
 			toolbar_buttons.set_placement_settings(placement_settings)
-			OverlayManager.set_toolbar_reference(toolbar_buttons)
+			service_registry.overlay_manager.set_toolbar_reference(toolbar_buttons)
 			PluginLogger.info(PluginConstants.COMPONENT_MAIN, "PlacementSettings reference connected to toolbar")
 
 func _cleanup_toolbar():
@@ -280,7 +304,8 @@ func _cleanup_toolbar():
 		toolbar_buttons = null
 	
 	# Clear toolbar reference in OverlayManager
-	OverlayManager.set_toolbar_reference(null)
+	if service_registry and service_registry.overlay_manager:
+		service_registry.overlay_manager.set_toolbar_reference(null)
 
 ## Settings Management
 
@@ -318,6 +343,9 @@ func _process(delta: float) -> void:
 	if not _is_plugin_ready():
 		return
 	
+	if not service_registry or not service_registry.transformation_coordinator:
+		return
+	
 	# Get current camera for positioning
 	var camera = _get_current_camera()
 	if not camera:
@@ -331,11 +359,11 @@ func _process(delta: float) -> void:
 		_settings_cache_frame = -1
 	
 	# Delegate frame processing to coordinator with cached settings (Task 3.3 optimization)
-	TransformationCoordinator.process_frame_input(camera, _get_frame_settings(), delta)
+	service_registry.transformation_coordinator.process_frame_input(camera, _get_frame_settings(), delta)
 	
 	# Update transform mode button state
 	if toolbar_buttons and toolbar_buttons.has_method("set_transform_mode_active"):
-		toolbar_buttons.set_transform_mode_active(TransformationCoordinator.is_transform_mode())
+		toolbar_buttons.set_transform_mode_active(service_registry.transformation_coordinator.is_transform_mode())
 
 func _is_plugin_ready() -> bool:
 	"""Check if plugin is ready for processing"""
@@ -343,7 +371,9 @@ func _is_plugin_ready() -> bool:
 
 func _get_current_camera() -> Camera3D:
 	"""Get the current 3D viewport camera"""
-	var viewport_3d = EditorInterface.get_editor_viewport_3d(0)
+	if not service_registry or not service_registry.editor_facade:
+		return null
+	var viewport_3d = service_registry.editor_facade.get_editor_viewport_3d(0)
 	if viewport_3d:
 		return viewport_3d.get_camera_3d()
 	return null
@@ -352,16 +382,21 @@ func _get_current_camera() -> Camera3D:
 
 func handles(object) -> bool:
 	"""Check if we should handle input for this object"""
-	return TransformationCoordinator.is_any_mode_active()
+	if not service_registry or not service_registry.transformation_coordinator:
+		return false
+	return service_registry.transformation_coordinator.is_any_mode_active()
 
 func _input(event: InputEvent) -> void:
 	"""Handle input at the highest priority to prevent TAB focus issues and mouse wheel zoom"""
 	
+	if not service_registry or not service_registry.transformation_coordinator:
+		return
+	
 	# Handle mouse wheel events when modes are active to prevent viewport zoom
-	if event is InputEventMouseButton and TransformationCoordinator.is_any_mode_active():
+	if event is InputEventMouseButton and service_registry.transformation_coordinator.is_any_mode_active():
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			# Check if we should handle this event (action key is held)
-			if TransformationCoordinator.handle_mouse_wheel_input(event):
+			if service_registry.transformation_coordinator.handle_mouse_wheel_input(event):
 				# Event was handled - consume it IMMEDIATELY to prevent viewport zoom
 				get_viewport().set_input_as_handled()
 				return
@@ -388,7 +423,9 @@ func _input(event: InputEvent) -> void:
 		var transform_key = SettingsManager.get_setting("transform_mode_key", "TAB")
 		if key_string == transform_key or full_key_string == transform_key:
 			# Only handle if we have a selected Node3D
-			var selection = EditorInterface.get_selection()
+			if not service_registry or not service_registry.editor_facade:
+				return
+			var selection = service_registry.editor_facade.get_selection()
 			var selected_nodes = selection.get_selected_nodes()
 			
 			# Check if we have a valid Node3D selected
@@ -433,7 +470,7 @@ func _shortcut_input(event: InputEvent) -> void:
 			return
 		
 		# For other plugin keys, only handle when modes are active
-		if TransformationCoordinator.is_any_mode_active():
+		if service_registry and service_registry.transformation_coordinator and service_registry.transformation_coordinator.is_any_mode_active():
 			# Check if this key matches any of our plugin keybindings
 			if SettingsManager.is_plugin_key(full_key_string) or SettingsManager.is_plugin_key(key_string):
 				# This is our key - consume it to prevent Godot from processing it
@@ -442,11 +479,14 @@ func _shortcut_input(event: InputEvent) -> void:
 func _forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 	"""Forward 3D GUI input - intercept and consume plugin-related keys and mouse wheel"""
 	
+	if not service_registry or not service_registry.transformation_coordinator:
+		return EditorPlugin.AFTER_GUI_INPUT_PASS
+	
 	# Handle mouse wheel events when modes are active
-	if event is InputEventMouseButton and TransformationCoordinator.is_any_mode_active():
+	if event is InputEventMouseButton and service_registry.transformation_coordinator.is_any_mode_active():
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			# Check if we should handle this event (action key is held)
-			if TransformationCoordinator.handle_mouse_wheel_input(event):
+			if service_registry.transformation_coordinator.handle_mouse_wheel_input(event):
 				# Event was handled - consume it IMMEDIATELY to prevent viewport zoom
 				# Mark as handled first, then return stop
 				event.set_canceled(true)
@@ -479,7 +519,7 @@ func _forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 			return EditorPlugin.AFTER_GUI_INPUT_STOP
 		
 		# For other plugin keys, only handle when modes are active
-		if not TransformationCoordinator.is_any_mode_active():
+		if not service_registry or not service_registry.transformation_coordinator or not service_registry.transformation_coordinator.is_any_mode_active():
 			return EditorPlugin.AFTER_GUI_INPUT_PASS
 		
 		# Check if this key matches any of our plugin keybindings
@@ -496,7 +536,7 @@ func _forward_canvas_gui_input(event: InputEvent) -> bool:
 	"""Handle canvas/2D GUI input - also intercept plugin keys"""
 	
 	# Only handle input when plugin modes are active
-	if not TransformationCoordinator.is_any_mode_active():
+	if not service_registry or not service_registry.transformation_coordinator or not service_registry.transformation_coordinator.is_any_mode_active():
 		return false
 	
 	# Handle key events to prevent conflicts with Godot shortcuts
@@ -532,6 +572,10 @@ func _on_asset_selected(asset_path: String, mesh_resource: Resource, settings: D
 	"""Handle asset selection from dock"""
 	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Asset selected: " + asset_path)
 	
+	if not service_registry or not service_registry.transformation_coordinator:
+		PluginLogger.error(PluginConstants.COMPONENT_MAIN, "Cannot start placement mode - service registry not initialized")
+		return
+	
 	# Update dock settings and get combined settings
 	SettingsManager.update_dock_settings(settings)
 	_settings_cache_frame = -1  # Invalidate cache when settings change
@@ -539,16 +583,21 @@ func _on_asset_selected(asset_path: String, mesh_resource: Resource, settings: D
 	
 	# Start placement mode through the coordinator
 	if mesh_resource and mesh_resource is Mesh:
-		TransformationCoordinator.start_placement_mode(mesh_resource, null, -1, "", combined_settings, dock)
+		service_registry.transformation_coordinator.start_placement_mode(mesh_resource, null, -1, "", combined_settings, dock)
 	else:
-		TransformationCoordinator.start_placement_mode(null, null, -1, asset_path, combined_settings, dock)
+		service_registry.transformation_coordinator.start_placement_mode(null, null, -1, asset_path, combined_settings, dock)
 	
 	# Show user feedback
-	OverlayManager.show_status_message("Placement mode started - Left-click to place, ESC to exit", Color.GREEN, 3.0)
+	if service_registry and service_registry.overlay_manager:
+		service_registry.overlay_manager.show_status_message("Placement mode started - Left-click to place, ESC to exit", Color.GREEN, 3.0)
 
 func _on_meshlib_item_selected(meshlib: MeshLibrary, item_id: int, settings: Dictionary):
 	"""Handle MeshLibrary item selection from dock"""
 	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "MeshLib item selected: " + str(item_id))
+	
+	if not service_registry or not service_registry.transformation_coordinator:
+		PluginLogger.error(PluginConstants.COMPONENT_MAIN, "Cannot start placement mode - service registry not initialized")
+		return
 	
 	# Update dock settings and get combined settings
 	SettingsManager.update_dock_settings(settings)
@@ -556,10 +605,11 @@ func _on_meshlib_item_selected(meshlib: MeshLibrary, item_id: int, settings: Dic
 	var combined_settings = _get_frame_settings()  # Use cached getter
 	
 	# Start placement mode through the coordinator
-	TransformationCoordinator.start_placement_mode(null, meshlib, item_id, "", combined_settings, dock)
+	service_registry.transformation_coordinator.start_placement_mode(null, meshlib, item_id, "", combined_settings, dock)
 	
 	# Show user feedback
-	OverlayManager.show_status_message("Placement mode started - Left-click to place, ESC to exit", Color.GREEN, 3.0)
+	if service_registry and service_registry.overlay_manager:
+		service_registry.overlay_manager.show_status_message("Placement mode started - Left-click to place, ESC to exit", Color.GREEN, 3.0)
 
 ## Settings and Configuration
 
@@ -577,10 +627,14 @@ func get_plugin_settings() -> Dictionary:
 
 func get_system_status() -> Dictionary:
 	"""Get status of all systems for debugging"""
+	var current_mode = "NONE"
+	if service_registry and service_registry.transformation_coordinator:
+		current_mode = service_registry.transformation_coordinator.get_current_mode()
+	
 	return {
 		"plugin_ready": _is_plugin_ready(),
 		"dock_exists": dock != null,
-		"current_mode": TransformationCoordinator.get_current_mode(),
+		"current_mode": current_mode,
 		"has_camera": _get_current_camera() != null,
 		"settings_loaded": SettingsManager.get_settings_summary()["plugin_settings_count"] > 0
 	}

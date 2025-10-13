@@ -42,7 +42,7 @@ transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 3, -
 transform = Transform3D(7.549784e-08, 0, -0.9999991, 0, 1, 0, 0.9999991, 0, 7.549784e-08, 3, 1.4305115e-06, 1)
 
 [node name="tower-top" parent="." instance=ExtResource("4_c6xj6")]
-transform = Transform3D(-1.9550478e-07, 6.2179004e-07, 1.2, 9.7752405e-08, 1.2, -6.2179004e-07, -1.2, 9.7752306e-08, -1.9550482e-07, 0, 0, -3)
+transform = Transform3D(-1.915947e-07, 9.809189e-07, 1.1760001, 6.206211e-08, 1.1760001, -9.809189e-07, -1.1760001, 6.206194e-08, -1.9159475e-07, 0, 0, -3)
 
 [node name="building_d" parent="." instance=ExtResource("6_kem5a")]
 transform = Transform3D(-1, 0, -1.509958e-07, 0, 1, 0, 1.509958e-07, 0, -1, -4, -0.10000048, -2)
@@ -50,17 +50,17 @@ transform = Transform3D(-1, 0, -1.509958e-07, 0, 1, 0, 1.509958e-07, 0, -1, -4, 
 [node name="barrels" parent="." instance=ExtResource("7_gxmxl")]
 transform = Transform3D(1, 6.500875e-06, 5.960465e-07, -6.500875e-06, 1, 7.2849473e-09, -5.9604645e-07, -7.288822e-09, 1, 0, 0, -5)
 
-[node name="detail-crate" type="Node3D" parent="." instance=ExtResource("8_884kg")]
+[node name="detail-crate" parent="." instance=ExtResource("8_884kg")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 0, -5.8)
 
-[node name="detail-crate_2" type="Node3D" parent="." instance=ExtResource("8_884kg")]
+[node name="detail-crate_2" parent="." instance=ExtResource("8_884kg")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, -6.5)
 
-[node name="detail-crate_3" type="Node3D" parent="." instance=ExtResource("8_884kg")]
+[node name="detail-crate_3" parent="." instance=ExtResource("8_884kg")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -6)
 
-[node name="detail-crate_4" type="Node3D" parent="." instance=ExtResource("8_884kg")]
+[node name="detail-crate_4" parent="." instance=ExtResource("8_884kg")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 0.3, -5.8)
 
-[node name="overhang-round-railing" type="Node3D" parent="." instance=ExtResource("9_d4o4o")]
+[node name="overhang-round-railing" parent="." instance=ExtResource("9_d4o4o")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.001372, -0.039298326, -6.999619)

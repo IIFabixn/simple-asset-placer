@@ -1,23 +1,9 @@
 @tool
-extends InstanceManagerBase
+extends RefCounted
 
 class_name SmoothTransformManager
 
-# Import base class
-const InstanceManagerBase = preload("res://addons/simpleassetplacer/core/instance_manager_base.gd")
-
-# === SINGLETON INSTANCE ===
-
-static var _instance: SmoothTransformManager = null
-
-static func _set_instance(instance: InstanceManagerBase) -> void:
-	_instance = instance as SmoothTransformManager
-
-static func _get_instance() -> InstanceManagerBase:
-	return _instance
-
-static func has_instance() -> bool:
-	return _instance != null and is_instance_valid(_instance)
+const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
 
 """
 SMOOTH TRANSFORMATION MANAGER
@@ -43,26 +29,19 @@ DEPENDS ON: Godot's Tween system and Transform3D math
 # Import utilities
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
 
+# === SERVICE REGISTRY ===
+
+var _services: ServiceRegistry
+
+func _init(services: ServiceRegistry):
+	_services = services
+
 # === INSTANCE VARIABLES ===
 
-# Smooth transform data for each object (private instance storage)
-var __smooth_data: Dictionary = {}
-var __smooth_enabled: bool = true
-var __smooth_speed: float = 8.0
-
-# === STATIC PROPERTIES (BACKWARD COMPATIBILITY) ===
-
-# Internal properties accessed by static functions
-static var _smooth_data: Dictionary:
-	get: return _get_instance().__smooth_data if has_instance() else {}
-
-static var _smooth_enabled: bool:
-	get: return _get_instance().__smooth_enabled if has_instance() else true
-	set(value): if has_instance(): _get_instance().__smooth_enabled = value
-
-static var _smooth_speed: float:
-	get: return _get_instance().__smooth_speed if has_instance() else 8.0
-	set(value): if has_instance(): _get_instance().__smooth_speed = value
+# Smooth transform data for each object
+var _smooth_data: Dictionary = {}
+var _smooth_enabled: bool = true
+var _smooth_speed: float = 8.0
 
 # Smooth transform data structure
 class SmoothTransform:
@@ -81,7 +60,7 @@ class SmoothTransform:
 
 ## CONFIGURATION
 
-static func configure(smooth_enabled_or_settings, smooth_speed: float = 8.0):
+func configure(smooth_enabled_or_settings, smooth_speed: float = 8.0):
 	"""Configure smooth transformation settings
 	
 	Can be called two ways:
@@ -109,12 +88,12 @@ static func configure(smooth_enabled_or_settings, smooth_speed: float = 8.0):
 	if was_enabled and not enabled:
 		force_update_to_targets()
 
-static func load_from_editor_settings():
+func load_from_editor_settings():
 	"""Load settings from Godot's EditorSettings"""
 	if not Engine.is_editor_hint():
 		return
 		
-	var editor_settings = EditorInterface.get_editor_settings()
+	var editor_settings = _services.editor_facade.get_editor_settings()
 	if not editor_settings:
 		return
 	
@@ -132,7 +111,7 @@ static func load_from_editor_settings():
 
 ## OBJECT REGISTRATION
 
-static func register_object(node: Node3D) -> bool:
+func register_object(node: Node3D) -> bool:
 	"""Register an object for smooth transformations"""
 	if not node or not node.is_inside_tree():
 		return false
@@ -144,7 +123,7 @@ static func register_object(node: Node3D) -> bool:
 	
 	return true
 
-static func unregister_object(node: Node3D):
+func unregister_object(node: Node3D):
 	"""Unregister an object from smooth transformations"""
 	if not node:
 		return
@@ -154,14 +133,13 @@ static func unregister_object(node: Node3D):
 		_smooth_data.erase(node_id)
 		PluginLogger.info("SmoothTransformManager", "Unregistered object: " + str(node.name))
 
-static func clear_all_objects():
+func clear_all_objects():
 	"""Clear all registered objects"""
-	if has_instance():
-		_get_instance().__smooth_data.clear()
+	_smooth_data.clear()
 	PluginLogger.info("SmoothTransformManager", "Cleared all smooth transform objects")
 
-static func cleanup_all():
-	"""Cleanup static resources (static wrapper for backward compatibility)"""
+func cleanup_all():
+	"""Cleanup resources"""
 	clear_all_objects()
 	PluginLogger.debug("SmoothTransformManager", "Cleanup completed")
 
@@ -171,7 +149,7 @@ func cleanup() -> void:
 
 ## TRANSFORM UPDATES
 
-static func set_target_position(node: Node3D, position: Vector3):
+func set_target_position(node: Node3D, position: Vector3):
 	"""Set target position for smooth interpolation"""
 	if not _smooth_enabled or not node or not node.is_inside_tree():
 		# Apply directly if smooth transforms disabled or node invalid
@@ -188,7 +166,7 @@ static func set_target_position(node: Node3D, position: Vector3):
 		smooth_data.target_position = position
 		smooth_data.is_lerping = true
 
-static func set_target_rotation(node: Node3D, rotation: Vector3):
+func set_target_rotation(node: Node3D, rotation: Vector3):
 	"""Set target rotation for smooth interpolation"""
 	if not _smooth_enabled or not node or not node.is_inside_tree():
 		# Apply directly if smooth transforms disabled or node invalid
@@ -205,7 +183,7 @@ static func set_target_rotation(node: Node3D, rotation: Vector3):
 		smooth_data.target_rotation = rotation
 		smooth_data.is_lerping = true
 
-static func set_target_scale(node: Node3D, scale: Vector3):
+func set_target_scale(node: Node3D, scale: Vector3):
 	"""Set target scale for smooth interpolation"""
 	if not _smooth_enabled or not node or not node.is_inside_tree():
 		# Apply directly if smooth transforms disabled or node invalid
@@ -222,7 +200,7 @@ static func set_target_scale(node: Node3D, scale: Vector3):
 		smooth_data.target_scale = scale
 		smooth_data.is_lerping = true
 
-static func set_target_transform(node: Node3D, position: Vector3, rotation: Vector3, scale: Vector3):
+func set_target_transform(node: Node3D, position: Vector3, rotation: Vector3, scale: Vector3):
 	"""Set all target transform components at once"""
 	if not _smooth_enabled or not node or not node.is_inside_tree():
 		# Apply directly if smooth transforms disabled or node invalid
@@ -243,7 +221,7 @@ static func set_target_transform(node: Node3D, position: Vector3, rotation: Vect
 		smooth_data.target_scale = scale
 		smooth_data.is_lerping = true
 
-static func apply_transform_immediately(node: Node3D, position: Vector3, rotation: Vector3, scale: Vector3):
+func apply_transform_immediately(node: Node3D, position: Vector3, rotation: Vector3, scale: Vector3):
 	"""Apply transform immediately without smoothing (for initialization)"""
 	if not node or not node.is_inside_tree():
 		return
@@ -261,7 +239,7 @@ static func apply_transform_immediately(node: Node3D, position: Vector3, rotatio
 		smooth_data.target_scale = scale
 		smooth_data.is_lerping = false
 
-static func force_update_to_targets():
+func force_update_to_targets():
 	"""Force all objects to immediately snap to their target transforms (useful when disabling smoothing)"""
 	for node_id in _smooth_data.keys():
 		var smooth_data = _smooth_data[node_id]
@@ -278,7 +256,7 @@ static func force_update_to_targets():
 
 ## INTERPOLATION UPDATE
 
-static func update_smooth_transforms(delta: float):
+func update_smooth_transforms(delta: float):
 	"""Update all smooth transformations - call this every frame"""
 	if not _smooth_enabled:
 		return
@@ -336,11 +314,11 @@ static func update_smooth_transforms(delta: float):
 
 ## UTILITY FUNCTIONS
 
-static func is_smooth_transforms_enabled() -> bool:
+func is_smooth_transforms_enabled() -> bool:
 	"""Check if smooth transforms are currently enabled"""
 	return _smooth_enabled
 
-static func is_object_lerping(node: Node3D) -> bool:
+func is_object_lerping(node: Node3D) -> bool:
 	"""Check if an object is currently lerping"""
 	if not node:
 		return false
@@ -349,7 +327,7 @@ static func is_object_lerping(node: Node3D) -> bool:
 	var smooth_data = _smooth_data.get(node_id)
 	return smooth_data != null and smooth_data.is_lerping
 
-static func get_target_position(node: Node3D) -> Vector3:
+func get_target_position(node: Node3D) -> Vector3:
 	"""Get the target position for an object"""
 	if not node:
 		return Vector3.ZERO
@@ -360,7 +338,7 @@ static func get_target_position(node: Node3D) -> Vector3:
 		return smooth_data.target_position
 	return node.global_position if node.is_inside_tree() else Vector3.ZERO
 
-static func get_target_rotation(node: Node3D) -> Vector3:
+func get_target_rotation(node: Node3D) -> Vector3:
 	"""Get the target rotation for an object"""
 	if not node:
 		return Vector3.ZERO
@@ -371,7 +349,7 @@ static func get_target_rotation(node: Node3D) -> Vector3:
 		return smooth_data.target_rotation
 	return node.rotation if node.is_inside_tree() else Vector3.ZERO
 
-static func get_target_scale(node: Node3D) -> Vector3:
+func get_target_scale(node: Node3D) -> Vector3:
 	"""Get the target scale for an object"""
 	if not node:
 		return Vector3.ONE
@@ -382,7 +360,7 @@ static func get_target_scale(node: Node3D) -> Vector3:
 		return smooth_data.target_scale
 	return node.scale if node.is_inside_tree() else Vector3.ONE
 
-static func stop_lerping(node: Node3D):
+func stop_lerping(node: Node3D):
 	"""Stop lerping for a specific object"""
 	if not node:
 		return
@@ -391,6 +369,7 @@ static func stop_lerping(node: Node3D):
 	var smooth_data = _smooth_data.get(node_id)
 	if smooth_data:
 		smooth_data.is_lerping = false
+
 
 
 

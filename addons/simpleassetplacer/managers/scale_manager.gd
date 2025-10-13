@@ -3,9 +3,11 @@ extends RefCounted
 
 class_name ScaleManager
 
+const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
+
 """
-3D SCALING MATHEMATICS SYSTEM (REFACTORED - STATELESS)
-======================================================
+3D SCALING CALCULATIONS SERVICE (REFACTORED - INSTANCE-BASED)
+==============================================================
 
 PURPOSE: Pure scaling calculation service working with TransformState.
 
@@ -23,25 +25,30 @@ ARCHITECTURE POSITION: Pure calculation service with NO state storage
 - Does NOT know about placement/transform modes
 - Focused solely on scaling math
 
-REFACTORED: State moved to TransformState, application moved to TransformApplicator
+FULLY INSTANCE-BASED with ServiceRegistry injection (matches PositionManager and RotationManager)
 
-USED BY: TransformationManager for scaling calculations
+USED BY: TransformationCoordinator for scaling calculations
 DEPENDS ON: TransformState, IncrementCalculator, Godot math
 """
 
 # Import dependencies
 const TransformState = preload("res://addons/simpleassetplacer/core/transform_state.gd")
 const IncrementCalculator = preload("res://addons/simpleassetplacer/utils/increment_calculator.gd")
-const SmoothTransformManager = preload("res://addons/simpleassetplacer/core/smooth_transform_manager.gd")
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
+
+# === SERVICE REGISTRY ===
+
+var _services: ServiceRegistry
+
+func _init(services: ServiceRegistry):
+	_services = services
 
 ## Configuration
 
-static func configure(state: TransformState, settings: Dictionary):
+func configure(state: TransformState, settings: Dictionary):
 	"""Configure scale manager with settings"""
-	# Handle smooth transform settings
-	if settings.has("smooth_enabled") and settings.has("smooth_speed"):
-		SmoothTransformManager.configure(settings.smooth_enabled, settings.smooth_speed)
+	# Note: Smooth transform settings should be configured by the coordinator,
+	# not by ScaleManager (to avoid cross-manager dependencies)
 	
 	# Handle initial scale
 	if settings.has("initial_scale"):
@@ -57,20 +64,21 @@ static func configure(state: TransformState, settings: Dictionary):
 		var max_val = settings.get("max_scale", 100.0)
 		clamp_scale(state, min_val, max_val)
 
-## @deprecated: Use configure() with a Dictionary instead
-static func configure_smooth_transforms(enabled: bool, speed: float = 8.0):
-	"""Configure smooth transform settings for scaling (deprecated - use configure() instead)"""
-	# No local caching - SmoothTransformManager handles the settings
-	SmoothTransformManager.configure(enabled, speed)
+## @deprecated: Smooth transforms configured by coordinator, not ScaleManager
+func configure_smooth_transforms(enabled: bool, speed: float = 8.0):
+	"""Configure smooth transform settings (DEPRECATED - coordinator handles this now)"""
+	# This function is kept for API compatibility but does nothing
+	# The coordinator now configures SmoothTransformManager directly
+	pass
 
 ## Core Scale Functions
 
-static func set_scale_multiplier(state: TransformState, multiplier: float):
+func set_scale_multiplier(state: TransformState, multiplier: float):
 	"""Set uniform scale multiplier (1.0 = original size, 2.0 = double, 0.5 = half)"""
 	state.scale_multiplier = max(0.01, multiplier)  # Prevent zero/negative scale
 	state.non_uniform_multiplier = Vector3(state.scale_multiplier, state.scale_multiplier, state.scale_multiplier)
 
-static func set_non_uniform_multiplier(state: TransformState, multiplier: Vector3):
+func set_non_uniform_multiplier(state: TransformState, multiplier: Vector3):
 	"""Set non-uniform scale multiplier"""
 	state.non_uniform_multiplier = Vector3(
 		max(0.01, multiplier.x),
@@ -80,32 +88,32 @@ static func set_non_uniform_multiplier(state: TransformState, multiplier: Vector
 	# Update uniform scale to average
 	state.scale_multiplier = (state.non_uniform_multiplier.x + state.non_uniform_multiplier.y + state.non_uniform_multiplier.z) / 3.0
 
-static func get_scale(state: TransformState) -> float:
+func get_scale(state: TransformState) -> float:
 	"""Get current uniform scale multiplier"""
 	return state.scale_multiplier
 
-static func get_scale_vector(state: TransformState) -> Vector3:
+func get_scale_vector(state: TransformState) -> Vector3:
 	"""Get current scale multiplier as Vector3"""
 	return state.non_uniform_multiplier
 
-static func reset_scale(state: TransformState):
+func reset_scale(state: TransformState):
 	"""Reset scale multiplier to 1.0 (original size)"""
 	set_scale_multiplier(state, 1.0)
 	PluginLogger.debug("ScaleManager", "Scale multiplier reset to 1.0")
 
 ## Scale Modifications
 
-static func increase_scale(state: TransformState, amount: float = 0.1):
+func increase_scale(state: TransformState, amount: float = 0.1):
 	"""Increase scale multiplier by amount"""
 	set_scale_multiplier(state, state.scale_multiplier + amount)
 	PluginLogger.debug("ScaleManager", "Increased scale multiplier by " + str(amount) + " to " + str(state.scale_multiplier))
 
-static func decrease_scale(state: TransformState, amount: float = 0.1):
+func decrease_scale(state: TransformState, amount: float = 0.1):
 	"""Decrease scale multiplier by amount"""
 	set_scale_multiplier(state, state.scale_multiplier - amount)
 	PluginLogger.debug("ScaleManager", "Decreased scale multiplier by " + str(amount) + " to " + str(state.scale_multiplier))
 
-static func adjust_scale_with_modifiers(state: TransformState, base_amount: float, modifiers: Dictionary):
+func adjust_scale_with_modifiers(state: TransformState, base_amount: float, modifiers: Dictionary):
 	"""Adjust scale with modifier-calculated step
 	
 	Args:
@@ -117,22 +125,22 @@ static func adjust_scale_with_modifiers(state: TransformState, base_amount: floa
 	set_scale_multiplier(state, state.scale_multiplier + step)
 	PluginLogger.debug("ScaleManager", "Adjusted scale by " + str(step) + " to " + str(state.scale_multiplier))
 
-static func multiply_scale(state: TransformState, factor: float):
+func multiply_scale(state: TransformState, factor: float):
 	"""Multiply current scale multiplier by a factor"""
 	set_scale_multiplier(state, state.scale_multiplier * factor)
 	PluginLogger.debug("ScaleManager", "Multiplied scale by " + str(factor) + " to " + str(state.scale_multiplier))
 
-static func scale_up(state: TransformState, factor: float = 1.1):
+func scale_up(state: TransformState, factor: float = 1.1):
 	"""Scale up by a factor (default 10% increase)"""
 	multiply_scale(state, factor)
 
-static func scale_down(state: TransformState, factor: float = 0.9):
+func scale_down(state: TransformState, factor: float = 0.9):
 	"""Scale down by a factor (default 10% decrease)"""
 	multiply_scale(state, factor)
 
 ## Non-Uniform Scale Modifications
 
-static func scale_axis(state: TransformState, axis: String, amount: float):
+func scale_axis(state: TransformState, axis: String, amount: float):
 	"""Scale a specific axis multiplier by amount"""
 	match axis.to_upper():
 		"X":
@@ -148,7 +156,7 @@ static func scale_axis(state: TransformState, axis: String, amount: float):
 	# Update uniform scale multiplier
 	state.scale_multiplier = (state.non_uniform_multiplier.x + state.non_uniform_multiplier.y + state.non_uniform_multiplier.z) / 3.0
 
-static func scale_axis_with_modifiers(state: TransformState, axis: String, base_amount: float, modifiers: Dictionary):
+func scale_axis_with_modifiers(state: TransformState, axis: String, base_amount: float, modifiers: Dictionary):
 	"""Scale a specific axis with modifier-calculated step
 	
 	Args:
@@ -160,7 +168,7 @@ static func scale_axis_with_modifiers(state: TransformState, axis: String, base_
 	var step = IncrementCalculator.calculate_scale_step(base_amount, modifiers)
 	scale_axis(state, axis, step)
 
-static func multiply_axis_scale(state: TransformState, axis: String, factor: float):
+func multiply_axis_scale(state: TransformState, axis: String, factor: float):
 	"""Multiply a specific axis scale multiplier by a factor"""
 	match axis.to_upper():
 		"X":
@@ -178,7 +186,7 @@ static func multiply_axis_scale(state: TransformState, axis: String, factor: flo
 
 ## Node Application (DEPRECATED - Use TransformApplicator)
 
-static func apply_uniform_scale_to_node(state: TransformState, node: Node3D, original_scale: Vector3 = Vector3.ONE):
+func apply_uniform_scale_to_node(state: TransformState, node: Node3D, original_scale: Vector3 = Vector3.ONE):
 	"""Apply uniform scale multiplier to a node's original scale
 	
 	Uses ADDITIVE scaling logic:
@@ -193,6 +201,9 @@ static func apply_uniform_scale_to_node(state: TransformState, node: Node3D, ori
 		state: TransformState containing scale data
 		node: The Node3D to apply scale to
 		original_scale: The node's original scale (from transform mode) or Vector3.ONE for placement mode
+	
+	NOTE: This function does NOT handle smooth transforms - caller must handle that
+	      (to avoid cross-manager dependencies in pure utility class)
 	"""
 	if node and node.is_inside_tree():
 		# ADDITIVE SCALING: Add offset to each axis
@@ -212,34 +223,31 @@ static func apply_uniform_scale_to_node(state: TransformState, node: Node3D, ori
 		target_scale.y = max(0.01, target_scale.y)
 		target_scale.z = max(0.01, target_scale.z)
 		
-		# Apply scale with or without smoothing
-		if SmoothTransformManager._smooth_enabled:
-			SmoothTransformManager.set_target_scale(node, target_scale)
-		else:
-			node.scale = target_scale
+		# Apply scale directly (no smooth transform - caller handles that)
+		node.scale = target_scale
 
 ## Scale Constraints and Validation
 
-static func clamp_scale(state: TransformState, min_multiplier: float = 0.01, max_multiplier: float = 100.0):
+func clamp_scale(state: TransformState, min_multiplier: float = 0.01, max_multiplier: float = 100.0):
 	"""Clamp scale multiplier within specified bounds"""
 	state.scale_multiplier = clampf(state.scale_multiplier, min_multiplier, max_multiplier)
 	state.non_uniform_multiplier.x = clampf(state.non_uniform_multiplier.x, min_multiplier, max_multiplier)
 	state.non_uniform_multiplier.y = clampf(state.non_uniform_multiplier.y, min_multiplier, max_multiplier)
 	state.non_uniform_multiplier.z = clampf(state.non_uniform_multiplier.z, min_multiplier, max_multiplier)
 
-static func is_uniform_scale(state: TransformState) -> bool:
+func is_uniform_scale(state: TransformState) -> bool:
 	"""Check if current scale multiplier is uniform"""
 	var epsilon = 0.001
 	return abs(state.non_uniform_multiplier.x - state.non_uniform_multiplier.y) < epsilon and \
 		   abs(state.non_uniform_multiplier.y - state.non_uniform_multiplier.z) < epsilon
 
-static func is_scale_at_default(state: TransformState) -> bool:
+func is_scale_at_default(state: TransformState) -> bool:
 	"""Check if scale multiplier is at default (1.0 = original size)"""
 	return abs(state.scale_multiplier - 1.0) < 0.001
 
 ## Scale Presets
 
-static func set_scale_preset(state: TransformState, preset_name: String):
+func set_scale_preset(state: TransformState, preset_name: String):
 	"""Set scale multiplier to a common preset"""
 	match preset_name.to_lower():
 		"tiny":
@@ -263,17 +271,17 @@ static func set_scale_preset(state: TransformState, preset_name: String):
 
 ## Scale Interpolation
 
-static func lerp_to_scale(state: TransformState, target_multiplier: float, weight: float):
+func lerp_to_scale(state: TransformState, target_multiplier: float, weight: float):
 	"""Smoothly interpolate to a target scale multiplier"""
 	set_scale_multiplier(state, lerp(state.scale_multiplier, target_multiplier, weight))
 
-static func lerp_to_scale_vector(state: TransformState, target_multiplier: Vector3, weight: float):
+func lerp_to_scale_vector(state: TransformState, target_multiplier: Vector3, weight: float):
 	"""Smoothly interpolate to a target scale multiplier vector"""
 	set_non_uniform_multiplier(state, state.non_uniform_multiplier.lerp(target_multiplier, weight))
 
 ## Configuration and Settings
 
-static func get_configuration(state: TransformState) -> Dictionary:
+func get_configuration(state: TransformState) -> Dictionary:
 	"""Get current configuration"""
 	return {
 		"scale_multiplier": state.scale_multiplier,
@@ -284,11 +292,11 @@ static func get_configuration(state: TransformState) -> Dictionary:
 
 ## Display and Formatting
 
-static func get_scale_percentage(state: TransformState) -> float:
+func get_scale_percentage(state: TransformState) -> float:
 	"""Get scale multiplier as percentage (1.0 = 100%)"""
 	return state.scale_multiplier * 100.0
 
-static func get_scale_display_text(state: TransformState) -> String:
+func get_scale_display_text(state: TransformState) -> String:
 	"""Get formatted scale display text"""
 	if is_uniform_scale(state):
 		return "Scale: %.1f%%" % get_scale_percentage(state)
@@ -301,7 +309,7 @@ static func get_scale_display_text(state: TransformState) -> String:
 
 ## Debug and Information
 
-static func debug_print_scale(state: TransformState):
+func debug_print_scale(state: TransformState):
 	"""Print current scale state for debugging"""
 	PluginLogger.debug("ScaleManager", "ScaleManager State:")
 	PluginLogger.debug("ScaleManager", "  Uniform Scale Multiplier: %.3f (%.1f%%)" % [state.scale_multiplier, get_scale_percentage(state)])
@@ -309,7 +317,7 @@ static func debug_print_scale(state: TransformState):
 	PluginLogger.debug("ScaleManager", "  Is Uniform: " + str(is_uniform_scale(state)))
 	PluginLogger.debug("ScaleManager", "  Is Default: " + str(is_scale_at_default(state)))
 
-static func get_scale_info(state: TransformState) -> Dictionary:
+func get_scale_info(state: TransformState) -> Dictionary:
 	"""Get comprehensive scale information"""
 	return {
 		"scale_multiplier": state.scale_multiplier,

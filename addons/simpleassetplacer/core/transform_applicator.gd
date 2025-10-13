@@ -10,18 +10,17 @@ TRANSFORM APPLICATION SERVICE
 PURPOSE: Centralized service for applying transforms to Node3D objects.
 
 RESPONSIBILITIES:
-- Apply complete transform state to nodes
-- Handle smooth transform integration
+- Apply complete transform state to nodes (immediate, no smoothing)
 - Apply grid snapping to positions
 - Combine rotation sources (surface + manual)
 - Scale original transforms appropriately
-- Coordinate with SmoothTransformManager
+- Pure utility functions with no state
 
-ARCHITECTURE POSITION: Pure application service
+ARCHITECTURE POSITION: Pure static utility service
 - Does NOT store state (receives TransformState)
 - Does NOT calculate transforms (receives calculated values)
-- Does NOT handle input
-- Focused solely on applying transforms to nodes
+- Does NOT handle input or smoothing
+- Focused solely on immediate transform application
 
 REPLACES: 
 - RotationManager.apply_rotation_to_node()
@@ -29,18 +28,17 @@ REPLACES:
 - Scattered position application logic
 
 USED BY: TransformationManager, PreviewManager, UtilityManager
-DEPENDS ON: TransformState, SmoothTransformManager
+DEPENDS ON: TransformState only (pure utility, no manager dependencies)
 """
 
 # Import dependencies
 const TransformState = preload("res://addons/simpleassetplacer/core/transform_state.gd")
-const SmoothTransformManager = preload("res://addons/simpleassetplacer/core/smooth_transform_manager.gd")
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
 
 ## MAIN APPLICATION METHODS
 
 static func apply_transform_state(node: Node3D, state: TransformState, original_transform: Transform3D = Transform3D()):
-	"""Apply complete transform state to a node
+	"""Apply complete transform state to a node (immediate, no smoothing)
 	
 	Args:
 		node: The Node3D to transform
@@ -62,18 +60,13 @@ static func apply_transform_state(node: Node3D, state: TransformState, original_
 	var original_scale = original_transform.basis.get_scale() if original_transform != Transform3D() else Vector3.ONE
 	var final_scale = original_scale * state.get_scale_vector()
 	
-	# Apply using smooth transforms if enabled
-	if SmoothTransformManager._smooth_enabled:
-		SmoothTransformManager.set_target_position(node, final_position)
-		SmoothTransformManager.set_target_rotation(node, final_rotation)
-		SmoothTransformManager.set_target_scale(node, final_scale)
-	else:
-		node.global_position = final_position
-		node.rotation = final_rotation
-		node.scale = final_scale
+	# Apply immediately
+	node.global_position = final_position
+	node.rotation = final_rotation
+	node.scale = final_scale
 
 static func apply_position_only(node: Node3D, state: TransformState):
-	"""Apply only position from state (useful for preview updates)"""
+	"""Apply only position from state (immediate, no smoothing)"""
 	if not node or not is_instance_valid(node) or not node.is_inside_tree():
 		return
 	
@@ -81,13 +74,10 @@ static func apply_position_only(node: Node3D, state: TransformState):
 	if state.snap_enabled:
 		final_position = apply_grid_snap(final_position, state)
 	
-	if SmoothTransformManager._smooth_enabled:
-		SmoothTransformManager.set_target_position(node, final_position)
-	else:
-		node.global_position = final_position
+	node.global_position = final_position
 
 static func apply_rotation_only(node: Node3D, state: TransformState, original_rotation: Vector3 = Vector3.ZERO):
-	"""Apply only rotation from state
+	"""Apply only rotation from state (immediate, no smoothing)
 	
 	Args:
 		node: The Node3D to rotate
@@ -99,14 +89,10 @@ static func apply_rotation_only(node: Node3D, state: TransformState, original_ro
 	
 	# Combine original + surface alignment + manual offset
 	var final_rotation = original_rotation + state.get_final_rotation()
-	
-	if SmoothTransformManager._smooth_enabled:
-		SmoothTransformManager.set_target_rotation(node, final_rotation)
-	else:
-		node.rotation = final_rotation
+	node.rotation = final_rotation
 
 static func apply_scale_only(node: Node3D, state: TransformState, original_scale: Vector3 = Vector3.ONE):
-	"""Apply only scale from state
+	"""Apply only scale from state (immediate, no smoothing)
 	
 	Args:
 		node: The Node3D to scale
@@ -117,11 +103,26 @@ static func apply_scale_only(node: Node3D, state: TransformState, original_scale
 		return
 	
 	var final_scale = original_scale * state.get_scale_vector()
-	
-	if SmoothTransformManager._smooth_enabled:
-		SmoothTransformManager.set_target_scale(node, final_scale)
-	else:
-		node.scale = final_scale
+	node.scale = final_scale
+
+## HELPER METHODS FOR DIRECT APPLICATION
+
+static func apply_position(node: Node3D, pos: Vector3) -> void:
+	"""Apply position directly to node (immediate)"""
+	if node and is_instance_valid(node) and node.is_inside_tree():
+		node.global_position = pos
+
+static func apply_rotation(node: Node3D, q: Quaternion) -> void:
+	"""Apply rotation directly to node via quaternion (immediate)"""
+	if node and is_instance_valid(node) and node.is_inside_tree():
+		node.quaternion = q
+
+static func apply_scale(node: Node3D, scale: Vector3) -> void:
+	"""Apply scale directly to node (immediate)"""
+	if node and is_instance_valid(node) and node.is_inside_tree():
+		var t := node.global_transform
+		t.basis = t.basis.scaled(scale / t.basis.get_scale())
+		node.global_transform = t
 
 ## GRID SNAPPING
 

@@ -3,6 +3,8 @@ extends RefCounted
 
 class_name CategoryManager
 
+const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
+
 ## CategoryManager handles category detection, tag management, and filtering logic
 ## for the Simple Asset Placer plugin.
 ##
@@ -29,6 +31,10 @@ enum CategoryType {
 	SPECIAL      # Favorites, Recent, etc.
 }
 
+# === SERVICE REGISTRY ===
+
+var _services: ServiceRegistry
+
 # Data storage
 var custom_tags: Dictionary = {}  # {"asset_name_or_path": ["tag1", "tag2"]}
 var tag_usage: Dictionary = {}    # {"tag_name": usage_count}
@@ -40,14 +46,15 @@ var config_file_path: String = ""
 var recently_used_tags: Array = []  # Last used tags for quick access
 
 
-func _init():
+func _init(services: ServiceRegistry):
+	_services = services
 	load_editor_settings()
 
 
 ## Load favorites and recent assets from EditorSettings
 func load_editor_settings():
 	if Engine.is_editor_hint():
-		var editor_settings = EditorInterface.get_editor_settings()
+		var editor_settings = _services.editor_facade.get_editor_settings()
 		if editor_settings:
 			# Load favorites
 			if editor_settings.has_setting(EDITOR_SETTINGS_FAVORITES_KEY):
@@ -74,7 +81,7 @@ func load_editor_settings():
 ## Save favorites and recent assets to EditorSettings
 func save_editor_settings():
 	if Engine.is_editor_hint():
-		var editor_settings = EditorInterface.get_editor_settings()
+		var editor_settings = _services.editor_facade.get_editor_settings()
 		if editor_settings:
 			editor_settings.set_setting(EDITOR_SETTINGS_FAVORITES_KEY, favorites)
 			editor_settings.set_setting(EDITOR_SETTINGS_RECENT_KEY, recent_assets)
@@ -661,6 +668,7 @@ func build_category_tree(assets: Array) -> Dictionary:
 				current_node = current_node[category]
 	
 	return tree
+
 
 
 

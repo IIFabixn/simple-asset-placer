@@ -3,6 +3,8 @@ extends RefCounted
 
 class_name RotationManager
 
+const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
+
 """
 3D ROTATION CALCULATIONS SERVICE (REFACTORED - STATELESS)
 =========================================================
@@ -33,13 +35,20 @@ const TransformState = preload("res://addons/simpleassetplacer/core/transform_st
 const IncrementCalculator = preload("res://addons/simpleassetplacer/utils/increment_calculator.gd")
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
 
+# === SERVICE REGISTRY ===
+
+var _services: ServiceRegistry
+
+func _init(services: ServiceRegistry):
+	_services = services
+
 ## Configuration
 
-static func configure(state: TransformState, settings: Dictionary):
+func configure(state: TransformState, settings: Dictionary):
 	"""Configure rotation manager with settings"""
 	# Handle smooth transform settings
 	if settings.has("smooth_enabled") and settings.has("smooth_speed"):
-		SmoothTransformManager.configure(settings.smooth_enabled, settings.smooth_speed)
+		_services.smooth_transform_manager.configure(settings.smooth_enabled, settings.smooth_speed)
 	
 	# Handle initial rotation
 	if settings.has("initial_rotation"):
@@ -48,19 +57,19 @@ static func configure(state: TransformState, settings: Dictionary):
 			set_rotation_offset_degrees(state, initial)
 
 ## @deprecated: Use configure() with a Dictionary instead
-static func configure_smooth_transforms(enabled: bool, speed: float = 8.0):
+func configure_smooth_transforms(enabled: bool, speed: float = 8.0):
 	"""Configure smooth transform settings for rotation (deprecated - use configure() instead)"""
 	# No local caching - SmoothTransformManager handles the settings
-	SmoothTransformManager.configure(enabled, speed)
+	_services.smooth_transform_manager.configure(enabled, speed)
 
 ## Core Rotation Functions
 
-static func set_rotation_offset(state: TransformState, rotation: Vector3):
+func set_rotation_offset(state: TransformState, rotation: Vector3):
 	"""Set manual rotation offset (in radians)"""
 	state.manual_rotation_offset = rotation
 	_normalize_rotation(state)
 
-static func set_rotation_offset_degrees(state: TransformState, rotation_degrees: Vector3):
+func set_rotation_offset_degrees(state: TransformState, rotation_degrees: Vector3):
 	"""Set manual rotation offset (in degrees)"""
 	state.manual_rotation_offset = Vector3(
 		deg_to_rad(rotation_degrees.x),
@@ -69,11 +78,11 @@ static func set_rotation_offset_degrees(state: TransformState, rotation_degrees:
 	)
 	_normalize_rotation(state)
 
-static func get_rotation_offset(state: TransformState) -> Vector3:
+func get_rotation_offset(state: TransformState) -> Vector3:
 	"""Get current manual rotation offset in radians"""
 	return state.manual_rotation_offset
 
-static func get_rotation_offset_degrees(state: TransformState) -> Vector3:
+func get_rotation_offset_degrees(state: TransformState) -> Vector3:
 	"""Get current manual rotation offset in degrees"""
 	return Vector3(
 		rad_to_deg(state.manual_rotation_offset.x),
@@ -81,16 +90,16 @@ static func get_rotation_offset_degrees(state: TransformState) -> Vector3:
 		rad_to_deg(state.manual_rotation_offset.z)
 	)
 
-static func reset_rotation(state: TransformState):
+func reset_rotation(state: TransformState):
 	"""Reset manual rotation offset to zero (keeps surface alignment)"""
 	state.manual_rotation_offset = Vector3.ZERO
 	PluginLogger.debug("RotationManager", "Manual rotation offset reset to zero")
 
-static func reset_surface_alignment(state: TransformState):
+func reset_surface_alignment(state: TransformState):
 	"""Reset surface alignment rotation to zero"""
 	state.surface_alignment_rotation = Vector3.ZERO
 
-static func reset_all_rotation(state: TransformState):
+func reset_all_rotation(state: TransformState):
 	"""Reset both manual offset and surface alignment rotation"""
 	state.manual_rotation_offset = Vector3.ZERO
 	state.surface_alignment_rotation = Vector3.ZERO
@@ -98,22 +107,22 @@ static func reset_all_rotation(state: TransformState):
 
 ## Rotation Modifications
 
-static func rotate_x(state: TransformState, degrees: float):
+func rotate_x(state: TransformState, degrees: float):
 	"""Rotate around X axis by degrees"""
 	state.manual_rotation_offset.x += deg_to_rad(degrees)
 	_normalize_rotation(state)
 
-static func rotate_y(state: TransformState, degrees: float):
+func rotate_y(state: TransformState, degrees: float):
 	"""Rotate around Y axis by degrees"""
 	state.manual_rotation_offset.y += deg_to_rad(degrees)
 	_normalize_rotation(state)
 
-static func rotate_z(state: TransformState, degrees: float):
+func rotate_z(state: TransformState, degrees: float):
 	"""Rotate around Z axis by degrees"""
 	state.manual_rotation_offset.z += deg_to_rad(degrees)
 	_normalize_rotation(state)
 
-static func rotate_axis(state: TransformState, axis: String, degrees: float):
+func rotate_axis(state: TransformState, axis: String, degrees: float):
 	"""Rotate around specified axis by degrees"""
 	match axis.to_upper():
 		"X":
@@ -125,7 +134,7 @@ static func rotate_axis(state: TransformState, axis: String, degrees: float):
 		_:
 			PluginLogger.warning("RotationManager", "Invalid axis: " + axis)
 
-static func rotate_axis_with_modifiers(state: TransformState, axis: String, base_degrees: float, modifiers: Dictionary):
+func rotate_axis_with_modifiers(state: TransformState, axis: String, base_degrees: float, modifiers: Dictionary):
 	"""Rotate around specified axis with modifier-adjusted step
 	
 	Args:
@@ -137,12 +146,12 @@ static func rotate_axis_with_modifiers(state: TransformState, axis: String, base
 	var step_degrees = IncrementCalculator.calculate_rotation_step(base_degrees, modifiers)
 	rotate_axis(state, axis, step_degrees)
 
-static func add_rotation(state: TransformState, delta_rotation: Vector3):
+func add_rotation(state: TransformState, delta_rotation: Vector3):
 	"""Add a rotation delta (in radians)"""
 	state.manual_rotation_offset += delta_rotation
 	_normalize_rotation(state)
 
-static func add_rotation_degrees(state: TransformState, delta_rotation_degrees: Vector3):
+func add_rotation_degrees(state: TransformState, delta_rotation_degrees: Vector3):
 	"""Add a rotation delta (in degrees)"""
 	add_rotation(state, Vector3(
 		deg_to_rad(delta_rotation_degrees.x),
@@ -152,7 +161,7 @@ static func add_rotation_degrees(state: TransformState, delta_rotation_degrees: 
 
 ## Node Application (DEPRECATED - Use TransformApplicator)
 
-static func apply_rotation_to_node(state: TransformState, node: Node3D, original_rotation: Vector3 = Vector3.ZERO):
+func apply_rotation_to_node(state: TransformState, node: Node3D, original_rotation: Vector3 = Vector3.ZERO):
 	"""Apply rotation offset to a Node3D's original rotation
 	Combines original rotation + surface alignment + manual offset
 	
@@ -180,12 +189,12 @@ static func apply_rotation_to_node(state: TransformState, node: Node3D, original
 		var target_rotation = combined_transform.basis.get_euler()
 		
 		# Apply to node with or without smoothing
-		if SmoothTransformManager._smooth_enabled:
-			SmoothTransformManager.set_target_rotation(node, target_rotation)
+		if _services.smooth_transform_manager.is_smooth_transforms_enabled():
+			_services.smooth_transform_manager.set_target_rotation(node, target_rotation)
 		else:
 			node.rotation = target_rotation
 
-static func align_with_surface_normal(state: TransformState, surface_normal: Vector3):
+func align_with_surface_normal(state: TransformState, surface_normal: Vector3):
 	"""Calculate rotation to align object's up vector with surface normal
 	This creates a BASE rotation where the object's Y-axis points along the surface normal.
 	User manual rotations are applied ON TOP of this base rotation."""
@@ -227,7 +236,7 @@ static func align_with_surface_normal(state: TransformState, surface_normal: Vec
 	state.surface_alignment_rotation = basis.get_euler()
 	_normalize_surface_rotation(state)
 
-static func apply_rotation_step(state: TransformState, node: Node3D, axis: String, degrees: float, original_rotation: Vector3 = Vector3.ZERO, rotate_position_offset: bool = false):
+func apply_rotation_step(state: TransformState, node: Node3D, axis: String, degrees: float, original_rotation: Vector3 = Vector3.ZERO, rotate_position_offset: bool = false):
 	"""Apply a rotation step to the MANUAL rotation offset and update the node
 	This rotation offset is combined with the original rotation and surface alignment
 	
@@ -261,14 +270,13 @@ static func apply_rotation_step(state: TransformState, node: Node3D, axis: Strin
 	# If in placement mode, also rotate the position offset so it follows the mesh rotation
 	if rotate_position_offset:
 		# Rotate the position offset to match the mesh rotation
-		var PositionManager = preload("res://addons/simpleassetplacer/core/position_manager.gd")
-		PositionManager.rotate_manual_offset(state, rotation_axis, degrees)
+		_services.position_manager.rotate_manual_offset(state, rotation_axis, degrees)
 	
 	# Apply the combined rotation (original + surface alignment + manual offset) to the node
 	apply_rotation_to_node(state, node, original_rotation)
 	PluginLogger.debug("RotationManager", "Applied " + str(degrees) + "° manual rotation offset to " + axis + " axis")
 
-static func apply_rotation_step_with_modifiers(state: TransformState, node: Node3D, axis: String, base_degrees: float, modifiers: Dictionary, original_rotation: Vector3 = Vector3.ZERO, rotate_position_offset: bool = false):
+func apply_rotation_step_with_modifiers(state: TransformState, node: Node3D, axis: String, base_degrees: float, modifiers: Dictionary, original_rotation: Vector3 = Vector3.ZERO, rotate_position_offset: bool = false):
 	"""Apply a rotation step with modifier-adjusted increment
 	
 	DEPRECATED: Use rotate_axis_with_modifiers() + TransformApplicator instead
@@ -285,31 +293,31 @@ static func apply_rotation_step_with_modifiers(state: TransformState, node: Node
 	var step_degrees = IncrementCalculator.calculate_rotation_step(base_degrees, modifiers)
 	apply_rotation_step(state, node, axis, step_degrees, original_rotation, rotate_position_offset)
 
-static func reset_node_rotation(node: Node3D):
+func reset_node_rotation(node: Node3D):
 	"""Reset a node's rotation to zero"""
 	if node:
 		node.rotation = Vector3.ZERO
 		PluginLogger.debug("RotationManager", "Reset rotation for node: " + node.name)
 
-static func lerp_to_rotation(state: TransformState, target_rotation: Vector3, weight: float):
+func lerp_to_rotation(state: TransformState, target_rotation: Vector3, weight: float):
 	"""Smoothly interpolate to a target rotation offset"""
 	state.manual_rotation_offset = state.manual_rotation_offset.lerp(target_rotation, weight)
 
 ## Utility Functions
 
-static func _normalize_rotation(state: TransformState):
+func _normalize_rotation(state: TransformState):
 	"""Keep rotation offset values within reasonable bounds"""
 	state.manual_rotation_offset.x = fmod(state.manual_rotation_offset.x, TAU)  # TAU = 2 * PI
 	state.manual_rotation_offset.y = fmod(state.manual_rotation_offset.y, TAU)
 	state.manual_rotation_offset.z = fmod(state.manual_rotation_offset.z, TAU)
 
-static func _normalize_surface_rotation(state: TransformState):
+func _normalize_surface_rotation(state: TransformState):
 	"""Keep surface alignment rotation values within reasonable bounds"""
 	state.surface_alignment_rotation.x = fmod(state.surface_alignment_rotation.x, TAU)
 	state.surface_alignment_rotation.y = fmod(state.surface_alignment_rotation.y, TAU)
 	state.surface_alignment_rotation.z = fmod(state.surface_alignment_rotation.z, TAU)
 
-static func _normalize_rotation_degrees(rotation_degrees: Vector3) -> Vector3:
+func _normalize_rotation_degrees(rotation_degrees: Vector3) -> Vector3:
 	"""Normalize rotation degrees to 0-360 range"""
 	return Vector3(
 		fmod(rotation_degrees.x + 360.0, 360.0),
@@ -319,21 +327,21 @@ static func _normalize_rotation_degrees(rotation_degrees: Vector3) -> Vector3:
 
 ## Rotation Queries
 
-static func is_rotation_zero(state: TransformState) -> bool:
+func is_rotation_zero(state: TransformState) -> bool:
 	"""Check if rotation offset is at zero"""
 	return state.manual_rotation_offset.length_squared() < 0.001
 
-static func get_rotation_magnitude(state: TransformState) -> float:
+func get_rotation_magnitude(state: TransformState) -> float:
 	"""Get the magnitude of current rotation offset"""
 	return state.manual_rotation_offset.length()
 
-static func get_euler_angles(state: TransformState) -> Vector3:
+func get_euler_angles(state: TransformState) -> Vector3:
 	"""Get rotation offset as Euler angles (alias for get_rotation_offset)"""
 	return get_rotation_offset(state)
 
 ## Rotation Presets
 
-static func set_rotation_preset(state: TransformState, preset_name: String):
+func set_rotation_preset(state: TransformState, preset_name: String):
 	"""Set rotation offset to a common preset"""
 	match preset_name.to_lower():
 		"identity", "zero":
@@ -355,7 +363,7 @@ static func set_rotation_preset(state: TransformState, preset_name: String):
 
 ## Configuration and Settings
 
-static func get_configuration(state: TransformState) -> Dictionary:
+func get_configuration(state: TransformState) -> Dictionary:
 	"""Get current configuration"""
 	return {
 		"current_rotation_offset_degrees": get_rotation_offset_degrees(state),
@@ -364,7 +372,7 @@ static func get_configuration(state: TransformState) -> Dictionary:
 
 ## Debug and Information
 
-static func debug_print_rotation(state: TransformState):
+func debug_print_rotation(state: TransformState):
 	"""Print current rotation state for debugging"""
 	var rot_deg = get_rotation_offset_degrees(state)
 	PluginLogger.debug("RotationManager", "RotationManager State:")
@@ -372,7 +380,7 @@ static func debug_print_rotation(state: TransformState):
 	PluginLogger.debug("RotationManager", "  Rotation Offset (radians): X:%.3f Y:%.3f Z:%.3f" % [state.manual_rotation_offset.x, state.manual_rotation_offset.y, state.manual_rotation_offset.z])
 	PluginLogger.debug("RotationManager", "  Magnitude: %.3f" % get_rotation_magnitude(state))
 
-static func get_rotation_info(state: TransformState) -> Dictionary:
+func get_rotation_info(state: TransformState) -> Dictionary:
 	"""Get comprehensive rotation information"""
 	return {
 		"rotation_offset_radians": state.manual_rotation_offset,
@@ -380,6 +388,7 @@ static func get_rotation_info(state: TransformState) -> Dictionary:
 		"magnitude": get_rotation_magnitude(state),
 		"is_zero": is_rotation_zero(state)
 	}
+
 
 
 

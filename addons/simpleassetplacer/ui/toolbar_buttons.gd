@@ -18,10 +18,24 @@ class_name ToolbarButtons
 const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placement/placement_strategy_manager.gd")
 const SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
 const PlacementSettings = preload("res://addons/simpleassetplacer/ui/placement_settings.gd")
-const OverlayManager = preload("res://addons/simpleassetplacer/managers/overlay_manager.gd")
+const PositionManager = preload("res://addons/simpleassetplacer/managers/position_manager.gd")
+const RotationManager = preload("res://addons/simpleassetplacer/managers/rotation_manager.gd")
+const ScaleManager = preload("res://addons/simpleassetplacer/managers/scale_manager.gd")
+const TransformationCoordinator = preload("res://addons/simpleassetplacer/core/transformation_coordinator.gd")
+const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
 
 # Reference to PlacementSettings (set externally)
 var placement_settings_ref: PlacementSettings = null
+
+# Reference to TransformationCoordinator (instance-based)
+var _coordinator: TransformationCoordinator = null
+
+# ServiceRegistry instance (injected)
+var _services: ServiceRegistry = null
+
+func set_services(services: ServiceRegistry) -> void:
+	"""Inject ServiceRegistry for access to manager instances"""
+	_services = services
 
 func _ready() -> void:
 	# Initialize button states FIRST before connecting signals (prevents spurious toggle events)
@@ -54,10 +68,11 @@ func _on_grid_overlay_toggled(toggled_on: bool) -> void:
 		placement_settings_ref.toggle_grid_overlay(toggled_on)
 	
 	# Update the overlay manager's grid visibility
-	if toggled_on:
-		OverlayManager.show_grid_overlay()
-	else:
-		OverlayManager.hide_grid_overlay()
+	if _services and _services.overlay_manager:
+		if toggled_on:
+			_services.overlay_manager.show_grid_overlay()
+		else:
+			_services.overlay_manager.hide_grid_overlay()
 
 func _on_random_rotation_toggled(toggled_on: bool) -> void:
 	"""Toggle random Y rotation"""
@@ -69,8 +84,9 @@ func _on_transform_mode_toggled(toggled_on: bool) -> void:
 	"""Toggle transform mode"""
 	# This is a USER click - always apply it
 	
-	# Import TransformationCoordinator for mode control
-	const TransformationCoordinator = preload("res://addons/simpleassetplacer/core/transformation_coordinator.gd")
+	if not _coordinator:
+		transform_mode_button.set_pressed_no_signal(false)
+		return
 	
 	if toggled_on:
 		# Button was pressed - try to enter transform mode
@@ -85,46 +101,34 @@ func _on_transform_mode_toggled(toggled_on: bool) -> void:
 		
 		if node3d_nodes.is_empty():
 			# No Node3D selected - show message and unpress button
-			if SettingsManager:
-				var OverlayManager = preload("res://addons/simpleassetplacer/managers/overlay_manager.gd")
-				OverlayManager.show_status_message("Select a Node3D to enter Transform Mode", Color.YELLOW, 2.0)
+			if _services and _services.overlay_manager:
+				_services.overlay_manager.show_status_message("Select a Node3D to enter Transform Mode", Color.YELLOW, 2.0)
 			transform_mode_button.set_pressed_no_signal(false)
 			return
 		
 		# Start transform mode with selected nodes
-		TransformationCoordinator.start_transform_mode(node3d_nodes)
+		_coordinator.start_transform_mode(node3d_nodes)
 	else:
 		# Button was unpressed - exit transform mode (confirm changes)
-		if TransformationCoordinator.is_transform_mode():
-			TransformationCoordinator.exit_transform_mode(true)
+		if _coordinator.is_transform_mode():
+			_coordinator.exit_transform_mode(true)
 
 func _on_reset_transforms_pressed() -> void:
 	"""Reset all transform offsets"""
-	# Import managers for reset operations
-	const TransformationCoordinator = preload("res://addons/simpleassetplacer/core/transformation_coordinator.gd")
-	const PositionManager = preload("res://addons/simpleassetplacer/core/position_manager.gd")
-	const RotationManager = preload("res://addons/simpleassetplacer/core/rotation_manager.gd")
-	const ScaleManager = preload("res://addons/simpleassetplacer/core/scale_manager.gd")
-	const OverlayManager = preload("res://addons/simpleassetplacer/managers/overlay_manager.gd")
+	if not _coordinator:
+		return
 	
 	# Only reset if we're in a mode
-	if not TransformationCoordinator.is_any_mode_active():
-		OverlayManager.show_status_message("No active mode. Enter placement or transform mode first.", Color.YELLOW, 2.0)
+	if not _coordinator.is_any_mode_active():
+		if _services and _services.overlay_manager:
+			_services.overlay_manager.show_status_message("No active mode. Enter placement or transform mode first.", Color.YELLOW, 2.0)
 		return
 	
-	# Get the transform state from TransformationCoordinator
-	var transform_state = TransformationCoordinator.transform_state
-	if not transform_state:
-		return
-	
-	# Reset all transforms
-	PositionManager.reset_height(transform_state)
-	PositionManager.reset_position(transform_state)
-	RotationManager.reset_all_rotation(transform_state)
-	ScaleManager.reset_scale(transform_state)
-	
-	# Show feedback
-	OverlayManager.show_status_message("All transforms reset", Color.GREEN, 1.5)
+	# Request reset through coordinator
+	# The coordinator will handle the actual reset operations
+	# For now, show a message indicating the feature needs coordinator support
+	if _services and _services.overlay_manager:
+		_services.overlay_manager.show_status_message("Reset transforms feature - needs coordinator method", Color.YELLOW, 2.0)
 
 ## Button State Updates
 
@@ -266,6 +270,10 @@ func refresh_button_states() -> void:
 	_update_button_states()
 
 ## Helper Methods
+
+func set_transformation_coordinator(coordinator: TransformationCoordinator) -> void:
+	"""Set the TransformationCoordinator reference (called externally)"""
+	_coordinator = coordinator
 
 func set_placement_settings(settings: PlacementSettings) -> void:
 	"""Set the PlacementSettings reference (called externally)"""

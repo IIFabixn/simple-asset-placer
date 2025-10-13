@@ -14,6 +14,7 @@ const AssetThumbnailItem = preload("res://addons/simpleassetplacer/ui/asset_thum
 const CategoryManager = preload("res://addons/simpleassetplacer/managers/category_manager.gd")
 const SettingsDefinition = preload("res://addons/simpleassetplacer/settings/settings_definition.gd")
 const LayoutCalculator = preload("res://addons/simpleassetplacer/utils/layout_calculator.gd")
+const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
 
 signal asset_selected(asset_path: String, mesh_resource: Resource, settings: Dictionary)
 signal meshlib_item_selected(meshlib: MeshLibrary, item_id: int, settings: Dictionary)
@@ -38,12 +39,19 @@ var discovered_assets: Array = []
 var supported_extensions = ["obj", "fbx", "dae", "gltf", "glb", "blend", "tscn", "scn", "tres", "res", "meshlib"]
 var category_manager: CategoryManager = null
 
+# ServiceRegistry instance (injected)
+var _services: ServiceRegistry = null
+
+func set_services(services: ServiceRegistry) -> void:
+	"""Inject ServiceRegistry for access to manager instances"""
+	_services = services
+
 func _ready():
 	name = "Asset Placer"
 	
-	# Initialize category manager
-	category_manager = CategoryManager.new()
-	category_manager.load_config_file()
+	# Note: CategoryManager will be injected from plugin via set_category_manager()
+	# Cannot create it here as it requires ServiceRegistry
+	# category_manager = CategoryManager.new(service_registry)
 	
 	setup_ui()
 	discover_assets()

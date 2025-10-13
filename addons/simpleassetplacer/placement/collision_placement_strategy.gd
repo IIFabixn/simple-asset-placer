@@ -56,8 +56,22 @@ func calculate_position(from: Vector3, to: Vector3, config: Dictionary) -> Place
 		if node:
 			_gather_collision_rids_recursive(node, exclude_rids)
 	
-	# Get world space state
-	var space_state = get_world_space_state()
+	# Get world space state from config or editor scene root
+	var space_state: PhysicsDirectSpaceState3D = null
+	
+	# Try to get from config first (if world_root was passed)
+	var world_root = config.get("world_root", null)
+	if world_root:
+		space_state = PlacementStrategy.get_world_space_state_static(world_root)
+	
+	# If not available, try to get from EditorInterface (plugin context)
+	if not space_state:
+		var editor_interface = Engine.get_singleton("EditorInterface")
+		if editor_interface:
+			var edited_scene_root = editor_interface.get_edited_scene_root()
+			if edited_scene_root:
+				space_state = PlacementStrategy.get_world_space_state_static(edited_scene_root)
+	
 	if not space_state:
 		PluginLogger.warning(PluginConstants.COMPONENT_POSITION, "CollisionPlacementStrategy: No space state available")
 		return _create_fallback_result(from, to)

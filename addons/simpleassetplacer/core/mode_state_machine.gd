@@ -1,20 +1,9 @@
 @tool
-extends "res://addons/simpleassetplacer/core/instance_manager_base.gd"
+extends RefCounted
 
 class_name ModeStateMachine
 
-# === SINGLETON INSTANCE ===
-
-static var _instance: ModeStateMachine = null
-
-static func _set_instance(instance: InstanceManagerBase) -> void:
-	_instance = instance as ModeStateMachine
-
-static func _get_instance() -> InstanceManagerBase:
-	return _instance
-
-static func has_instance() -> bool:
-	return _instance != null and is_instance_valid(_instance)
+const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
 
 """
 MODE STATE MACHINE
@@ -33,8 +22,6 @@ ARCHITECTURE POSITION: Core state manager
 - Provides single source of truth for current mode
 - No business logic - pure state management
 
-PHASE 5.2: Converted to instance-based architecture with hybrid static pattern
-
 USED BY: TransformationCoordinator, mode handlers
 USES: PluginLogger, PluginConstants
 """
@@ -42,6 +29,13 @@ USES: PluginLogger, PluginConstants
 # Import utilities
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
 const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
+
+# === SERVICE REGISTRY ===
+
+var _services: ServiceRegistry
+
+func _init(services: ServiceRegistry):
+	_services = services
 
 # === MODE ENUM ===
 
@@ -53,35 +47,29 @@ enum Mode {
 
 # === STATE ===
 
-# Instance variable (Phase 5.2: Instance-based architecture)
-var __current_mode: Mode = Mode.NONE
-
-# Static property forwarding to instance (Phase 5.2: Hybrid pattern)
-static var current_mode: Mode:
-	get: return _get_instance().__current_mode if has_instance() else Mode.NONE
-	set(value): if has_instance(): _get_instance().__current_mode = value
+var _current_mode: Mode = Mode.NONE
 
 ## STATE QUERIES
 
-static func is_any_mode_active() -> bool:
+func is_any_mode_active() -> bool:
 	"""Check if any transformation mode is currently active"""
-	return current_mode != Mode.NONE
+	return _current_mode != Mode.NONE
 
-static func is_placement_mode() -> bool:
+func is_placement_mode() -> bool:
 	"""Check if placement mode is active"""
-	return current_mode == Mode.PLACEMENT
+	return _current_mode == Mode.PLACEMENT
 
-static func is_transform_mode() -> bool:
+func is_transform_mode() -> bool:
 	"""Check if transform mode is active"""
-	return current_mode == Mode.TRANSFORM
+	return _current_mode == Mode.TRANSFORM
 
-static func get_current_mode() -> Mode:
+func get_current_mode() -> Mode:
 	"""Get the current mode (returns Mode enum)"""
-	return current_mode
+	return _current_mode
 
-static func get_current_mode_string() -> String:
+func get_current_mode_string() -> String:
 	"""Get the current mode as a string (for display/logging purposes)"""
-	match current_mode:
+	match _current_mode:
 		Mode.NONE:
 			return "none"
 		Mode.PLACEMENT:
@@ -93,7 +81,7 @@ static func get_current_mode_string() -> String:
 
 ## MODE TRANSITIONS
 
-static func can_enter_mode(new_mode: Mode) -> bool:
+func can_enter_mode(new_mode: Mode) -> bool:
 	"""Check if we can transition to the specified mode
 	
 	Args:
@@ -107,22 +95,22 @@ static func can_enter_mode(new_mode: Mode) -> bool:
 		return true
 	
 	# Can't enter same mode twice
-	if new_mode == current_mode:
+	if new_mode == _current_mode:
 		PluginLogger.warning("ModeStateMachine", "Already in " + get_mode_name(new_mode) + " mode")
 		return false
 	
 	# Can enter any mode from NONE
-	if current_mode == Mode.NONE:
+	if _current_mode == Mode.NONE:
 		return true
 	
 	# Can't enter new mode while another is active (must exit first)
-	if current_mode != Mode.NONE and new_mode != Mode.NONE:
-		PluginLogger.warning("ModeStateMachine", "Must exit " + get_mode_name(current_mode) + " mode before entering " + get_mode_name(new_mode) + " mode")
+	if _current_mode != Mode.NONE and new_mode != Mode.NONE:
+		PluginLogger.warning("ModeStateMachine", "Must exit " + get_mode_name(_current_mode) + " mode before entering " + get_mode_name(new_mode) + " mode")
 		return false
 	
 	return true
 
-static func transition_to_mode(new_mode: Mode) -> bool:
+func transition_to_mode(new_mode: Mode) -> bool:
 	"""Attempt to transition to a new mode
 	
 	Args:
@@ -134,8 +122,8 @@ static func transition_to_mode(new_mode: Mode) -> bool:
 	if not can_enter_mode(new_mode):
 		return false
 	
-	var old_mode = current_mode
-	current_mode = new_mode
+	var old_mode = _current_mode
+	_current_mode = new_mode
 	
 	# Log transition
 	if old_mode != new_mode:
@@ -146,21 +134,21 @@ static func transition_to_mode(new_mode: Mode) -> bool:
 	
 	return true
 
-static func set_mode(mode: Mode) -> void:
+func set_mode(mode: Mode) -> void:
 	"""Directly set the mode (low-level, use transition_to_mode for validation)
 	
 	Args:
 		mode: The mode to set
 	"""
-	current_mode = mode
+	_current_mode = mode
 
-static func clear_mode() -> void:
+func clear_mode() -> void:
 	"""Clear the current mode (set to NONE)"""
-	current_mode = Mode.NONE
+	_current_mode = Mode.NONE
 
 ## VALIDATION HELPERS
 
-static func validate_mode_transition(from_mode: Mode, to_mode: Mode) -> bool:
+func validate_mode_transition(from_mode: Mode, to_mode: Mode) -> bool:
 	"""Validate a specific mode transition
 	
 	Args:
@@ -188,7 +176,7 @@ static func validate_mode_transition(from_mode: Mode, to_mode: Mode) -> bool:
 	
 	return true
 
-static func require_mode(required_mode: Mode, operation_name: String = "Operation") -> bool:
+func require_mode(required_mode: Mode, operation_name: String = "Operation") -> bool:
 	"""Check if current mode matches required mode, log error if not
 	
 	Args:
@@ -198,15 +186,15 @@ static func require_mode(required_mode: Mode, operation_name: String = "Operatio
 	Returns:
 		bool: True if in required mode, False otherwise
 	"""
-	if current_mode != required_mode:
+	if _current_mode != required_mode:
 		PluginLogger.error(
 			"ModeStateMachine",
-			operation_name + " requires " + get_mode_name(required_mode) + " mode, but current mode is " + get_mode_name(current_mode)
+			operation_name + " requires " + get_mode_name(required_mode) + " mode, but current mode is " + get_mode_name(_current_mode)
 		)
 		return false
 	return true
 
-static func require_no_mode(operation_name: String = "Operation") -> bool:
+func require_no_mode(operation_name: String = "Operation") -> bool:
 	"""Check that no mode is active, log error if one is
 	
 	Args:
@@ -215,17 +203,17 @@ static func require_no_mode(operation_name: String = "Operation") -> bool:
 	Returns:
 		bool: True if no mode active, False otherwise
 	"""
-	if current_mode != Mode.NONE:
+	if _current_mode != Mode.NONE:
 		PluginLogger.error(
 			"ModeStateMachine",
-			operation_name + " requires no active mode, but " + get_mode_name(current_mode) + " mode is active"
+			operation_name + " requires no active mode, but " + get_mode_name(_current_mode) + " mode is active"
 		)
 		return false
 	return true
 
 ## UTILITY HELPERS
 
-static func get_mode_name(mode: Mode) -> String:
+func get_mode_name(mode: Mode) -> String:
 	"""Get human-readable name for a mode
 	
 	Args:
@@ -244,7 +232,7 @@ static func get_mode_name(mode: Mode) -> String:
 		_:
 			return "UNKNOWN"
 
-static func get_mode_from_string(mode_string: String) -> Mode:
+func get_mode_from_string(mode_string: String) -> Mode:
 	"""Get Mode enum from string representation
 	
 	Args:
@@ -266,9 +254,10 @@ static func get_mode_from_string(mode_string: String) -> Mode:
 
 ## DEBUG
 
-static func debug_print_state() -> void:
+func debug_print_state() -> void:
 	"""Print current state for debugging"""
 	PluginLogger.debug(
 		"ModeStateMachine",
-		"Current mode: " + get_mode_name(current_mode) + " (" + str(current_mode) + ")"
+		"Current mode: " + get_mode_name(_current_mode) + " (" + str(_current_mode) + ")"
 	)
+

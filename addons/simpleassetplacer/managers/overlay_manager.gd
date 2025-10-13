@@ -1,25 +1,9 @@
 @tool
-extends InstanceManagerBase
+extends RefCounted
 
 class_name OverlayManager
 
-# Import base class
-const InstanceManagerBase = preload("res://addons/simpleassetplacer/core/instance_manager_base.gd")
-
-# === SINGLETON INSTANCE ===
-
-static var _instance: OverlayManager = null
-
-static func _set_instance(instance: InstanceManagerBase) -> void:
-	_instance = instance as OverlayManager
-
-static func _get_instance() -> InstanceManagerBase:
-	return _instance
-
-static func has_instance() -> bool:
-	return _instance != null and is_instance_valid(_instance)
-
-# Forward reference to ModeStateMachine for Mode enum
+const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
 const ModeStateMachine = preload("res://addons/simpleassetplacer/core/mode_state_machine.gd")
 const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placement/placement_strategy_manager.gd")
 const SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
@@ -51,6 +35,13 @@ DEPENDS ON: Godot UI system, EditorInterface for overlay containers
 # Preload the status overlay scene
 const StatusOverlayScene = preload("res://addons/simpleassetplacer/ui/status_overlay.tscn")
 
+# === SERVICE REGISTRY ===
+
+var _services: ServiceRegistry
+
+func _init(services: ServiceRegistry):
+	_services = services
+
 # === INSTANCE VARIABLES ===
 
 # Overlay references
@@ -65,141 +56,117 @@ var _overlays_initialized: bool = false
 var _current_mode: int = 0
 var _show_overlays: bool = true
 
-# === STATIC PROPERTIES (BACKWARD COMPATIBILITY) ===
+## Getters
 
-static var main_overlay: Control:
-	get: return _get_instance()._main_overlay if has_instance() else null
-	set(value): if has_instance(): _get_instance()._main_overlay = value
+func get_grid_overlay() -> Node3D:
+	"""Get the grid overlay node"""
+	return _grid_overlay
 
-static var status_overlay: CanvasLayer:
-	get: return _get_instance()._status_overlay if has_instance() else null
-	set(value): if has_instance(): _get_instance()._status_overlay = value
-
-static var toolbar_buttons: Control:
-	get: return _get_instance()._toolbar_buttons if has_instance() else null
-	set(value): if has_instance(): _get_instance()._toolbar_buttons = value
-
-static var grid_overlay: Node3D:
-	get: return _get_instance()._grid_overlay if has_instance() else null
-	set(value): if has_instance(): _get_instance()._grid_overlay = value
-
-static var half_step_grid_overlay: Node3D:
-	get: return _get_instance()._half_step_grid_overlay if has_instance() else null
-	set(value): if has_instance(): _get_instance()._half_step_grid_overlay = value
-
-static var overlays_initialized: bool:
-	get: return _get_instance()._overlays_initialized if has_instance() else false
-	set(value): if has_instance(): _get_instance()._overlays_initialized = value
-
-static var current_mode: int:
-	get: return _get_instance()._current_mode if has_instance() else 0
-	set(value): if has_instance(): _get_instance()._current_mode = value
-
-static var show_overlays: bool:
-	get: return _get_instance()._show_overlays if has_instance() else true
-	set(value): if has_instance(): _get_instance()._show_overlays = value
+func get_half_step_grid_overlay() -> Node3D:
+	"""Get the half-step grid overlay node"""
+	return _half_step_grid_overlay
 
 ## Core Overlay Management
 
-static func initialize_overlays():
+func initialize_overlays():
 	"""Initialize all overlay systems"""
-	if overlays_initialized:
+	if _overlays_initialized:
 		return
 	
 	cleanup_all_overlays()
 	_create_main_overlay()
-	overlays_initialized = true
+	_overlays_initialized = true
 
-static func _create_main_overlay():
+func _create_main_overlay():
 	"""Create the main overlay container"""
-	if NodeUtils.is_valid(main_overlay):
+	if NodeUtils.is_valid(_main_overlay):
 		return
 	
-	main_overlay = Control.new()
-	main_overlay.name = "AssetPlacerOverlay"
-	main_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	main_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_main_overlay = Control.new()
+	_main_overlay.name = "AssetPlacerOverlay"
+	_main_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_main_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	
 	# Add to editor viewport
-	var editor_viewport = EditorInterface.get_editor_main_screen()
+	var editor_viewport = _services.editor_facade.get_editor_main_screen()
 	if editor_viewport:
-		editor_viewport.add_child(main_overlay)
+		editor_viewport.add_child(_main_overlay)
 	
 	# Load status overlay from scene
 	_load_status_overlay_scene()
 
 ## Status Overlay
 
-static func _load_status_overlay_scene():
+func _load_status_overlay_scene():
 	"""Load status overlay from scene file"""
-	if NodeUtils.is_valid(status_overlay):
+	if NodeUtils.is_valid(_status_overlay):
 		return
 	
 	# Instance the status overlay scene (CanvasLayer)
-	status_overlay = StatusOverlayScene.instantiate()
+	_status_overlay = StatusOverlayScene.instantiate()
 	
 	# Add to the 3D viewport specifically so it's positioned relative to viewport, not entire editor
-	var viewport_3d = EditorInterface.get_editor_viewport_3d(0)
+	var viewport_3d = _services.editor_facade.get_editor_viewport_3d(0)
 	if viewport_3d:
-		viewport_3d.add_child(status_overlay)
+		viewport_3d.add_child(_status_overlay)
 	
 	# Set visible to false AFTER it's in the tree (deferred to ensure _ready() has run)
-	status_overlay.call_deferred("set_visible", false)
+	_status_overlay.call_deferred("set_visible", false)
 
-static func set_placement_settings_reference(placement_settings: Node):
+func set_placement_settings_reference(placement_settings: Node):
 	"""Set the PlacementSettings reference for the status overlay"""
-	if NodeUtils.is_valid(status_overlay) and status_overlay.has_method("set_placement_settings"):
-		status_overlay.set_placement_settings(placement_settings)
+	if NodeUtils.is_valid(_status_overlay) and _status_overlay.has_method("set_placement_settings"):
+		_status_overlay.set_placement_settings(placement_settings)
 
-static func set_toolbar_reference(toolbar: Control):
+func set_toolbar_reference(toolbar: Control):
 	"""Set the toolbar buttons reference"""
-	toolbar_buttons = toolbar
+	_toolbar_buttons = toolbar
 
-static func show_transform_overlay(mode: int, node_name: String = "", position: Vector3 = Vector3.ZERO, rotation: Vector3 = Vector3.ZERO, scale: float = 1.0, height_offset: float = 0.0):
+func show_transform_overlay(mode: int, node_name: String = "", position: Vector3 = Vector3.ZERO, rotation: Vector3 = Vector3.ZERO, scale: float = 1.0, height_offset: float = 0.0):
 	"""Show unified transform overlay with all current transformation data"""
 	if not _is_overlay_ready():
 		return
 	
 	# Use the scene's controller method
-	status_overlay.show_transform_info(mode, node_name, position, rotation, scale, height_offset)
-	current_mode = mode
+	_status_overlay.show_transform_info(mode, node_name, position, rotation, scale, height_offset)
+	_current_mode = mode
 
-static func refresh_overlay_buttons():
+func refresh_overlay_buttons():
 	"""Refresh the button states in the toolbar"""
-	if NodeUtils.is_valid(toolbar_buttons) and toolbar_buttons.has_method("refresh_button_states"):
-		toolbar_buttons.refresh_button_states()
+	if NodeUtils.is_valid(_toolbar_buttons) and _toolbar_buttons.has_method("refresh_button_states"):
+		_toolbar_buttons.refresh_button_states()
 
-static func show_status_message(message: String, color: Color = Color.GREEN, duration: float = 0.0):
+func show_status_message(message: String, color: Color = Color.GREEN, duration: float = 0.0):
 	"""Show a temporary status message"""
 	if not _is_overlay_ready():
 		return
 	
 	# Use the scene's controller method
-	status_overlay.show_status_message(message, color)
+	_status_overlay.show_status_message(message, color)
 	
 	# Auto-hide after duration if specified
 	if duration > 0.0:
 		await Engine.get_main_loop().create_timer(duration).timeout
-		if NodeUtils.is_valid(status_overlay) and current_mode == 0:  # Only hide if not in active mode (0 = NONE)
-			status_overlay.hide_overlay()
-		elif not NodeUtils.is_valid(status_overlay):
-			status_overlay = null  # Clear invalid reference
+		if NodeUtils.is_valid(_status_overlay) and _current_mode == 0:  # Only hide if not in active mode (0 = NONE)
+			_status_overlay.hide_overlay()
+		elif not NodeUtils.is_valid(_status_overlay):
+			_status_overlay = null  # Clear invalid reference
 
-static func hide_transform_overlay():
+func hide_transform_overlay():
 	"""Hide the unified transform overlay"""
-	if NodeUtils.is_valid_and_ready(status_overlay):
-		status_overlay.hide_overlay()
-	current_mode = 0  # NONE mode
+	if NodeUtils.is_valid_and_ready(_status_overlay):
+		_status_overlay.hide_overlay()
+	_current_mode = 0  # NONE mode
 
-static func hide_status_overlay():
+func hide_status_overlay():
 	"""Hide status overlay (legacy compatibility)"""
 	hide_transform_overlay()
 
 ## Mode-Specific Display
 
-static func set_mode(mode: int):
+func set_mode(mode: int):
 	"""Update the current mode for overlay context"""
-	current_mode = mode
+	_current_mode = mode
 	
 	match mode:
 		1:  # PLACEMENT mode
@@ -211,61 +178,61 @@ static func set_mode(mode: int):
 
 ## Overlay Utilities
 
-static func show_all_overlays():
+func show_all_overlays():
 	"""Show all relevant overlays for current mode"""
-	show_overlays = true
+	_show_overlays = true
 	_ensure_overlay_visible(true)
 
-static func hide_all_overlays():
+func hide_all_overlays():
 	"""Hide all overlays"""
-	show_overlays = false
+	_show_overlays = false
 	hide_status_overlay()
 
-static func cleanup_all_overlays():
+func cleanup_all_overlays():
 	"""Clean up all overlay resources"""
-	status_overlay = NodeUtils.cleanup_and_null(status_overlay)
-	grid_overlay = NodeUtils.cleanup_and_null(grid_overlay)
-	half_step_grid_overlay = NodeUtils.cleanup_and_null(half_step_grid_overlay)
-	main_overlay = NodeUtils.cleanup_and_null(main_overlay)
+	_status_overlay = NodeUtils.cleanup_and_null(_status_overlay)
+	_grid_overlay = NodeUtils.cleanup_and_null(_grid_overlay)
+	_half_step_grid_overlay = NodeUtils.cleanup_and_null(_half_step_grid_overlay)
+	_main_overlay = NodeUtils.cleanup_and_null(_main_overlay)
 	
-	overlays_initialized = false
+	_overlays_initialized = false
 
 ## Consolidated Helper Functions
 
-static func _is_overlay_ready() -> bool:
+func _is_overlay_ready() -> bool:
 	"""Check if overlays are properly initialized and ready for use"""
-	return show_overlays and NodeUtils.is_valid_and_ready(status_overlay)
+	return _show_overlays and NodeUtils.is_valid_and_ready(_status_overlay)
 
-static func _ensure_overlay_visible(visible: bool = true) -> void:
+func _ensure_overlay_visible(visible: bool = true) -> void:
 	"""Ensure status overlay has the specified visibility"""
-	NodeUtils.safe_set_visible(status_overlay, visible)
+	NodeUtils.safe_set_visible(_status_overlay, visible)
 
-static func _cleanup_grids() -> void:
+func _cleanup_grids() -> void:
 	"""Clean up both main and half-step grid overlays"""
-	grid_overlay = NodeUtils.cleanup_and_null(grid_overlay)
-	half_step_grid_overlay = NodeUtils.cleanup_and_null(half_step_grid_overlay)
+	_grid_overlay = NodeUtils.cleanup_and_null(_grid_overlay)
+	_half_step_grid_overlay = NodeUtils.cleanup_and_null(_half_step_grid_overlay)
 
 ## Configuration
 
-static func set_overlay_visibility(visible: bool):
+func set_overlay_visibility(visible: bool):
 	"""Set global overlay visibility"""
-	show_overlays = visible
+	_show_overlays = visible
 	
 	if visible:
 		show_all_overlays()
 	else:
 		hide_all_overlays()
 
-static func configure_overlay_positions(positions: Dictionary):
+func configure_overlay_positions(positions: Dictionary):
 	"""Configure overlay positions"""	
-	if positions.has("status") and status_overlay:
-		var label = status_overlay.get_node("StatusLabel")
+	if positions.has("status") and _status_overlay:
+		var label = _status_overlay.get_node("StatusLabel")
 		if label:
 			label.position = positions.status
 
 ## Grid Overlay
 
-static func create_grid_overlay(center: Vector3, grid_size: float, grid_extent: int = 10, offset: Vector3 = Vector3.ZERO, show_half_step: bool = false):
+func create_grid_overlay(center: Vector3, grid_size: float, grid_extent: int = 10, offset: Vector3 = Vector3.ZERO, show_half_step: bool = false):
 	"""Create a 3D grid visualization in the world
 	center: Center position of the grid
 	grid_size: Size of each grid cell
@@ -277,22 +244,22 @@ static func create_grid_overlay(center: Vector3, grid_size: float, grid_extent: 
 	remove_grid_overlay()
 	
 	# Get the 3D editor viewport
-	var editor_root = EditorInterface.get_edited_scene_root()
+	var editor_root = _services.editor_facade.get_edited_scene_root()
 	if not editor_root:
 		return
 	
 	# Create main grid node
-	grid_overlay = MeshInstance3D.new()
-	grid_overlay.name = "AssetPlacerGrid"
+	_grid_overlay = MeshInstance3D.new()
+	_grid_overlay.name = "AssetPlacerGrid"
 	
 	# IMPORTANT: Set top_level = true to make grid independent of parent's transform
 	# This prevents the grid from being affected by the scene root's rotation/scale
 	# Without this, if the scene root is rotated (e.g., 180° Y rotation), the grid would be flipped
-	grid_overlay.top_level = true
+	_grid_overlay.top_level = true
 	
 	# Create grid mesh
 	var immediate_mesh = ImmediateMesh.new()
-	grid_overlay.mesh = immediate_mesh
+	_grid_overlay.mesh = immediate_mesh
 	
 	# Create material for main grid lines
 	var material = StandardMaterial3D.new()
@@ -301,7 +268,7 @@ static func create_grid_overlay(center: Vector3, grid_size: float, grid_extent: 
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.no_depth_test = true  # Always visible
 	material.disable_receive_shadows = true
-	grid_overlay.material_override = material
+	_grid_overlay.material_override = material
 	
 	# Draw main grid lines
 	immediate_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
@@ -339,24 +306,24 @@ static func create_grid_overlay(center: Vector3, grid_size: float, grid_extent: 
 	immediate_mesh.surface_end()
 	
 	# Add main grid to scene
-	editor_root.add_child(grid_overlay)
-	grid_overlay.global_position = Vector3.ZERO  # Lines use absolute world coordinates
+	editor_root.add_child(_grid_overlay)
+	_grid_overlay.global_position = Vector3.ZERO  # Lines use absolute world coordinates
 	
 	# Create half-step grid if requested
 	if show_half_step:
 		_create_half_step_grid(center, grid_size * 0.5, grid_extent * 2, offset, editor_root)
 
-static func _create_half_step_grid(center: Vector3, half_grid_size: float, grid_extent: int, offset: Vector3, editor_root: Node):
+func _create_half_step_grid(center: Vector3, half_grid_size: float, grid_extent: int, offset: Vector3, editor_root: Node):
 	"""Create a red half-step grid overlay for fine snapping visualization"""
 	
 	# Create half-step grid node
-	half_step_grid_overlay = MeshInstance3D.new()
-	half_step_grid_overlay.name = "AssetPlacerHalfStepGrid"
-	half_step_grid_overlay.top_level = true
+	_half_step_grid_overlay = MeshInstance3D.new()
+	_half_step_grid_overlay.name = "AssetPlacerHalfStepGrid"
+	_half_step_grid_overlay.top_level = true
 	
 	# Create half-step grid mesh
 	var half_mesh = ImmediateMesh.new()
-	half_step_grid_overlay.mesh = half_mesh
+	_half_step_grid_overlay.mesh = half_mesh
 	
 	# Create material for half-step grid lines (red, more transparent)
 	var half_material = StandardMaterial3D.new()
@@ -365,7 +332,7 @@ static func _create_half_step_grid(center: Vector3, half_grid_size: float, grid_
 	half_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	half_material.no_depth_test = true  # Always visible
 	half_material.disable_receive_shadows = true
-	half_step_grid_overlay.material_override = half_material
+	_half_step_grid_overlay.material_override = half_material
 	
 	# Draw half-step grid lines
 	half_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
@@ -402,39 +369,39 @@ static func _create_half_step_grid(center: Vector3, half_grid_size: float, grid_
 	half_mesh.surface_end()
 	
 	# Add half-step grid to scene
-	editor_root.add_child(half_step_grid_overlay)
-	half_step_grid_overlay.global_position = Vector3.ZERO
+	editor_root.add_child(_half_step_grid_overlay)
+	_half_step_grid_overlay.global_position = Vector3.ZERO
 
-static func update_grid_overlay(center: Vector3, grid_size: float, grid_extent: int = 10, offset: Vector3 = Vector3.ZERO, show_half_step: bool = false):
+func update_grid_overlay(center: Vector3, grid_size: float, grid_extent: int = 10, offset: Vector3 = Vector3.ZERO, show_half_step: bool = false):
 	"""Update existing grid or create new one"""
 	create_grid_overlay(center, grid_size, grid_extent, offset, show_half_step)
 
-static func hide_grid_overlay():
+func hide_grid_overlay():
 	"""Hide the grid overlay"""
-	NodeUtils.safe_set_visible(grid_overlay, false)
-	NodeUtils.safe_set_visible(half_step_grid_overlay, false)
+	NodeUtils.safe_set_visible(_grid_overlay, false)
+	NodeUtils.safe_set_visible(_half_step_grid_overlay, false)
 
-static func show_grid_overlay():
+func show_grid_overlay():
 	"""Show the grid overlay"""
-	NodeUtils.safe_set_visible(grid_overlay, true)
-	NodeUtils.safe_set_visible(half_step_grid_overlay, true)
+	NodeUtils.safe_set_visible(_grid_overlay, true)
+	NodeUtils.safe_set_visible(_half_step_grid_overlay, true)
 
-static func remove_grid_overlay():
+func remove_grid_overlay():
 	"""Remove and cleanup grid overlay"""
 	_cleanup_grids()
 
 ## Debug and Information
 
-static func debug_print_overlay_state():
+func debug_print_overlay_state():
 	"""Print current overlay state for debugging"""
 	PluginLogger.debug("OverlayManager", "OverlayManager State:")
-	PluginLogger.debug("OverlayManager", "  Initialized: " + str(overlays_initialized))
-	PluginLogger.debug("OverlayManager", "  Show Overlays: " + str(show_overlays))
-	PluginLogger.debug("OverlayManager", "  Current Mode: " + str(current_mode))
-	PluginLogger.debug("OverlayManager", "  Main Overlay Valid: " + str(NodeUtils.is_valid(main_overlay)))
-	PluginLogger.debug("OverlayManager", "  Status Overlay Valid: " + str(NodeUtils.is_valid(status_overlay)))
-	PluginLogger.debug("OverlayManager", "  Grid Overlay Valid: " + str(NodeUtils.is_valid(grid_overlay)))
-	PluginLogger.debug("OverlayManager", "  Half-Step Grid Overlay Valid: " + str(NodeUtils.is_valid(half_step_grid_overlay)))
+	PluginLogger.debug("OverlayManager", "  Initialized: " + str(_overlays_initialized))
+	PluginLogger.debug("OverlayManager", "  Show Overlays: " + str(_show_overlays))
+	PluginLogger.debug("OverlayManager", "  Current Mode: " + str(_current_mode))
+	PluginLogger.debug("OverlayManager", "  Main Overlay Valid: " + str(NodeUtils.is_valid(_main_overlay)))
+	PluginLogger.debug("OverlayManager", "  Status Overlay Valid: " + str(NodeUtils.is_valid(_status_overlay)))
+	PluginLogger.debug("OverlayManager", "  Grid Overlay Valid: " + str(NodeUtils.is_valid(_grid_overlay)))
+	PluginLogger.debug("OverlayManager", "  Half-Step Grid Overlay Valid: " + str(NodeUtils.is_valid(_half_step_grid_overlay)))
 
 
 

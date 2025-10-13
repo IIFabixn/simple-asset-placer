@@ -1,23 +1,10 @@
 @tool
-extends InstanceManagerBase
+extends RefCounted
 
 class_name PreviewManager
 
-# Import base class
-const InstanceManagerBase = preload("res://addons/simpleassetplacer/core/instance_manager_base.gd")
-
-# === SINGLETON INSTANCE ===
-
-static var _instance: PreviewManager = null
-
-static func _set_instance(instance: InstanceManagerBase) -> void:
-	_instance = instance as PreviewManager
-
-static func _get_instance() -> InstanceManagerBase:
-	return _instance
-
-static func has_instance() -> bool:
-	return _instance != null and is_instance_valid(_instance)
+const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
+const NodeUtils = preload("res://addons/simpleassetplacer/utils/node_utils.gd")
 
 """
 PREVIEW MESH MANAGEMENT SYSTEM
@@ -43,9 +30,12 @@ USED BY: TransformationManager for placement mode preview operations
 DEPENDS ON: Godot scene system, material system, resource loading, SmoothTransformManager
 """
 
-# Import smooth transform system
-const SmoothTransformManager = preload("res://addons/simpleassetplacer/core/smooth_transform_manager.gd")
-const NodeUtils = preload("res://addons/simpleassetplacer/utils/node_utils.gd")
+# === SERVICE REGISTRY ===
+
+var _services: ServiceRegistry
+
+func _init(services: ServiceRegistry):
+	_services = services
 
 # === INSTANCE VARIABLES ===
 
@@ -60,43 +50,14 @@ var _current_scale: Vector3 = Vector3.ONE
 var _preview_opacity: float = 0.6
 var _preview_color: Color = Color.WHITE
 
-# === STATIC PROPERTIES (BACKWARD COMPATIBILITY) ===
-
-static var preview_mesh: Node3D:
-	get: return _get_instance()._preview_mesh if has_instance() else null
-	set(value): if has_instance(): _get_instance()._preview_mesh = value
-
-static var preview_material: StandardMaterial3D:
-	get: return _get_instance()._preview_material if has_instance() else null
-	set(value): if has_instance(): _get_instance()._preview_material = value
-
-static var current_position: Vector3:
-	get: return _get_instance()._current_position if has_instance() else Vector3.ZERO
-	set(value): if has_instance(): _get_instance()._current_position = value
-
-static var current_rotation: Vector3:
-	get: return _get_instance()._current_rotation if has_instance() else Vector3.ZERO
-	set(value): if has_instance(): _get_instance()._current_rotation = value
-
-static var current_scale: Vector3:
-	get: return _get_instance()._current_scale if has_instance() else Vector3.ONE
-	set(value): if has_instance(): _get_instance()._current_scale = value
-
-static var preview_opacity: float:
-	get: return _get_instance()._preview_opacity if has_instance() else 0.6
-	set(value): if has_instance(): _get_instance()._preview_opacity = value
-
-static var preview_color: Color:
-	get: return _get_instance()._preview_color if has_instance() else Color.WHITE
-	set(value): if has_instance(): _get_instance()._preview_color = value
-
 ## Configuration
 
-static func configure(settings: Dictionary) -> void:
+func configure(settings: Dictionary) -> void:
 	"""Configure preview manager with settings"""
 	# Handle smooth transform settings
 	if settings.has("smooth_enabled") and settings.has("smooth_speed"):
-		SmoothTransformManager.configure(settings.smooth_enabled, settings.smooth_speed)
+		if _services and _services.smooth_transform_manager:
+			_services.smooth_transform_manager.configure(settings.smooth_enabled, settings.smooth_speed)
 	
 	# Handle preview appearance settings
 	if settings.has("preview_opacity"):
@@ -106,23 +67,24 @@ static func configure(settings: Dictionary) -> void:
 		set_preview_color(settings.preview_color)
 	
 	# Recreate material with new settings if it exists
-	if preview_material and (settings.has("preview_opacity") or settings.has("preview_color")):
-		preview_material.queue_free()
-		preview_material = null
+	if _preview_material and (settings.has("preview_opacity") or settings.has("preview_color")):
+		_preview_material.queue_free()
+		_preview_material = null
 
 ## @deprecated: Use configure() with a Dictionary instead
-static func configure_smooth_transforms(enabled: bool, speed: float) -> void:
+func configure_smooth_transforms(enabled: bool, speed: float) -> void:
 	"""Configure smooth transform settings (deprecated - use configure() instead)"""
 	configure({"smooth_enabled": enabled, "smooth_speed": speed})
 
-static func update_smooth_transforms(delta: float) -> void:
+func update_smooth_transforms(delta: float) -> void:
 	"""Update smooth transformations - call every frame"""
 	# Always delegate to SmoothTransformManager - it handles enabled state internally
-	SmoothTransformManager.update_smooth_transforms(delta)
+	if _services and _services.smooth_transform_manager:
+		_services.smooth_transform_manager.update_smooth_transforms(delta)
 
 ## Preview Creation
 
-static func start_preview_mesh(mesh: Mesh, settings: Dictionary = {}) -> void:
+func start_preview_mesh(mesh: Mesh, settings: Dictionary = {}) -> void:
 	"""Start preview with a mesh"""
 	if not mesh or not is_instance_valid(mesh):
 		PluginLogger.error("PreviewManager", "Cannot start preview - invalid mesh provided")
@@ -130,35 +92,36 @@ static func start_preview_mesh(mesh: Mesh, settings: Dictionary = {}) -> void:
 	
 	cleanup_preview()
 	
-	var current_scene = EditorInterface.get_edited_scene_root()
+	var current_scene = _services.editor_facade.get_edited_scene_root()
 	if not current_scene or not is_instance_valid(current_scene):
 		PluginLogger.error("PreviewManager", "No valid scene available for preview")
 		return
 	
 	# Create preview mesh instance
-	preview_mesh = MeshInstance3D.new()
-	preview_mesh.mesh = mesh
+	_preview_mesh = MeshInstance3D.new()
+	_preview_mesh.mesh = mesh
 	# Don't override materials - preserve original mesh appearance
 	# Instead, use transparency property to make it semi-transparent
-	preview_mesh.transparency = 1.0 - preview_opacity  # transparency: 0.0 = opaque, 1.0 = fully transparent
-	preview_mesh.name = "AssetPlacerPreview"
-	preview_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	preview_mesh.layers = 1  # Default render layer
+	_preview_mesh.transparency = 1.0 - _preview_opacity  # transparency: 0.0 = opaque, 1.0 = fully transparent
+	_preview_mesh.name = "AssetPlacerPreview"
+	_preview_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_preview_mesh.layers = 1  # Default render layer
 	
 	# Add to scene first
-	current_scene.add_child(preview_mesh)
+	current_scene.add_child(_preview_mesh)
 	
 	# Apply initial transform (after node is in tree)
-	preview_mesh.global_position = current_position
-	preview_mesh.rotation = current_rotation
-	preview_mesh.scale = current_scale
+	_preview_mesh.global_position = _current_position
+	_preview_mesh.rotation = _current_rotation
+	_preview_mesh.scale = _current_scale
 	
 	# Register with smooth transform manager
-	SmoothTransformManager.register_object(preview_mesh)
+	if _services and _services.smooth_transform_manager:
+		_services.smooth_transform_manager.register_object(_preview_mesh)
 	
 	PluginLogger.info("PreviewManager", "Started mesh preview")
 
-static func start_preview_asset(asset_path: String, settings: Dictionary = {}) -> void:
+func start_preview_asset(asset_path: String, settings: Dictionary = {}) -> void:
 	"""Start preview with an asset file"""
 	if asset_path == "" or not FileAccess.file_exists(asset_path):
 		PluginLogger.error("PreviewManager", "Cannot start preview - invalid asset path: " + asset_path)
@@ -174,7 +137,7 @@ static func start_preview_asset(asset_path: String, settings: Dictionary = {}) -
 	
 	cleanup_preview()
 	
-	var current_scene = EditorInterface.get_edited_scene_root()
+	var current_scene = _services.editor_facade.get_edited_scene_root()
 	if not current_scene or not is_instance_valid(current_scene):
 		PluginLogger.error("PreviewManager", "No valid scene available for preview")
 		return
@@ -190,7 +153,7 @@ static func start_preview_asset(asset_path: String, settings: Dictionary = {}) -
 		preview_node = MeshInstance3D.new()
 		preview_node.mesh = asset
 		# Use transparency instead of material override
-		preview_node.transparency = 1.0 - preview_opacity
+		preview_node.transparency = 1.0 - _preview_opacity
 	else:
 		PluginLogger.error("PreviewManager", "Unsupported asset type for: " + asset_path)
 		return
@@ -199,30 +162,31 @@ static func start_preview_asset(asset_path: String, settings: Dictionary = {}) -
 		PluginLogger.error("PreviewManager", "Failed to create preview node from: " + asset_path)
 		return
 	
-	preview_mesh = preview_node
-	preview_mesh.name = "AssetPlacerPreview"
+	_preview_mesh = preview_node
+	_preview_mesh.name = "AssetPlacerPreview"
 	
 	# Apply transparency to all mesh instances
-	_apply_preview_transparency_to_children(preview_mesh)
+	_apply_preview_transparency_to_children(_preview_mesh)
 	
 	# Add to scene first
-	current_scene.add_child(preview_mesh)
+	current_scene.add_child(_preview_mesh)
 	
 	# Apply initial transform (after node is in tree)
-	preview_mesh.global_position = current_position
-	preview_mesh.rotation = current_rotation
-	preview_mesh.scale = current_scale
+	_preview_mesh.global_position = _current_position
+	_preview_mesh.rotation = _current_rotation
+	_preview_mesh.scale = _current_scale
 	
 	# Register with smooth transform manager
-	SmoothTransformManager.register_object(preview_mesh)
+	if _services and _services.smooth_transform_manager:
+		_services.smooth_transform_manager.register_object(_preview_mesh)
 	
 	PluginLogger.info("PreviewManager", "Started asset preview for: " + asset_path)
 
-static func _apply_preview_transparency_to_children(node: Node) -> void:
+func _apply_preview_transparency_to_children(node: Node) -> void:
 	"""Apply transparency to all GeometryInstance3D children (preserves original materials)"""
 	if node is GeometryInstance3D:
 		# Use transparency property to make it semi-transparent while preserving materials
-		node.transparency = 1.0 - preview_opacity  # 0.0 = opaque, 1.0 = fully transparent
+		node.transparency = 1.0 - _preview_opacity  # 0.0 = opaque, 1.0 = fully transparent
 		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	
 	for child in node.get_children():
@@ -230,129 +194,138 @@ static func _apply_preview_transparency_to_children(node: Node) -> void:
 
 ## Preview Updates
 
-static func update_preview_position(position: Vector3) -> void:
+func update_preview_position(position: Vector3) -> void:
 	"""Update preview position (with optional smoothing)"""
-	current_position = position
-	if NodeUtils.is_valid_and_in_tree(preview_mesh):
+	_current_position = position
+	if NodeUtils.is_valid_and_in_tree(_preview_mesh):
 		# Always delegate to SmoothTransformManager - it handles enabled/disabled state
-		SmoothTransformManager.set_target_position(preview_mesh, position)
+		if _services and _services.smooth_transform_manager:
+			_services.smooth_transform_manager.set_target_position(_preview_mesh, position)
 
-static func update_preview_rotation(rotation: Vector3) -> void:
+func update_preview_rotation(rotation: Vector3) -> void:
 	"""Update preview rotation (with optional smoothing)"""
-	current_rotation = rotation
-	if NodeUtils.is_valid_and_in_tree(preview_mesh):
+	_current_rotation = rotation
+	if NodeUtils.is_valid_and_in_tree(_preview_mesh):
 		# Always delegate to SmoothTransformManager - it handles enabled/disabled state
-		SmoothTransformManager.set_target_rotation(preview_mesh, rotation)
+		if _services and _services.smooth_transform_manager:
+			_services.smooth_transform_manager.set_target_rotation(_preview_mesh, rotation)
 
-static func update_preview_scale(scale: Vector3) -> void:
+func update_preview_scale(scale: Vector3) -> void:
 	"""Update preview scale (with optional smoothing)"""
-	current_scale = scale
-	if NodeUtils.is_valid_and_in_tree(preview_mesh):
+	_current_scale = scale
+	if NodeUtils.is_valid_and_in_tree(_preview_mesh):
 		# Always delegate to SmoothTransformManager - it handles enabled/disabled state
-		SmoothTransformManager.set_target_scale(preview_mesh, scale)
+		if _services and _services.smooth_transform_manager:
+			_services.smooth_transform_manager.set_target_scale(_preview_mesh, scale)
 
-static func update_preview_transform(position: Vector3, rotation: Vector3, scale: Vector3) -> void:
+func update_preview_transform(position: Vector3, rotation: Vector3, scale: Vector3) -> void:
 	"""Update all preview transform components at once (with optional smoothing)"""
-	current_position = position
-	current_rotation = rotation
-	current_scale = scale
+	_current_position = position
+	_current_rotation = rotation
+	_current_scale = scale
 	
-	if NodeUtils.is_valid_and_in_tree(preview_mesh):
+	if NodeUtils.is_valid_and_in_tree(_preview_mesh):
 		# Always delegate to SmoothTransformManager - it handles enabled/disabled state
-		SmoothTransformManager.set_target_transform(preview_mesh, position, rotation, scale)
+		if _services and _services.smooth_transform_manager:
+			_services.smooth_transform_manager.set_target_transform(_preview_mesh, position, rotation, scale)
 
 ## Preview State Queries
 
-static func has_preview() -> bool:
+func has_preview() -> bool:
 	"""Check if there's an active preview"""
-	return preview_mesh != null and is_instance_valid(preview_mesh) and preview_mesh.is_inside_tree()
+	return _preview_mesh != null and is_instance_valid(_preview_mesh) and _preview_mesh.is_inside_tree()
 
-static func get_preview_position() -> Vector3:
+func get_preview_mesh() -> Node3D:
+	"""Get the preview mesh node"""
+	return _preview_mesh
+
+func get_preview_position() -> Vector3:
 	"""Get current preview position (returns target position when smooth transforms are enabled)"""
-	if has_preview() and preview_mesh.is_inside_tree():
+	if has_preview() and _preview_mesh.is_inside_tree():
 		# If smooth transforms are enabled, return the target position instead of current
-		if SmoothTransformManager.is_smooth_transforms_enabled():
-			return SmoothTransformManager.get_target_position(preview_mesh)
-		return preview_mesh.global_position
-	return current_position
+		if _services and _services.smooth_transform_manager and _services.smooth_transform_manager.is_smooth_transforms_enabled():
+			return _services.smooth_transform_manager.get_target_position(_preview_mesh)
+		return _preview_mesh.global_position
+	return _current_position
 
-static func get_preview_rotation() -> Vector3:
+func get_preview_rotation() -> Vector3:
 	"""Get current preview rotation (returns target rotation when smooth transforms are enabled)"""
 	if has_preview():
 		# If smooth transforms are enabled, return the target rotation instead of current
-		if SmoothTransformManager.is_smooth_transforms_enabled():
-			return SmoothTransformManager.get_target_rotation(preview_mesh)
-		return preview_mesh.rotation
-	return current_rotation
+		if _services and _services.smooth_transform_manager and _services.smooth_transform_manager.is_smooth_transforms_enabled():
+			return _services.smooth_transform_manager.get_target_rotation(_preview_mesh)
+		return _preview_mesh.rotation
+	return _current_rotation
 
-static func get_preview_scale() -> Vector3:
+func get_preview_scale() -> Vector3:
 	"""Get current preview scale (returns target scale when smooth transforms are enabled)"""
 	if has_preview():
 		# If smooth transforms are enabled, return the target scale instead of current
-		if SmoothTransformManager.is_smooth_transforms_enabled():
-			return SmoothTransformManager.get_target_scale(preview_mesh)
-		return preview_mesh.scale
-	return current_scale
+		if _services and _services.smooth_transform_manager and _services.smooth_transform_manager.is_smooth_transforms_enabled():
+			return _services.smooth_transform_manager.get_target_scale(_preview_mesh)
+		return _preview_mesh.scale
+	return _current_scale
 
-static func get_preview_transform() -> Transform3D:
+func get_preview_transform() -> Transform3D:
 	"""Get current preview transform"""
 	if has_preview():
-		return preview_mesh.transform
+		return _preview_mesh.transform
 	return Transform3D()
 
 ## Preview Visibility and Appearance
 
-static func set_preview_visibility(visible: bool) -> void:
+func set_preview_visibility(visible: bool) -> void:
 	"""Set preview visibility"""
-	NodeUtils.safe_set_visible(preview_mesh, visible)
+	NodeUtils.safe_set_visible(_preview_mesh, visible)
 
-static func set_preview_opacity(opacity: float) -> void:
+func set_preview_opacity(opacity: float) -> void:
 	"""Set preview opacity"""
-	preview_opacity = clampf(opacity, 0.0, 1.0)
+	_preview_opacity = clampf(opacity, 0.0, 1.0)
 	
-	if preview_material:
-		preview_material.albedo_color.a = preview_opacity
+	if _preview_material:
+		_preview_material.albedo_color.a = _preview_opacity
 	
-	PluginLogger.debug("PreviewManager", "Set preview opacity to " + str(preview_opacity))
+	PluginLogger.debug("PreviewManager", "Set preview opacity to " + str(_preview_opacity))
 
-static func set_preview_color(color: Color) -> void:
+func set_preview_color(color: Color) -> void:
 	"""Set preview color tint"""
-	preview_color = color
+	_preview_color = color
 	
-	if preview_material:
-		preview_material.albedo_color = Color(color.r, color.g, color.b, preview_opacity)
+	if _preview_material:
+		_preview_material.albedo_color = Color(color.r, color.g, color.b, _preview_opacity)
 	
 	PluginLogger.debug("PreviewManager", "Set preview color to " + str(color))
 
 ## Preview Cleanup
 
-static func cleanup_preview() -> void:
+func cleanup_preview() -> void:
 	"""Clean up the current preview"""
-	if NodeUtils.is_valid(preview_mesh):
+	if NodeUtils.is_valid(_preview_mesh):
 		# Unregister from smooth transform manager
-		SmoothTransformManager.unregister_object(preview_mesh)
-		preview_mesh = NodeUtils.cleanup_and_null(preview_mesh)
+		if _services and _services.smooth_transform_manager:
+			_services.smooth_transform_manager.unregister_object(_preview_mesh)
+		_preview_mesh = NodeUtils.cleanup_and_null(_preview_mesh)
 		PluginLogger.debug("PreviewManager", "Cleaned up preview")
 
-static func get_configuration() -> Dictionary:
+func get_configuration() -> Dictionary:
 	"""Get current configuration"""
 	return {
-		"preview_opacity": preview_opacity,
-		"preview_color": preview_color,
+		"_preview_opacity": _preview_opacity,
+		"_preview_color": _preview_color,
 		"has_preview": has_preview()
 	}
 
 ## Utility Functions
 
-static func get_preview_bounds() -> AABB:
+func get_preview_bounds() -> AABB:
 	"""Get preview bounding box"""
-	if has_preview() and preview_mesh.mesh:
-		var aabb = preview_mesh.mesh.get_aabb()
+	if has_preview() and _preview_mesh.mesh:
+		var aabb = _preview_mesh.mesh.get_aabb()
 		# Transform AABB by the preview's transform
-		return aabb.transformed(preview_mesh.transform)
+		return aabb.transformed(_preview_mesh.transform)
 	return AABB()
 
-static func is_preview_in_camera_view(camera: Camera3D) -> bool:
+func is_preview_in_camera_view(camera: Camera3D) -> bool:
 	"""Check if preview is visible in camera view"""
 	if not has_preview() or not camera:
 		return false
@@ -364,27 +337,28 @@ static func is_preview_in_camera_view(camera: Camera3D) -> bool:
 
 ## Debug and Information
 
-static func debug_print_preview_state() -> void:
+func debug_print_preview_state() -> void:
 	"""Print current preview state for debugging"""
 	PluginLogger.debug("PreviewManager", "PreviewManager State:")
 	PluginLogger.debug("PreviewManager", "  Has Preview: " + str(has_preview()))
-	PluginLogger.debug("PreviewManager", "  Position: " + str(current_position))
-	PluginLogger.debug("PreviewManager", "  Rotation: " + str(current_rotation))
-	PluginLogger.debug("PreviewManager", "  Scale: " + str(current_scale))
-	PluginLogger.debug("PreviewManager", "  Opacity: " + str(preview_opacity))
-	PluginLogger.debug("PreviewManager", "  Color: " + str(preview_color))
+	PluginLogger.debug("PreviewManager", "  Position: " + str(_current_position))
+	PluginLogger.debug("PreviewManager", "  Rotation: " + str(_current_rotation))
+	PluginLogger.debug("PreviewManager", "  Scale: " + str(_current_scale))
+	PluginLogger.debug("PreviewManager", "  Opacity: " + str(_preview_opacity))
+	PluginLogger.debug("PreviewManager", "  Color: " + str(_preview_color))
 
-static func get_preview_info() -> Dictionary:
+func get_preview_info() -> Dictionary:
 	"""Get comprehensive preview information"""
 	return {
 		"has_preview": has_preview(),
 		"position": get_preview_position(),
 		"rotation": get_preview_rotation(),
 		"scale": get_preview_scale(),
-		"opacity": preview_opacity,
-		"color": preview_color,
+		"opacity": _preview_opacity,
+		"color": _preview_color,
 		"bounds": get_preview_bounds() if has_preview() else AABB()
 	}
+
 
 
 

@@ -8,7 +8,8 @@ class_name SettingsManager
 # Import utilities
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
 const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
-const SmoothTransformManager = preload("res://addons/simpleassetplacer/core/smooth_transform_manager.gd")
+const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
+const SmoothTransformManager = preload("res://addons/simpleassetplacer/managers/smooth_transform_manager.gd")
 
 ## Settings Storage
 
@@ -113,19 +114,33 @@ static func _load_from_editor_settings():
 		# If not found in EditorSettings, keep the default value
 	
 	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Settings loaded from EditorSettings")
-	
-	# Also load SmoothTransformManager settings
-	SmoothTransformManager.load_from_editor_settings()
 
 static func reload_from_editor_settings():
 	"""Reload settings from EditorSettings and invalidate cache (for real-time updates)"""
 	_load_from_editor_settings()
 	_cache_dirty = true
 	
-	# Also reload SmoothTransformManager settings
-	SmoothTransformManager.load_from_editor_settings()
-	
 	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Settings reloaded from EditorSettings")
+
+static func load_from_editor_settings(facade: Object) -> Dictionary:
+	"""Load settings from EditorSettings via EditorFacade
+	
+	Args:
+		facade: EditorFacade instance for accessing EditorSettings
+		
+	Returns:
+		Dictionary with smooth transform and transform increment settings
+	"""
+	var es = facade.get_editor_settings()
+	var d := {}
+	d["smooth_transforms"] = es.get_setting("simpleassetplacer/smooth_transforms", true)
+	d["smooth_transform_speed"] = es.get_setting("simpleassetplacer/smooth_transform_speed", 8.0)
+	d["fine_rotation_increment"] = es.get_setting("simpleassetplacer/fine_rotation_increment", 5.0)
+	d["large_rotation_increment"] = es.get_setting("simpleassetplacer/large_rotation_increment", 90.0)
+	d["fine_scale_increment"] = es.get_setting("simpleassetplacer/fine_scale_increment", 0.01)
+	d["large_scale_increment"] = es.get_setting("simpleassetplacer/large_scale_increment", 0.5)
+	d["fine_height_increment"] = es.get_setting("simpleassetplacer/fine_height_increment", 0.01)
+	return d
 
 static func load_from_file(config_path: String = "user://simpleassetplacer_settings.cfg") -> bool:
 	"""Load settings from ConfigFile"""

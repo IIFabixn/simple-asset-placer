@@ -3,6 +3,8 @@ extends RefCounted
 
 class_name UndoRedoHelper
 
+const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
+
 """
 UNDO/REDO HELPER
 ================
@@ -28,9 +30,16 @@ USES: EditorInterface, PluginLogger
 # Import utilities
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
 
+# === SERVICE REGISTRY ===
+
+var _services: ServiceRegistry
+
+func _init(services: ServiceRegistry):
+	_services = services
+
 ## VALIDATION
 
-static func is_valid_for_undo(node: Node) -> bool:
+func is_valid_for_undo(node: Node) -> bool:
 	"""Check if node is valid for undo operations
 	
 	Args:
@@ -47,20 +56,20 @@ static func is_valid_for_undo(node: Node) -> bool:
 		return false
 	return true
 
-static func is_scene_valid() -> bool:
+func is_scene_valid() -> bool:
 	"""Check if the currently edited scene is valid
 	
 	Returns:
 		bool: True if scene exists and is valid
 	"""
-	var scene = EditorInterface.get_edited_scene_root()
+	var scene = _services.editor_facade.get_edited_scene_root()
 	if not scene:
 		return false
 	if not is_instance_valid(scene):
 		return false
 	return true
 
-static func validate_undo_manager(undo_redo: EditorUndoRedoManager) -> bool:
+func validate_undo_manager(undo_redo: EditorUndoRedoManager) -> bool:
 	"""Validate that undo manager is available and usable
 	
 	Args:
@@ -79,7 +88,7 @@ static func validate_undo_manager(undo_redo: EditorUndoRedoManager) -> bool:
 
 ## PLACEMENT UNDO/REDO
 
-static func create_placement_undo(
+func create_placement_undo(
 	undo_redo: EditorUndoRedoManager,
 	placed_node: Node3D,
 	action_name: String = ""
@@ -116,7 +125,7 @@ static func create_placement_undo(
 		action_name = "Place " + placed_node.name
 	
 	# Store the scene root
-	var scene_root = EditorInterface.get_edited_scene_root()
+	var scene_root = _services.editor_facade.get_edited_scene_root()
 	
 	# IMPORTANT: The node is already in the scene at this point from placement.
 	# We need to set its owner so it persists with the scene.
@@ -146,7 +155,7 @@ static func create_placement_undo(
 
 ## TRANSFORM UNDO/REDO (SINGLE OBJECT)
 
-static func create_transform_undo(
+func create_transform_undo(
 	undo_redo: EditorUndoRedoManager,
 	target_node: Node3D,
 	original_transform: Transform3D,
@@ -202,7 +211,7 @@ static func create_transform_undo(
 
 ## TRANSFORM UNDO/REDO (MULTIPLE OBJECTS)
 
-static func create_multi_transform_undo(
+func create_multi_transform_undo(
 	undo_redo: EditorUndoRedoManager,
 	target_nodes: Array,
 	original_transforms: Dictionary,
@@ -269,7 +278,7 @@ static func create_multi_transform_undo(
 
 ## ERROR HANDLING
 
-static func handle_undo_error(context: String, error_message: String) -> void:
+func handle_undo_error(context: String, error_message: String) -> void:
 	"""Log and handle undo/redo errors
 	
 	Args:
@@ -280,7 +289,7 @@ static func handle_undo_error(context: String, error_message: String) -> void:
 
 ## UTILITY FUNCTIONS
 
-static func get_action_description(
+func get_action_description(
 	action_type: String,
 	node_name: String = "",
 	node_count: int = 1
@@ -302,7 +311,7 @@ static func get_action_description(
 	else:
 		return action_type
 
-static func should_create_undo(confirm_changes: bool) -> bool:
+func should_create_undo(confirm_changes: bool) -> bool:
 	"""Determine if an undo entry should be created based on confirmation
 	
 	Args:
@@ -314,3 +323,4 @@ static func should_create_undo(confirm_changes: bool) -> bool:
 	# Only create undo entries when confirming changes
 	# If canceling (ESC key), don't create undo because changes are reverted immediately
 	return confirm_changes
+

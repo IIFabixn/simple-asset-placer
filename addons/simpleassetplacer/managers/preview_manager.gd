@@ -71,11 +71,6 @@ func configure(settings: Dictionary) -> void:
 		_preview_material.queue_free()
 		_preview_material = null
 
-## @deprecated: Use configure() with a Dictionary instead
-func configure_smooth_transforms(enabled: bool, speed: float) -> void:
-	"""Configure smooth transform settings (deprecated - use configure() instead)"""
-	configure({"smooth_enabled": enabled, "smooth_speed": speed})
-
 func update_smooth_transforms(delta: float) -> void:
 	"""Update smooth transformations - call every frame"""
 	# Always delegate to SmoothTransformManager - it handles enabled state internally

@@ -64,13 +64,6 @@ func configure(state: TransformState, settings: Dictionary):
 		var max_val = settings.get("max_scale", 100.0)
 		clamp_scale(state, min_val, max_val)
 
-## @deprecated: Smooth transforms configured by coordinator, not ScaleManager
-func configure_smooth_transforms(enabled: bool, speed: float = 8.0):
-	"""Configure smooth transform settings (DEPRECATED - coordinator handles this now)"""
-	# This function is kept for API compatibility but does nothing
-	# The coordinator now configures SmoothTransformManager directly
-	pass
-
 ## Core Scale Functions
 
 func set_scale_multiplier(state: TransformState, multiplier: float):

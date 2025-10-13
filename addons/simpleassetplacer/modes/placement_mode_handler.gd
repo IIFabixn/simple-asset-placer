@@ -106,10 +106,14 @@ func enter_placement_mode(
 	# Configure smooth transformations
 	var smooth_enabled = settings.get("smooth_transforms", true)
 	var smooth_speed = settings.get("smooth_transform_speed", 8.0)
-	_services.preview_manager.configure_smooth_transforms(smooth_enabled, smooth_speed)
+	var smooth_config = {
+		"smooth_enabled": smooth_enabled,
+		"smooth_speed": smooth_speed
+	}
+	
+	_services.preview_manager.configure(smooth_config)
 	_services.smooth_transform_manager.configure(smooth_enabled, smooth_speed)
-	_services.rotation_manager.configure_smooth_transforms(smooth_enabled, smooth_speed)
-	# Note: ScaleManager is static and doesn't need smooth transform configuration
+	_services.rotation_manager.configure(transform_state, smooth_config)
 	
 	# Reset position manager for new placement
 	# Reset height and position offsets only if the corresponding settings are enabled

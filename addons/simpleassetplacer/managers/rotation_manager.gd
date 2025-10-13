@@ -56,12 +56,6 @@ func configure(state: TransformState, settings: Dictionary):
 		if initial is Vector3:
 			set_rotation_offset_degrees(state, initial)
 
-## @deprecated: Use configure() with a Dictionary instead
-func configure_smooth_transforms(enabled: bool, speed: float = 8.0):
-	"""Configure smooth transform settings for rotation (deprecated - use configure() instead)"""
-	# No local caching - SmoothTransformManager handles the settings
-	_services.smooth_transform_manager.configure(enabled, speed)
-
 ## Core Rotation Functions
 
 func set_rotation_offset(state: TransformState, rotation: Vector3):

@@ -277,10 +277,17 @@ func _ensure_undo_redo() -> void:
 func _configure_smooth_transforms(settings_dict: Dictionary) -> void:
     var smooth_enabled = settings_dict.get("smooth_transforms", true)
     var smooth_speed = settings_dict.get("smooth_transform_speed", 8.0)
-    _services.preview_manager.configure_smooth_transforms(smooth_enabled, smooth_speed)
+    
+    # Configure smooth transforms through the unified configure() method
+    var smooth_config = {
+        "smooth_enabled": smooth_enabled,
+        "smooth_speed": smooth_speed
+    }
+    
+    _services.preview_manager.configure(smooth_config)
     _services.smooth_transform_manager.configure(smooth_enabled, smooth_speed)
-    _services.rotation_manager.configure_smooth_transforms(smooth_enabled, smooth_speed)
-    _services.scale_manager.configure_smooth_transforms(smooth_enabled, smooth_speed)
+    _services.rotation_manager.configure(_transform_state if _transform_state else TransformState.new(), smooth_config)
+    _services.scale_manager.configure(_transform_state if _transform_state else TransformState.new(), smooth_config)
 
 func _process_navigation_input() -> void:
     var nav_input = _services.input_handler.get_navigation_input()

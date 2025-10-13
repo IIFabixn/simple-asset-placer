@@ -157,13 +157,8 @@ static func configure(settings: Dictionary):
 	if not collision_strategy or not plane_strategy:
 		initialize()
 	
-	# Determine which strategy to use
-	var strategy_type = settings.get("placement_strategy", "auto")
-	
-	# Auto-select based on legacy snap_to_ground setting
-	if strategy_type == "auto":
-		var snap_to_ground = settings.get("snap_to_ground", true)
-		strategy_type = "collision" if snap_to_ground else "plane"
+	# Determine which strategy to use (defaults to collision)
+	var strategy_type = settings.get("placement_strategy", "collision")
 	
 	# Only set strategy if it actually changed (avoids redundant logging)
 	if strategy_type != active_strategy_type:

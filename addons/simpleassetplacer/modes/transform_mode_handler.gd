@@ -11,7 +11,7 @@ const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_reg
 const SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
 const TransformState = preload("res://addons/simpleassetplacer/core/transform_state.gd")
 const ModeStateMachine = preload("res://addons/simpleassetplacer/core/mode_state_machine.gd")
-const ScaleManager = preload("res://addons/simpleassetplacer/core/scale_manager.gd")
+const ScaleManager = preload("res://addons/simpleassetplacer/managers/scale_manager.gd")
 
 var _services: ServiceRegistry
 
@@ -104,13 +104,21 @@ func process_input(camera: Camera3D, transform_data: Dictionary, transform_state
 		return
 	
 	# Handle scale input (including reset)
+	var scale_changed = false
 	if scale_input.get("up_pressed", false) or scale_input.get("down_pressed", false) or scale_input.get("reset_pressed", false):
 		_process_scale_for_group(scale_input, transform_data, transform_state, settings)
+		scale_changed = true
 	
 	# Handle rotation input (including reset)
+	var rotation_changed = false
 	if rotation_input.get("x_pressed", false) or rotation_input.get("y_pressed", false) or rotation_input.get("z_pressed", false) or rotation_input.get("reset_pressed", false):
 		_process_rotation_for_group(rotation_input, transform_data, transform_state, settings)
-	_apply_group_transformation(transform_data, transform_state)
+		rotation_changed = true
+	
+	# Only apply smooth transformation when not actively rotating (rotation sets positions directly)
+	if not rotation_changed:
+		_apply_group_transformation(transform_data, transform_state)
+	
 	update_overlays(transform_data)
 
 func _process_height_input(position_input: Dictionary, transform_data: Dictionary, transform_state: TransformState, settings: Dictionary) -> void:
@@ -158,22 +166,43 @@ func _process_position_input(camera: Camera3D, position_input: Dictionary, trans
 	var move_right = position_input.get("position_right_pressed", false)
 	if not (move_forward or move_backward or move_left or move_right):
 		return
-	var camera_basis = camera.global_transform.basis
-	var forward = -camera_basis.z
-	var right = camera_basis.x
-	forward.y = 0
-	right.y = 0
-	forward = forward.normalized()
-	right = right.normalized()
+	
+	# Get camera-relative directions snapped to nearest axis (same as placement mode)
+	var camera_forward = Vector3(0, 0, -1)
+	var camera_right = Vector3(1, 0, 0)
+	
+	if camera:
+		# Get camera forward and project to XZ plane
+		var cam_forward = -camera.global_transform.basis.z
+		cam_forward.y = 0
+		cam_forward = cam_forward.normalized()
+		
+		# Snap forward to nearest axis (Z or X)
+		if abs(cam_forward.z) > abs(cam_forward.x):
+			camera_forward = Vector3(0, 0, sign(cam_forward.z))
+		else:
+			camera_forward = Vector3(sign(cam_forward.x), 0, 0)
+		
+		# Get camera right and project to XZ plane
+		var cam_right = camera.global_transform.basis.x
+		cam_right.y = 0
+		cam_right = cam_right.normalized()
+		
+		# Snap right to nearest axis (X or Z)
+		if abs(cam_right.x) > abs(cam_right.z):
+			camera_right = Vector3(sign(cam_right.x), 0, 0)
+		else:
+			camera_right = Vector3(0, 0, sign(cam_right.z))
+	
 	var movement = Vector3.ZERO
 	if move_forward:
-		movement += forward
+		movement += camera_forward
 	if move_backward:
-		movement -= forward
+		movement -= camera_forward
 	if move_left:
-		movement -= right
+		movement -= camera_right
 	if move_right:
-		movement += right
+		movement += camera_right
 	if movement.length_squared() > 0:
 		movement = movement.normalized()
 		
@@ -267,13 +296,115 @@ func _process_rotation_for_group(rotation_input: Dictionary, transform_data: Dic
 	
 	if axis == "":
 		return
+	
 	var target_nodes = transform_data.get("target_nodes", [])
 	var original_transforms = transform_data.get("original_transforms", {})
 	var center = transform_data.get("center_position", Vector3.ZERO)
+	
+	# CRITICAL: Recalculate node offsets from current positions
+	# (center may have moved since last rotation due to mouse/WASD/wheel input)
+	var node_offsets = {}
 	for node in target_nodes:
 		if node and node.is_inside_tree():
-			var node_original_rotation = original_transforms.get(node, Transform3D()).basis.get_euler()
-			_services.rotation_manager.apply_rotation_step(transform_state, node, axis, rotation_step, node_original_rotation, true)
+			node_offsets[node] = node.global_position - center
+	
+	# Create rotation basis for the specified axis
+	var rotation_radians = deg_to_rad(rotation_step)
+	var rotation_axis_vector = Vector3.ZERO
+	match axis:
+		"X":
+			rotation_axis_vector = Vector3(1, 0, 0)
+		"Y":
+			rotation_axis_vector = Vector3(0, 1, 0)
+		"Z":
+			rotation_axis_vector = Vector3(0, 0, 1)
+	
+	var rotation_basis = Basis(rotation_axis_vector, rotation_radians)
+	var rotated_offsets = {}
+	
+	for node in target_nodes:
+		if not node or not node.is_inside_tree():
+			continue
+		
+		# Get the current offset from center
+		var offset = node_offsets.get(node, Vector3.ZERO)
+		
+		# Rotate the offset using the rotation basis
+		var rotated_offset = rotation_basis * offset
+		rotated_offsets[node] = rotated_offset
+		
+		# Calculate new position and rotation
+		var new_position = center + rotated_offset
+		var new_basis = rotation_basis * node.global_transform.basis
+		var new_rotation = new_basis.get_euler()
+		var current_scale = node.scale
+		
+		# Apply immediately without smoothing to prevent jittering
+		_services.smooth_transform_manager.apply_transform_immediately(
+			node, 
+			new_position, 
+			new_rotation, 
+			current_scale
+		)
+		
+		# Update the basis separately (apply_transform_immediately uses rotation property)
+		node.global_transform.basis = new_basis
+	
+	# Update the stored offsets for next rotation
+	transform_data["node_offsets"] = rotated_offsets
+
+func rotate_group_by_step(axis: String, rotation_step: float, transform_data: Dictionary, transform_state: TransformState) -> void:
+	"""Helper function to rotate group by a specific step amount (used by mouse wheel)"""
+	if axis == "" or rotation_step == 0.0:
+		return
+	
+	var target_nodes = transform_data.get("target_nodes", [])
+	var center = transform_data.get("center_position", Vector3.ZERO)
+	
+	# CRITICAL: Recalculate node offsets from current positions
+	var node_offsets = {}
+	for node in target_nodes:
+		if node and node.is_inside_tree():
+			node_offsets[node] = node.global_position - center
+	
+	# Create rotation basis for the specified axis
+	var rotation_radians = deg_to_rad(rotation_step)
+	var rotation_axis_vector = Vector3.ZERO
+	match axis:
+		"X":
+			rotation_axis_vector = Vector3(1, 0, 0)
+		"Y":
+			rotation_axis_vector = Vector3(0, 1, 0)
+		"Z":
+			rotation_axis_vector = Vector3(0, 0, 1)
+	
+	var rotation_basis = Basis(rotation_axis_vector, rotation_radians)
+	var rotated_offsets = {}
+	
+	for node in target_nodes:
+		if not node or not node.is_inside_tree():
+			continue
+		
+		var offset = node_offsets.get(node, Vector3.ZERO)
+		var rotated_offset = rotation_basis * offset
+		rotated_offsets[node] = rotated_offset
+		
+		var new_position = center + rotated_offset
+		var new_basis = rotation_basis * node.global_transform.basis
+		var new_rotation = new_basis.get_euler()
+		var current_scale = node.scale
+		
+		_services.smooth_transform_manager.apply_transform_immediately(
+			node, 
+			new_position, 
+			new_rotation, 
+			current_scale
+		)
+		
+		node.global_transform.basis = new_basis
+	
+	# Update the stored offsets for next rotation
+	transform_data["node_offsets"] = rotated_offsets
 
 func _apply_group_transformation(transform_data: Dictionary, transform_state: TransformState) -> void:
 	var target_nodes = transform_data.get("target_nodes", [])

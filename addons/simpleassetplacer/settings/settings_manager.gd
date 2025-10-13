@@ -54,8 +54,7 @@ static func get_default_settings() -> Dictionary:
 		"cycle_previous_asset_key": "BRACKETLEFT",  # [ key
 		
 		# Placement behavior
-		"placement_strategy": "auto",  # New: 'collision', 'plane', or 'auto'
-		"snap_to_ground": true,  # Legacy: used when placement_strategy is 'auto'
+		"placement_strategy": "collision",  # 'collision' or 'plane'
 		"snap_to_grid": false,
 		"randomize_rotation": false,
 		"randomize_scale": false,

@@ -25,8 +25,7 @@ var pressed_non_modifier_keys: Array = []
 
 # Settings properties - dynamically loaded from SettingsDefinition
 # Basic Settings
-var placement_strategy: String = "auto"
-var snap_to_ground: bool = false
+var placement_strategy: String = "collision"
 var align_with_normal: bool = false
 var snap_enabled: bool = false
 var snap_step: float = 1.0
@@ -34,8 +33,6 @@ var show_grid: bool = false
 var grid_extent: float = 20.0
 var random_rotation: bool = false
 var scale_multiplier: float = 1.0
-var add_collision: bool = false
-var group_instances: bool = false
 var smooth_transforms: bool = true
 var smooth_transform_speed: float = 8.0
 

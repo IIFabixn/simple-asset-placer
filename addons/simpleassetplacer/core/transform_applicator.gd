@@ -146,30 +146,31 @@ static func apply_grid_snap(position: Vector3, state: TransformState) -> Vector3
 	# Apply X-axis snapping
 	if state.snap_enabled:
 		var snap_x = position.x
+		var offset_x = state.snap_offset.x
 		if state.snap_center_x:
-			# Snap to center of grid cell
-			snap_x = round((position.x - state.snap_offset.x) / effective_snap_step) * effective_snap_step + state.snap_offset.x
-		else:
-			# Snap to grid lines
-			snap_x = round((position.x - state.snap_offset.x) / effective_snap_step) * effective_snap_step + state.snap_offset.x
+			# Snap to center of grid cell (offset by half step before rounding)
+			offset_x += effective_snap_step * 0.5
+		snap_x = round((position.x - offset_x) / effective_snap_step) * effective_snap_step + offset_x
 		snapped_pos.x = snap_x
 	
 	# Apply Z-axis snapping
 	if state.snap_enabled:
 		var snap_z = position.z
+		var offset_z = state.snap_offset.z
 		if state.snap_center_z:
-			snap_z = round((position.z - state.snap_offset.z) / effective_snap_step) * effective_snap_step + state.snap_offset.z
-		else:
-			snap_z = round((position.z - state.snap_offset.z) / effective_snap_step) * effective_snap_step + state.snap_offset.z
+			# Snap to center of grid cell (offset by half step before rounding)
+			offset_z += effective_snap_step * 0.5
+		snap_z = round((position.z - offset_z) / effective_snap_step) * effective_snap_step + offset_z
 		snapped_pos.z = snap_z
 	
 	# Apply Y-axis snapping (separate control)
 	if state.snap_y_enabled:
 		var snap_y = position.y
+		var offset_y = state.snap_offset.y
 		if state.snap_center_y:
-			snap_y = round((position.y - state.snap_offset.y) / state.snap_y_step) * state.snap_y_step + state.snap_offset.y
-		else:
-			snap_y = round((position.y - state.snap_offset.y) / state.snap_y_step) * state.snap_y_step + state.snap_offset.y
+			# Snap to center of grid cell (offset by half step before rounding)
+			offset_y += state.snap_y_step * 0.5
+		snap_y = round((position.y - offset_y) / state.snap_y_step) * state.snap_y_step + offset_y
 		snapped_pos.y = snap_y
 	
 	return snapped_pos

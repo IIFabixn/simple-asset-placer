@@ -81,6 +81,70 @@ func exit_any_mode() -> void:
         ModeStateMachine.Mode.TRANSFORM:
             exit_transform_mode(false)
 
+func reset_transforms() -> void:
+    """Reset all transform offsets (rotation, scale, height, position)"""
+    if not _transform_state:
+        return
+    
+    var mode = _services.mode_state_machine.get_current_mode()
+    
+    if mode == ModeStateMachine.Mode.PLACEMENT:
+        # Reset rotation
+        _services.rotation_manager.reset_all_rotation(_transform_state)
+        
+        # Reset scale
+        _services.scale_manager.reset_scale(_transform_state)
+        
+        # Reset height offset
+        _services.position_manager.reset_height(_transform_state)
+        
+        # Reset manual position offset
+        _transform_state.manual_position_offset = Vector3.ZERO
+        
+        # Show feedback
+        if _services.overlay_manager:
+            _services.overlay_manager.show_status_message("Reset all transforms", Color.GREEN, 1.5)
+    
+    elif mode == ModeStateMachine.Mode.TRANSFORM:
+        var target_nodes = _transform_data.get("target_nodes", [])
+        var original_transforms = _transform_data.get("original_transforms", {})
+        
+        # Reset rotation, scale, and update smooth transforms for all nodes
+        for node in target_nodes:
+            if node and node.is_inside_tree():
+                # Reset rotation
+                _services.rotation_manager.reset_node_rotation(node)
+                
+                # Reset scale to original
+                var node_original_scale = original_transforms.get(node, Transform3D()).basis.get_scale()
+                node.scale = node_original_scale
+                
+                # Update smooth transform manager to prevent re-applying old targets
+                _services.smooth_transform_manager.apply_transform_immediately(
+                    node,
+                    node.global_position,
+                    node.rotation,
+                    node.scale
+                )
+        
+        # Reset scale state
+        _services.scale_manager.reset_scale(_transform_state)
+        
+        # Reset height offset
+        _services.position_manager.reset_height(_transform_state)
+        
+        # Reset manual position offset
+        _transform_data["manual_position_offset"] = Vector3.ZERO
+        
+        # Update center position to match new state
+        var center_pos = Vector3(_transform_state.position.x, _transform_state.base_height + _transform_state.height_offset, _transform_state.position.z)
+        _transform_state.position = center_pos
+        _transform_data["center_position"] = center_pos
+        
+        # Show feedback
+        if _services.overlay_manager:
+            _services.overlay_manager.show_status_message("Reset all transforms", Color.GREEN, 1.5)
+
 func process_frame_input(camera: Camera3D, input_settings: Dictionary = {}, delta: float = 1.0/60.0) -> void:
     if not camera or not is_instance_valid(camera):
         return
@@ -301,15 +365,76 @@ func _apply_rotation_adjustment(wheel_input: Dictionary) -> void:
         if target_node:
             _services.rotation_manager.apply_rotation_step(_transform_state, target_node, axis, step, Vector3.ZERO, false)
     elif mode == ModeStateMachine.Mode.TRANSFORM:
-        var target_nodes = _transform_data.get("target_nodes", [])
-        var original_transforms = _transform_data.get("original_transforms", {})
-        for node in target_nodes:
-            if node and node.is_inside_tree():
-                var node_original_rotation = original_transforms.get(node, Transform3D()).basis.get_euler()
-                _services.rotation_manager.apply_rotation_step(_transform_state, node, axis, step, node_original_rotation, false)
+        # For transform mode with multiple nodes, rotate around the group center
+        _services.transform_mode_handler.rotate_group_by_step(axis, step, _transform_data, _transform_state)
 
 func _apply_position_adjustment(wheel_input: Dictionary) -> void:
-    pass
+    var direction = wheel_input.get("direction", 0)
+    var axis = wheel_input.get("axis", "forward")  # forward, backward, left, right
+    var reverse = wheel_input.get("reverse_modifier", false)
+    
+    # Get fine position increment from settings (mouse wheel provides fine adjustment)
+    var step = _settings.get("fine_position_increment", 0.01)
+    
+    # Apply reverse modifier if held
+    var actual_direction = direction
+    if reverse:
+        actual_direction = -direction
+    
+    var mode = _services.mode_state_machine.get_current_mode()
+    var camera = _services.editor_facade.get_editor_viewport_3d(0).get_camera_3d() if _services.editor_facade.get_editor_viewport_3d(0) else null
+    if not camera:
+        return
+    
+    # Calculate camera-relative directions snapped to nearest axis (same as mode handlers)
+    var camera_forward = Vector3(0, 0, -1)
+    var camera_right = Vector3(1, 0, 0)
+    
+    # Get camera forward and project to XZ plane
+    var cam_forward = -camera.global_transform.basis.z
+    cam_forward.y = 0
+    cam_forward = cam_forward.normalized()
+    
+    # Snap forward to nearest axis (Z or X)
+    if abs(cam_forward.z) > abs(cam_forward.x):
+        camera_forward = Vector3(0, 0, sign(cam_forward.z))
+    else:
+        camera_forward = Vector3(sign(cam_forward.x), 0, 0)
+    
+    # Get camera right and project to XZ plane
+    var cam_right = camera.global_transform.basis.x
+    cam_right.y = 0
+    cam_right = cam_right.normalized()
+    
+    # Snap right to nearest axis (X or Z)
+    if abs(cam_right.x) > abs(cam_right.z):
+        camera_right = Vector3(sign(cam_right.x), 0, 0)
+    else:
+        camera_right = Vector3(0, 0, sign(cam_right.z))
+    
+    # Determine movement direction based on axis
+    var movement = Vector3.ZERO
+    match axis:
+        "forward":
+            movement = camera_forward * actual_direction
+        "backward":
+            movement = -camera_forward * actual_direction
+        "left":
+            movement = -camera_right * actual_direction
+        "right":
+            movement = camera_right * actual_direction
+    
+    movement *= step
+    
+    # Apply movement based on mode
+    if mode == ModeStateMachine.Mode.PLACEMENT:
+        # In placement mode, adjust manual_position_offset
+        _transform_state.manual_position_offset += movement
+    elif mode == ModeStateMachine.Mode.TRANSFORM:
+        # In transform mode, adjust manual_position_offset in transform_data
+        var manual_offset = _transform_data.get("manual_position_offset", Vector3.ZERO)
+        manual_offset += movement
+        _transform_data["manual_position_offset"] = manual_offset
 
 func _grab_3d_viewport_focus() -> void:
     var viewport_3d = _services.editor_facade.get_editor_viewport_3d(0)

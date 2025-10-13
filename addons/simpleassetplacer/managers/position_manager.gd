@@ -51,7 +51,6 @@ var _height_step_size: float = 0.1
 var _collision_mask: int = 1
 var _use_half_step: bool = false
 var _align_with_normal: bool = false
-var _snap_to_ground: bool = true
 var _interpolation_enabled: bool = false
 var _interpolation_speed: float = 10.0
 
@@ -106,10 +105,11 @@ func update_position_from_mouse(state: TransformState, camera: Camera3D, mouse_p
 	if _align_with_normal or not lock_y_axis or state.is_initial_position:
 		should_update_base_height = true
 	elif lock_y_axis:
-		# Only update base height if XZ position changed significantly
+		# In collision mode, always update base height to follow terrain
+		# Only check XZ distance to avoid updating when mouse hasn't moved at all
 		var new_xz = Vector2(new_pos.x, new_pos.z)
 		var xz_distance = new_xz.distance_to(state.last_raycast_xz)
-		should_update_base_height = xz_distance > 0.1
+		should_update_base_height = xz_distance > 0.001  # Much smaller threshold to track terrain height
 	
 	if should_update_base_height:
 		# Update base_height from strategy result
@@ -133,8 +133,8 @@ func update_position_from_mouse(state: TransformState, camera: Camera3D, mouse_p
 		state.target_position.z = new_pos.z
 		state.target_position.y = state.base_height + state.height_offset
 	
-	# Apply grid snapping if enabled (to base position only)
-	if state.snap_enabled:
+	# Apply grid snapping if enabled (XZ or Y or both)
+	if state.snap_enabled or state.snap_y_enabled:
 		state.target_position = _apply_grid_snap(state, state.target_position)
 	
 	# Apply manual position offset (from WASD keys) AFTER snapping
@@ -157,13 +157,24 @@ func _apply_grid_snap(state: TransformState, pos: Vector3) -> Vector3:
 	
 	var snapped_pos = pos
 	
-	# Snap the position directly (no AABB center offset)
-	snapped_pos.x = snappedf(pos.x - state.snap_offset.x, effective_step_x) + state.snap_offset.x
-	snapped_pos.z = snappedf(pos.z - state.snap_offset.z, effective_step_z) + state.snap_offset.z
+	# Apply X-axis snapping with optional center offset
+	var offset_x = state.snap_offset.x
+	if state.snap_center_x:
+		offset_x += effective_step_x * 0.5
+	snapped_pos.x = snappedf(pos.x - offset_x, effective_step_x) + offset_x
 	
-	# Handle Y-axis if enabled
+	# Apply Z-axis snapping with optional center offset
+	var offset_z = state.snap_offset.z
+	if state.snap_center_z:
+		offset_z += effective_step_z * 0.5
+	snapped_pos.z = snappedf(pos.z - offset_z, effective_step_z) + offset_z
+	
+	# Handle Y-axis if enabled with optional center offset
 	if state.snap_y_enabled:
-		snapped_pos.y = snappedf(pos.y - state.snap_offset.y, effective_step_y) + state.snap_offset.y
+		var offset_y = state.snap_offset.y
+		if state.snap_center_y:
+			offset_y += effective_step_y * 0.5
+		snapped_pos.y = snappedf(pos.y - offset_y, effective_step_y) + offset_y
 	else:
 		snapped_pos.y = pos.y  # Keep original Y
 	
@@ -458,7 +469,6 @@ func update_smooth_position(state: TransformState, delta: float) -> void:
 func configure(state: TransformState, config: Dictionary) -> void:
 	"""Configure position manager settings and placement strategies"""
 	# Configure instance settings
-	_snap_to_ground = config.get("snap_to_ground", true)
 	_height_step_size = config.get("height_step_size", 0.1)
 	_collision_mask = config.get("collision_mask", 1)
 	_interpolation_enabled = config.get("interpolation_enabled", false)
@@ -481,7 +491,6 @@ func configure(state: TransformState, config: Dictionary) -> void:
 func get_configuration(state: TransformState) -> Dictionary:
 	"""Get current configuration"""
 	return {
-		"snap_to_ground": _snap_to_ground,
 		"height_step_size": _height_step_size,
 		"collision_mask": _collision_mask,
 		"interpolation_enabled": _interpolation_enabled,

@@ -41,17 +41,11 @@ static func get_all_settings() -> Array:
 	# Basic Settings Section
 	
 	# Placement Strategy (new unified setting with dropdown)
-	var placement_strategy = SettingMeta.new("placement_strategy", "simple_asset_placer/placement_strategy", "auto", SettingType.OPTION, "Placement Mode")
+	var placement_strategy = SettingMeta.new("placement_strategy", "simple_asset_placer/placement_strategy", "collision", SettingType.OPTION, "Placement Strategy")
 	placement_strategy.section = "basic"
-	placement_strategy.options = ["auto", "collision", "plane"]
-	placement_strategy.ui_tooltip = "Auto: Use snap_to_ground setting | Collision: Raycast to surfaces | Plane: Fixed height projection"
+	placement_strategy.options = ["collision", "plane"]
+	placement_strategy.ui_tooltip = "Collision: Raycast to surfaces | Plane: Fixed height projection"
 	settings.append(placement_strategy)
-	
-	# Legacy settings (kept for backward compatibility)
-	var snap_to_ground = SettingMeta.new("snap_to_ground", "simple_asset_placer/snap_to_ground", true, SettingType.BOOL, "Snap to Ground (Legacy)")
-	snap_to_ground.section = "basic"
-	snap_to_ground.ui_tooltip = "Legacy: Use collision-based placement (now controlled by placement_strategy)"
-	settings.append(snap_to_ground)
 	
 	var align_normal = SettingMeta.new("align_with_normal", "simple_asset_placer/align_with_normal", false, SettingType.BOOL, "Align with Surface Normal")
 	align_normal.section = "basic"
@@ -96,16 +90,6 @@ static func get_all_settings() -> Array:
 	scale_multiplier.step = 0.01
 	scale_multiplier.ui_tooltip = "Default scale multiplier for placed objects"
 	settings.append(scale_multiplier)
-	
-	var add_collision = SettingMeta.new("add_collision", "simple_asset_placer/add_collision", false, SettingType.BOOL, "Add Collision Shapes")
-	add_collision.section = "basic"
-	add_collision.ui_tooltip = "Automatically add collision shapes to placed objects"
-	settings.append(add_collision)
-	
-	var group_instances = SettingMeta.new("group_instances", "simple_asset_placer/group_instances", false, SettingType.BOOL, "Group Instances")
-	group_instances.section = "basic"
-	group_instances.ui_tooltip = "Group all placed instances under a parent node"
-	settings.append(group_instances)
 	
 	var smooth_transforms = SettingMeta.new("smooth_transforms", "simple_asset_placer/smooth_transforms", true, SettingType.BOOL, "Smooth Transformations")
 	smooth_transforms.section = "basic"

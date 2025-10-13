@@ -369,7 +369,7 @@ Access all settings via the **Settings** tab in the Asset Placer dock.
 ### **Placement Settings**
 
 #### **Snap & Alignment Options**
-- **Snap to Ground**: Raycast-based surface snapping for natural object placement
+- **Placement Strategy**: Choose between Auto (collision), Collision (raycast to surfaces), or Plane (fixed height)
 - **Align with Surface Normal**: Automatically align object rotation to match surface angle
 - **Grid Snap Enabled**: Snap positions to a customizable grid
 - **Snap Step**: Grid size for X/Z axis snapping (default: 1.0)
@@ -388,8 +388,6 @@ Control which part of the object is used for snapping:
 #### **Other Options**
 - **Random Rotation**: Apply random Y-axis rotation on placement
 - **Scale Multiplier**: Base scale applied to all placed objects
-- **Add Collision**: Automatically add collision shapes (StaticBody3D) to placed objects
-- **Group Instances**: Parent all placed instances under a common node
 
 ### **Reset Behavior**
 Control what gets reset when exiting modes:
@@ -661,7 +659,7 @@ The plugin automatically discovers and displays models in these formats:
 - 🔄 **Batch Operations**: Use Transform Mode to adjust multiple objects simultaneously
 
 ### **Placement Best Practices**
-- 🎯 **Surface Alignment**: Enable "Snap to Ground" for natural object placement on terrain
+- 🎯 **Surface Placement**: Use "Collision" placement strategy for natural object placement on terrain
 - 🔄 **Surface Normal Alignment**: Enable "Align with Surface Normal" for objects that should match terrain slope
 - 📏 **Grid Snapping**: Enable grid snap for architectural precision and consistent spacing
 - 🌐 **Grid Visualization**: Enable "Show Grid" to see the snap grid during placement
@@ -721,9 +719,9 @@ The plugin automatically discovers and displays models in these formats:
 ### **Placement Mode Issues**
 - ✅ Verify you're working in a 3D scene with objects that have collision
 - ✅ Ensure the 3D viewport camera is active and properly positioned
-- ✅ Check that "Snap to Ground" is enabled if you want surface raycasting
+- ✅ Check that "Placement Strategy" is set to "Collision" if you want surface raycasting
 - ✅ Try different camera angles if raycasting fails to hit surfaces
-- ✅ Disable "Snap to Ground" for free-space placement
+- ✅ Use "Plane" placement strategy for free-space placement at fixed height
 - ✅ For Terrain3D users: Enable Collision in Terrain3D settings
 
 ### **Object Not Appearing Where Expected**

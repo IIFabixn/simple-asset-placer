@@ -125,10 +125,7 @@ func _on_reset_transforms_pressed() -> void:
 		return
 	
 	# Request reset through coordinator
-	# The coordinator will handle the actual reset operations
-	# For now, show a message indicating the feature needs coordinator support
-	if _services and _services.overlay_manager:
-		_services.overlay_manager.show_status_message("Reset transforms feature - needs coordinator method", Color.YELLOW, 2.0)
+	_coordinator.reset_transforms()
 
 ## Button State Updates
 

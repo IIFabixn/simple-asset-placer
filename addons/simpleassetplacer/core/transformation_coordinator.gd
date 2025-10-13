@@ -288,8 +288,10 @@ func _process_navigation_input() -> void:
         handle_tab_key_activation(_dock_reference)
     if nav_input.cancel_pressed or nav_input.escape_pressed:
         exit_any_mode()
+    # Allow cycling placement strategy in both PLACEMENT and TRANSFORM modes
     if _services.input_handler.should_cycle_placement_mode():
-        _cycle_placement_strategy()
+        if _services.mode_state_machine.is_any_mode_active():
+            _cycle_placement_strategy()
 
 func _cycle_placement_strategy() -> void:
     var new_strategy = PlacementStrategyManager.cycle_strategy()

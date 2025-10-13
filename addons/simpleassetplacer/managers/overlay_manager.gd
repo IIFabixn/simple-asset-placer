@@ -152,6 +152,22 @@ func show_status_message(message: String, color: Color = Color.GREEN, duration: 
 		elif not NodeUtils.is_valid(_status_overlay):
 			_status_overlay = null  # Clear invalid reference
 
+func show_numeric_input(action_name: String, input_string: String):
+	"""Show numeric input feedback overlay
+	
+	Args:
+		action_name: Name of the action being modified (e.g., 'Rotate Y', 'Scale')
+		input_string: Current input string with prefix (e.g., '=90', '+5', '-2.5')
+	"""
+	if not _is_overlay_ready():
+		return
+	
+	# Build display message
+	var message = "%s: %s" % [action_name, input_string if input_string.length() > 0 else "_"]
+	
+	# Show with a distinct color
+	_status_overlay.show_status_message(message, Color(0.4, 0.7, 1.0))  # Light blue for numeric input
+
 func hide_transform_overlay():
 	"""Hide the unified transform overlay"""
 	if NodeUtils.is_valid_and_ready(_status_overlay):

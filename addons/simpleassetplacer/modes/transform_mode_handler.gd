@@ -12,6 +12,7 @@ const SettingsManager = preload("res://addons/simpleassetplacer/settings/setting
 const TransformState = preload("res://addons/simpleassetplacer/core/transform_state.gd")
 const ModeStateMachine = preload("res://addons/simpleassetplacer/core/mode_state_machine.gd")
 const ScaleManager = preload("res://addons/simpleassetplacer/managers/scale_manager.gd")
+const NumericInputManager = preload("res://addons/simpleassetplacer/managers/numeric_input_manager.gd")
 
 var _services: ServiceRegistry
 
@@ -78,12 +79,38 @@ func process_input(camera: Camera3D, transform_data: Dictionary, transform_state
 	var position_input = _services.input_handler.get_position_input()
 	var rotation_input = _services.input_handler.get_rotation_input()
 	var scale_input = _services.input_handler.get_scale_input()
+	var numeric_input = _services.input_handler.get_numeric_input()
+	
+	# Track action key presses for numeric input system (MUST come before processing numeric keys)
+	var numeric_mgr = _services.numeric_input_manager
+	_track_action_for_numeric_input(rotation_input, scale_input, position_input)
+	
+	# Process numeric input keys
+	_process_numeric_input(numeric_input, numeric_mgr)
+	
+	# Check for numeric input confirmation and application
+	var numeric_was_confirmed = false
+	if numeric_mgr.is_confirmed():
+		PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Applying numeric input...")
+		_apply_numeric_input(transform_data, transform_state, settings)
+		numeric_mgr.reset()
+		numeric_was_confirmed = true
+	
+	# Update numeric input overlay if active
+	if numeric_mgr.is_active() and numeric_mgr.is_within_grace_period():
+		var action_name = numeric_mgr.get_action_display_name()
+		var input_string = numeric_mgr.get_input_string()
+		_services.overlay_manager.show_numeric_input(action_name, input_string)
+	
+	# If numeric input is active, skip normal input processing (except mouse/position tracking)
+	var skip_normal_input = numeric_mgr.is_active() and not numeric_mgr.is_confirmed()
 	
 	# Process keyboard input (updates manual offsets and height)
-	_process_height_input(position_input, transform_data, transform_state, settings)
-	_process_position_input(camera, position_input, transform_data, transform_state, settings)
+	if not skip_normal_input:
+		_process_height_input(position_input, transform_data, transform_state, settings)
+		_process_position_input(camera, position_input, transform_data, transform_state, settings)
 	
-	# Update base position from mouse raycast
+	# Update base position from mouse raycast (always update)
 	var mouse_pos = position_input.get("mouse_position", Vector2.ZERO)
 	_services.position_manager.update_position_from_mouse(transform_state, camera, mouse_pos, 1, true, target_nodes)
 	
@@ -100,7 +127,18 @@ func process_input(camera: Camera3D, transform_data: Dictionary, transform_state
 	
 	# Handle confirm action (left click or Enter key)
 	if position_input.get("confirm_action", false):
-		transform_data["_confirm_exit"] = true
+		# If numeric input is active or was just confirmed, don't exit
+		if numeric_mgr.is_active() or numeric_was_confirmed:
+			if numeric_mgr.is_active():
+				numeric_mgr.confirm_action()
+			# Don't exit - numeric input takes priority
+			# Continue processing to apply the value
+		else:
+			transform_data["_confirm_exit"] = true
+			return
+	
+	# Skip normal transformations if numeric input is active
+	if skip_normal_input:
 		return
 	
 	# Handle scale input (including reset)
@@ -336,19 +374,23 @@ func _process_rotation_for_group(rotation_input: Dictionary, transform_data: Dic
 		# Calculate new position and rotation
 		var new_position = center + rotated_offset
 		var new_basis = rotation_basis * node.global_transform.basis
-		var new_rotation = new_basis.get_euler()
 		var current_scale = node.scale
 		
-		# Apply immediately without smoothing to prevent jittering
-		_services.smooth_transform_manager.apply_transform_immediately(
-			node, 
-			new_position, 
-			new_rotation, 
-			current_scale
-		)
-		
-		# Update the basis separately (apply_transform_immediately uses rotation property)
+		# Apply transform directly using basis to preserve compound rotations
+		# This avoids euler angle conversion issues (gimbal lock)
+		node.global_position = new_position
+		node.scale = current_scale
 		node.global_transform.basis = new_basis
+		
+		# Update smooth transform manager's tracking (if enabled)
+		if _services.smooth_transform_manager:
+			var new_rotation = new_basis.get_euler()
+			_services.smooth_transform_manager.apply_transform_immediately(
+				node,
+				new_position,
+				new_rotation,
+				current_scale
+			)
 	
 	# Update the stored offsets for next rotation
 	transform_data["node_offsets"] = rotated_offsets
@@ -419,12 +461,14 @@ func _apply_group_transformation(transform_data: Dictionary, transform_state: Tr
 func _apply_scale_to_node(transform_state: TransformState, node: Node3D, original_scale: Vector3) -> void:
 	if not node or not is_instance_valid(node):
 		return
-	# Use ADDITIVE scaling logic (same as scale_manager.apply_uniform_scale_to_node)
-	# offset = multiplier - 1.0
-	# target = original + offset (per axis)
+	
 	var scale_mult = _services.scale_manager.get_scale(transform_state)
-	var offset = scale_mult - 1.0
-	var new_scale = original_scale + Vector3(offset, offset, offset)
+	
+	# For numeric input: Use the multiplier as absolute scene scale (mult 1.0 = scene scale 1.0)
+	# Ignore original_scale when applying numeric scale - treat multiplier as the target scene scale
+	var new_scale = Vector3(scale_mult, scale_mult, scale_mult)
+	
+	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Setting node %s scale from %s to %s (mult: %s)" % [node.name, original_scale, new_scale, scale_mult])
 	
 	# Prevent negative or zero scale
 	new_scale.x = max(0.01, new_scale.x)
@@ -469,6 +513,215 @@ func _calculate_node_offsets(nodes: Array, center: Vector3) -> Dictionary:
 		if node and is_instance_valid(node) and node.is_inside_tree():
 			offsets[node] = node.global_position - center
 	return offsets
+
+## Numeric Input Integration
+
+func _track_action_for_numeric_input(rotation_input: Dictionary, scale_input: Dictionary, position_input: Dictionary) -> void:
+	"""Track when action keys are TAPPED (not held) to set context for numeric input.
+	The numeric input will only activate when user actually types a number."""
+	var numeric_mgr = _services.numeric_input_manager
+	if not numeric_mgr:
+		return
+	
+	# Import ActionType enum
+	var ActionType = NumericInputManager.ActionType
+	
+	# Track rotation actions (only on tap, not on hold/repeat)
+	if rotation_input.get("x_tapped", false):
+		PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "X key tapped - setting ROTATE_X context")
+		numeric_mgr.set_action_context(ActionType.ROTATE_X)
+	elif rotation_input.get("y_tapped", false):
+		PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Y key tapped - setting ROTATE_Y context")
+		numeric_mgr.set_action_context(ActionType.ROTATE_Y)
+	elif rotation_input.get("z_tapped", false):
+		PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Z key tapped - setting ROTATE_Z context")
+		numeric_mgr.set_action_context(ActionType.ROTATE_Z)
+	
+	# Track scale actions (only on tap, not on hold/repeat)
+	elif scale_input.get("up_tapped", false) or scale_input.get("down_tapped", false):
+		PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "PageUp/PageDown tapped - setting SCALE context")
+		numeric_mgr.set_action_context(ActionType.SCALE)
+	
+	# Track height actions (only on tap, not on hold/repeat)
+	elif position_input.get("height_up_tapped", false) or position_input.get("height_down_tapped", false):
+		numeric_mgr.set_action_context(ActionType.HEIGHT)
+	
+	# Track position actions (only on tap, not on hold/repeat)
+	elif position_input.get("position_forward_tapped", false):
+		numeric_mgr.set_action_context(ActionType.POSITION_FORWARD)
+	elif position_input.get("position_backward_tapped", false):
+		numeric_mgr.set_action_context(ActionType.POSITION_BACKWARD)
+	elif position_input.get("position_left_tapped", false):
+		numeric_mgr.set_action_context(ActionType.POSITION_LEFT)
+	elif position_input.get("position_right_tapped", false):
+		numeric_mgr.set_action_context(ActionType.POSITION_RIGHT)
+
+func _process_numeric_input(numeric_input: Dictionary, numeric_mgr: NumericInputManager) -> void:
+	"""Process numeric input keys from InputHandler polling"""
+	if not numeric_mgr:
+		return
+	
+	# Process digit keys
+	var digit = numeric_input.get("digit_pressed", -1)
+	if digit >= 0:
+		var digit_str = str(digit)
+		numeric_mgr.process_numeric_key(digit_str)
+	
+	# Process special keys (don't use elif - allow multiple keys in one frame)
+	if numeric_input.get("decimal_pressed", false):
+		numeric_mgr.process_decimal_key()
+	if numeric_input.get("minus_pressed", false):
+		numeric_mgr.process_minus_key()
+	if numeric_input.get("plus_pressed", false):
+		numeric_mgr.process_plus_key()
+	if numeric_input.get("equals_pressed", false):
+		numeric_mgr.process_equals_key()
+	if numeric_input.get("backspace_pressed", false):
+		numeric_mgr.process_backspace()
+	if numeric_input.get("enter_pressed", false):
+		if numeric_mgr.is_active():
+			numeric_mgr.confirm_action()
+	if numeric_input.get("escape_pressed", false):
+		if numeric_mgr.is_active():
+			numeric_mgr.cancel_action()
+
+func _apply_numeric_input(transform_data: Dictionary, transform_state: TransformState, settings: Dictionary) -> void:
+	"""Apply the confirmed numeric input value to the transformation"""
+	var numeric_mgr = _services.numeric_input_manager
+	if not numeric_mgr or not numeric_mgr.is_active():
+		return
+	
+	var action = numeric_mgr.get_active_action()
+	var ActionType = NumericInputManager.ActionType
+	
+	var target_nodes = transform_data.get("target_nodes", [])
+	var original_transforms = transform_data.get("original_transforms", {})
+	
+	match action:
+		ActionType.ROTATE_X, ActionType.ROTATE_Y, ActionType.ROTATE_Z:
+			_apply_numeric_rotation(action, numeric_mgr, transform_data, transform_state)
+		
+		ActionType.SCALE:
+			_apply_numeric_scale(numeric_mgr, transform_data, transform_state)
+		
+		ActionType.HEIGHT:
+			_apply_numeric_height(numeric_mgr, transform_data, transform_state)
+		
+		ActionType.POSITION_FORWARD, ActionType.POSITION_BACKWARD, ActionType.POSITION_LEFT, ActionType.POSITION_RIGHT:
+			_apply_numeric_position(action, numeric_mgr, transform_data, transform_state)
+
+func _apply_numeric_rotation(action, numeric_mgr, transform_data: Dictionary, transform_state: TransformState) -> void:
+	"""Apply numeric input to rotation"""
+	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Applying numeric rotation for action: %s" % action)
+	var ActionType = NumericInputManager.ActionType
+	var axis = ""
+	match action:
+		ActionType.ROTATE_X:
+			axis = "X"
+		ActionType.ROTATE_Y:
+			axis = "Y"
+		ActionType.ROTATE_Z:
+			axis = "Z"
+	
+	if axis == "":
+		return
+	
+	# Get current rotation of first node
+	var target_nodes = transform_data.get("target_nodes", [])
+	if target_nodes.is_empty():
+		return
+	
+	var first_node = target_nodes[0]
+	var current_rotation_deg = rad_to_deg(first_node.rotation[axis.to_lower()])
+	
+	# Apply numeric value
+	var new_rotation_deg = numeric_mgr.apply_to_value(current_rotation_deg)
+	var rotation_step = new_rotation_deg - current_rotation_deg
+	
+	# Apply the rotation
+	rotate_group_by_step(axis, rotation_step, transform_data, transform_state)
+
+func _apply_numeric_scale(numeric_mgr, transform_data: Dictionary, transform_state: TransformState) -> void:
+	"""Apply numeric input to scale
+	Scale input uses actual scale values (1.0 = normal size, 2.0 = double size, 0.5 = half size)
+	Absolute mode (=): Set to exact scale value
+	Relative mode (+/-): Add to current scale"""
+	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Applying numeric scale")
+	
+	var input_value = numeric_mgr.get_numeric_value()
+	var is_absolute = numeric_mgr.is_absolute_mode()
+	
+	# Apply to all nodes directly based on absolute/relative mode
+	var target_nodes = transform_data.get("target_nodes", [])
+	for node in target_nodes:
+		if node and node.is_inside_tree():
+			var current_scene_scale = node.scale
+			var new_scene_scale: Vector3
+			
+			if is_absolute:
+				# Absolute: Set to exact value (=1 means scale 1.0 in scene)
+				new_scene_scale = Vector3(input_value, input_value, input_value)
+			else:
+				# Relative: Add to current scale (+0.5 adds 0.5 to each axis)
+				var scale_change = numeric_mgr.apply_to_value(0.0)  # Get the delta
+				new_scene_scale = current_scene_scale + Vector3(scale_change, scale_change, scale_change)
+			
+			PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Scale node %s: current=%s, input=%.3f, is_absolute=%s, new=%s" % [
+				node.name, current_scene_scale, input_value, is_absolute, new_scene_scale
+			])
+			
+			# Prevent negative or zero scale
+			new_scene_scale.x = max(0.01, new_scene_scale.x)
+			new_scene_scale.y = max(0.01, new_scene_scale.y)
+			new_scene_scale.z = max(0.01, new_scene_scale.z)
+			
+			_services.smooth_transform_manager.set_target_scale(node, new_scene_scale)
+
+func _apply_numeric_height(numeric_mgr, transform_data: Dictionary, transform_state: TransformState) -> void:
+	"""Apply numeric input to height"""
+	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Applying numeric height...")
+	var current_height = transform_state.height_offset
+	var new_height = numeric_mgr.apply_to_value(current_height)
+	
+	# Set height offset directly
+	transform_state.height_offset = new_height
+	
+	# Update center position
+	var center_pos = Vector3(transform_state.position.x, transform_state.base_height + transform_state.height_offset, transform_state.position.z)
+	transform_state.position = center_pos
+	transform_data["center_position"] = center_pos
+
+func _apply_numeric_position(action, numeric_mgr, transform_data: Dictionary, transform_state: TransformState) -> void:
+	"""Apply numeric input to position offset"""
+	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Applying numeric position for action: %s" % action)
+	var ActionType = NumericInputManager.ActionType
+	var manual_offset = transform_data.get("manual_position_offset", Vector3.ZERO)
+	
+	var value = numeric_mgr.get_numeric_value()
+	if numeric_mgr.get_prefix_mode() == NumericInputManager.PrefixMode.ABSOLUTE:
+		# Absolute positioning
+		match action:
+			ActionType.POSITION_FORWARD, ActionType.POSITION_BACKWARD:
+				manual_offset.z = -value if action == ActionType.POSITION_FORWARD else value
+			ActionType.POSITION_LEFT, ActionType.POSITION_RIGHT:
+				manual_offset.x = -value if action == ActionType.POSITION_LEFT else value
+	else:
+		# Relative positioning
+		var delta = value
+		if numeric_mgr.get_prefix_mode() == NumericInputManager.PrefixMode.RELATIVE_SUB:
+			delta = -delta
+		
+		match action:
+			ActionType.POSITION_FORWARD:
+				manual_offset.z -= delta
+			ActionType.POSITION_BACKWARD:
+				manual_offset.z += delta
+			ActionType.POSITION_LEFT:
+				manual_offset.x -= delta
+			ActionType.POSITION_RIGHT:
+				manual_offset.x += delta
+	
+	transform_data["manual_position_offset"] = manual_offset
 
 func update_overlays(transform_data: Dictionary) -> void:
 	var target_nodes = transform_data.get("target_nodes", [])

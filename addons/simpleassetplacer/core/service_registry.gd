@@ -44,6 +44,7 @@ var mode_state_machine
 var preview_manager
 var overlay_manager
 var input_handler
+var numeric_input_manager
 
 # Transform managers
 var smooth_transform_manager
@@ -124,6 +125,7 @@ func cleanup() -> void:
 	preview_manager = null
 	overlay_manager = null
 	input_handler = null
+	numeric_input_manager = null
 	smooth_transform_manager = null
 	transform_applicator = null
 	placement_strategy_manager = null

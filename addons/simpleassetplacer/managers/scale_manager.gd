@@ -285,19 +285,19 @@ func get_configuration(state: TransformState) -> Dictionary:
 
 ## Display and Formatting
 
-func get_scale_percentage(state: TransformState) -> float:
-	"""Get scale multiplier as percentage (1.0 = 100%)"""
-	return state.scale_multiplier * 100.0
+func get_scale_value(state: TransformState) -> float:
+	"""Get scale multiplier as actual scale value (1.0 = normal size)"""
+	return state.scale_multiplier
 
 func get_scale_display_text(state: TransformState) -> String:
 	"""Get formatted scale display text"""
 	if is_uniform_scale(state):
-		return "Scale: %.1f%%" % get_scale_percentage(state)
+		return "Scale: %.2fx" % get_scale_value(state)
 	else:
-		return "Scale: X:%.1f%% Y:%.1f%% Z:%.1f%%" % [
-			state.non_uniform_multiplier.x * 100.0,
-			state.non_uniform_multiplier.y * 100.0,
-			state.non_uniform_multiplier.z * 100.0
+		return "Scale: X:%.2fx Y:%.2fx Z:%.2fx" % [
+			state.non_uniform_multiplier.x,
+			state.non_uniform_multiplier.y,
+			state.non_uniform_multiplier.z
 		]
 
 ## Debug and Information
@@ -305,7 +305,7 @@ func get_scale_display_text(state: TransformState) -> String:
 func debug_print_scale(state: TransformState):
 	"""Print current scale state for debugging"""
 	PluginLogger.debug("ScaleManager", "ScaleManager State:")
-	PluginLogger.debug("ScaleManager", "  Uniform Scale Multiplier: %.3f (%.1f%%)" % [state.scale_multiplier, get_scale_percentage(state)])
+	PluginLogger.debug("ScaleManager", "  Uniform Scale Multiplier: %.3fx" % state.scale_multiplier)
 	PluginLogger.debug("ScaleManager", "  Scale Multiplier Vector: X:%.3f Y:%.3f Z:%.3f" % [state.non_uniform_multiplier.x, state.non_uniform_multiplier.y, state.non_uniform_multiplier.z])
 	PluginLogger.debug("ScaleManager", "  Is Uniform: " + str(is_uniform_scale(state)))
 	PluginLogger.debug("ScaleManager", "  Is Default: " + str(is_scale_at_default(state)))
@@ -315,7 +315,7 @@ func get_scale_info(state: TransformState) -> Dictionary:
 	return {
 		"scale_multiplier": state.scale_multiplier,
 		"scale_multiplier_vector": state.non_uniform_multiplier,
-		"scale_percentage": get_scale_percentage(state),
+		"scale_value": get_scale_value(state),
 		"is_uniform": is_uniform_scale(state),
 		"is_default": is_scale_at_default(state),
 		"display_text": get_scale_display_text(state)

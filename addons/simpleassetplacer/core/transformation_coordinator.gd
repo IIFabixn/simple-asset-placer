@@ -62,6 +62,9 @@ func start_transform_mode(target_nodes: Variant, dock_instance = null) -> void:
 func exit_placement_mode() -> void:
     if not _services.mode_state_machine.is_placement_mode():
         return
+    # Cancel any active numeric input
+    if _services.numeric_input_manager:
+        _services.numeric_input_manager.reset()
     _services.placement_mode_handler.exit_placement_mode(_placement_data, _transform_state, _placement_end_callback, _settings)
     _placement_data.clear()
     _services.mode_state_machine.clear_mode()
@@ -69,12 +72,18 @@ func exit_placement_mode() -> void:
 func exit_transform_mode(confirm_changes: bool = true) -> void:
     if not _services.mode_state_machine.is_transform_mode():
         return
+    # Cancel any active numeric input
+    if _services.numeric_input_manager:
+        _services.numeric_input_manager.reset()
     _services.transform_mode_handler.exit_transform_mode(_transform_data, _transform_state, confirm_changes, _settings)
     _transform_data.clear()
     _services.mode_state_machine.clear_mode()
 
 func exit_any_mode() -> void:
     var mode = _services.mode_state_machine.get_current_mode()
+    # Cancel any active numeric input
+    if _services.numeric_input_manager:
+        _services.numeric_input_manager.reset()
     match mode:
         ModeStateMachine.Mode.PLACEMENT:
             exit_placement_mode()

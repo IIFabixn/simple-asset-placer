@@ -81,7 +81,7 @@ func show_transform_info(mode: int, node_name: String = "", position: Vector3 = 
 		rotation_label.text = "Rot: X: %.1f°  Y: %.1f°  Z: %.1f°" % [rad_to_deg(rotation.x), rad_to_deg(rotation.y), rad_to_deg(rotation.z)]
 	
 	if scale_label:
-		scale_label.text = "Scale: %.1f%%" % (scale_value * 100.0)
+		scale_label.text = "Scale: %.2fx" % scale_value
 	
 	# Update keybinds
 	if keybinds_label:

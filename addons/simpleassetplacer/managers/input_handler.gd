@@ -70,6 +70,10 @@ func update_input_state(input_settings: Dictionary = {}, viewport: SubViewport =
 	"""Update all input state for the current frame. Call this once per frame."""
 	_settings = input_settings
 	
+	# Track Tab key for numeric input system
+	if _services.numeric_input_manager:
+		_update_tab_key_tracking()
+	
 	# Store viewport for mouse position calculations
 	if viewport:
 		_cached_viewport = viewport
@@ -103,6 +107,19 @@ func update_input_state(input_settings: Dictionary = {}, viewport: SubViewport =
 	_update_key_states()
 	_update_mouse_states()
 	_update_action_states()
+
+func _update_tab_key_tracking():
+	"""Track Tab key press/release for numeric input system"""
+	var tab_key = _settings.get("transform_mode_key", "TAB")
+	var is_tab_pressed = _check_key_with_modifiers(tab_key)
+	var was_tab_pressed = _previous_keys.get("tab", false)
+	
+	# Tab just pressed
+	if is_tab_pressed and not was_tab_pressed:
+		_services.numeric_input_manager.process_tab_pressed()
+	# Tab just released
+	elif not is_tab_pressed and was_tab_pressed:
+		_services.numeric_input_manager.process_tab_released()
 
 func _update_key_states():
 	"""Update all key states based on current settings"""
@@ -189,6 +206,32 @@ func _update_key_states():
 	_track_key_press_time("cycle_next_asset", current_time)
 	_track_key_press_time("cycle_previous_asset", current_time)
 	_track_key_press_time("cycle_placement_mode", current_time)
+	
+	# Numeric input special keys - CHECK THESE FIRST before digits to avoid conflicts
+	_current_keys["decimal_point"] = Input.is_key_pressed(KEY_PERIOD)
+	_current_keys["minus"] = Input.is_key_pressed(KEY_MINUS)
+	_current_keys["plus"] = Input.is_key_pressed(KEY_PLUS) or (Input.is_key_pressed(KEY_EQUAL) and Input.is_key_pressed(KEY_SHIFT))
+	# Equals key: US layout = KEY_EQUAL without SHIFT, German/EU layout = KEY_0 with SHIFT
+	_current_keys["equals"] = (Input.is_key_pressed(KEY_EQUAL) and not Input.is_key_pressed(KEY_SHIFT)) or \
+	                          (Input.is_key_pressed(KEY_0) and Input.is_key_pressed(KEY_SHIFT))
+	_current_keys["backspace"] = Input.is_key_pressed(KEY_BACKSPACE)
+	_current_keys["enter"] = Input.is_key_pressed(KEY_ENTER) or Input.is_key_pressed(KEY_KP_ENTER)
+	
+	# Numeric input keys (0-9) - poll directly without modifier checks
+	# NOTE: Check digits AFTER special keys since = shares physical key with 0 on some keyboards
+	for i in range(10):
+		var digit_key = "digit_%d" % i
+		var keycode = KEY_0 + i
+		var is_digit = Input.is_key_pressed(keycode)
+		
+		# Don't detect digit if special key is already detected (e.g., Shift+0 = equals on German keyboards)
+		if i == 0 and _current_keys["equals"]:
+			is_digit = false  # Equals takes priority over 0
+		# On German/EU keyboards, Shift+0 produces =, so only detect 0 without SHIFT
+		elif i == 0 and Input.is_key_pressed(KEY_SHIFT):
+			is_digit = false  # Shift+0 is reserved for equals on German keyboards
+		
+		_current_keys[digit_key] = is_digit
 
 func _check_key_with_modifiers(key_string: String) -> bool:
 	"""Check if key is pressed, supporting both direct keys and modifier combinations
@@ -356,6 +399,27 @@ func is_key_just_pressed(key_name: String) -> bool:
 	# For all other keys (tab, cancel, etc.), use normal edge detection
 	return current and not previous
 
+func _is_key_edge_pressed(key_name: String) -> bool:
+	"""Simple edge detection - true when key transitions from not pressed to pressed.
+	This is used for numeric input context setting, where we want to detect the initial
+	key press regardless of how long the user holds it."""
+	var current = _current_keys.get(key_name, false)
+	var previous = _previous_keys.get(key_name, false)
+	return current and not previous
+
+func was_action_key_tapped(key_name: String) -> bool:
+	"""Check if an action key was tapped (not held).
+	This is specifically for numeric input activation - we only want to activate
+	numeric input on quick taps, not when holding for repeated actions."""
+	var current = _current_keys.get(key_name, false)
+	var previous = _previous_keys.get(key_name, false)
+	
+	# Key was just released and it was in pending_taps = it was a quick tap
+	if not current and previous and _pending_taps.has(key_name):
+		return true
+	
+	return false
+
 func is_key_held_for_wheel(key_name: String) -> bool:
 	"""Check if a key is being held long enough to be used with mouse wheel"""
 	if not is_key_pressed(key_name):
@@ -475,7 +539,11 @@ func get_rotation_input() -> Dictionary:
 		"reset_pressed": is_key_just_pressed("reset_rotation") and not right_mouse_held,
 		"reverse_modifier_held": is_reverse_modifier_held(),
 		"large_increment_modifier_held": is_large_increment_modifier_held(),
-		"fine_increment_modifier_held": is_fine_increment_modifier_held()
+		"fine_increment_modifier_held": is_fine_increment_modifier_held(),
+		# Tap detection for numeric input - use edge trigger (key just pressed, not released)
+		"x_tapped": _is_key_edge_pressed("rotate_x") and not right_mouse_held,
+		"y_tapped": _is_key_edge_pressed("rotate_y") and not right_mouse_held,
+		"z_tapped": _is_key_edge_pressed("rotate_z") and not right_mouse_held
 	}
 
 func get_scale_input() -> Dictionary:
@@ -489,7 +557,10 @@ func get_scale_input() -> Dictionary:
 		"reset_pressed": is_key_just_pressed("reset_scale") and not right_mouse_held,
 		"reverse_modifier_held": is_reverse_modifier_held(),
 		"large_increment_modifier_held": is_large_increment_modifier_held(),
-		"fine_increment_modifier_held": is_fine_increment_modifier_held()
+		"fine_increment_modifier_held": is_fine_increment_modifier_held(),
+		# Tap detection for numeric input - use edge trigger (key just pressed, not released)
+		"up_tapped": _is_key_edge_pressed("scale_up") and not right_mouse_held,
+		"down_tapped": _is_key_edge_pressed("scale_down") and not right_mouse_held
 	}
 
 func get_position_input() -> Dictionary:
@@ -497,20 +568,43 @@ func get_position_input() -> Dictionary:
 	# Disable position controls when right mouse button is held (viewport navigation)
 	var right_mouse_held = is_mouse_button_pressed("right")
 	
+	# Get tap detection result ONCE per key (calling is_key_just_pressed twice erases _pending_taps on first call!)
+	var height_up_just_pressed = is_key_just_pressed("height_up")
+	var height_down_just_pressed = is_key_just_pressed("height_down")
+	var pos_forward_just_pressed = is_key_just_pressed("position_forward")
+	var pos_backward_just_pressed = is_key_just_pressed("position_backward")
+	var pos_left_just_pressed = is_key_just_pressed("position_left")
+	var pos_right_just_pressed = is_key_just_pressed("position_right")
+	
+	# Apply right mouse held check for tapped flags (for numeric input context)
+	var height_up_tapped = height_up_just_pressed and not right_mouse_held
+	var height_down_tapped = height_down_just_pressed and not right_mouse_held
+	var pos_forward_tapped = pos_forward_just_pressed and not right_mouse_held
+	var pos_backward_tapped = pos_backward_just_pressed and not right_mouse_held
+	var pos_left_tapped = pos_left_just_pressed and not right_mouse_held
+	var pos_right_tapped = pos_right_just_pressed and not right_mouse_held
+	
 	return {
-		"height_up_pressed": (is_key_just_pressed("height_up") or is_action_key_held_with_repeat("height_up", "height")) and not right_mouse_held,
-		"height_down_pressed": (is_key_just_pressed("height_down") or is_action_key_held_with_repeat("height_down", "height")) and not right_mouse_held,
+		"height_up_pressed": (height_up_just_pressed or is_action_key_held_with_repeat("height_up", "height")) and not right_mouse_held,
+		"height_down_pressed": (height_down_just_pressed or is_action_key_held_with_repeat("height_down", "height")) and not right_mouse_held,
 		"reset_height_pressed": is_key_just_pressed("reset_height") and not right_mouse_held,
-		"position_left_pressed": (is_key_just_pressed("position_left") or is_action_key_held_with_repeat("position_left", "position")) and not right_mouse_held,
-		"position_right_pressed": (is_key_just_pressed("position_right") or is_action_key_held_with_repeat("position_right", "position")) and not right_mouse_held,
-		"position_forward_pressed": (is_key_just_pressed("position_forward") or is_action_key_held_with_repeat("position_forward", "position")) and not right_mouse_held,
-		"position_backward_pressed": (is_key_just_pressed("position_backward") or is_action_key_held_with_repeat("position_backward", "position")) and not right_mouse_held,
+		"position_left_pressed": (pos_left_just_pressed or is_action_key_held_with_repeat("position_left", "position")) and not right_mouse_held,
+		"position_right_pressed": (pos_right_just_pressed or is_action_key_held_with_repeat("position_right", "position")) and not right_mouse_held,
+		"position_forward_pressed": (pos_forward_just_pressed or is_action_key_held_with_repeat("position_forward", "position")) and not right_mouse_held,
+		"position_backward_pressed": (pos_backward_just_pressed or is_action_key_held_with_repeat("position_backward", "position")) and not right_mouse_held,
 		"reset_position_pressed": is_key_just_pressed("reset_position") and not right_mouse_held,
 		"mouse_position": get_mouse_position(),
 		"confirm_action": (is_mouse_button_just_pressed("left") and is_mouse_in_viewport()) or is_key_just_pressed("confirm"),
 		"reverse_modifier_held": is_reverse_modifier_held(),
 		"large_increment_modifier_held": is_large_increment_modifier_held(),
-		"fine_increment_modifier_held": is_fine_increment_modifier_held()
+		"fine_increment_modifier_held": is_fine_increment_modifier_held(),
+		# Tap detection for numeric input
+		"height_up_tapped": height_up_tapped,
+		"height_down_tapped": height_down_tapped,
+		"position_forward_tapped": pos_forward_tapped,
+		"position_backward_tapped": pos_backward_tapped,
+		"position_left_tapped": pos_left_tapped,
+		"position_right_tapped": pos_right_tapped
 	}
 
 func get_navigation_input() -> Dictionary:
@@ -520,6 +614,28 @@ func get_navigation_input() -> Dictionary:
 		"cancel_pressed": is_key_just_pressed("cancel") or is_action_pressed("ui_cancel"),
 		"escape_pressed": is_key_just_pressed("escape")
 	}
+
+func get_numeric_input() -> Dictionary:
+	"""Get numeric input state for Blender-style direct value entry
+	Returns which digit/special keys were just pressed (not held)"""
+	var result = {
+		"digit_pressed": -1,  # -1 = no digit, 0-9 = which digit
+		"decimal_pressed": is_key_just_pressed("decimal_point"),
+		"minus_pressed": is_key_just_pressed("minus"),
+		"plus_pressed": is_key_just_pressed("plus"),
+		"equals_pressed": is_key_just_pressed("equals"),
+		"backspace_pressed": is_key_just_pressed("backspace"),
+		"enter_pressed": is_key_just_pressed("enter"),
+		"escape_pressed": is_key_just_pressed("escape")
+	}
+	
+	# Check which digit was just pressed (only one at a time)
+	for i in range(10):
+		if is_key_just_pressed("digit_%d" % i):
+			result["digit_pressed"] = i
+			break
+	
+	return result
 
 func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 	"""Interpret mouse wheel event based on currently held action keys

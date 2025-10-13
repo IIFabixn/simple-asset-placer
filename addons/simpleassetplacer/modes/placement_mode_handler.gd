@@ -35,6 +35,7 @@ const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_con
 const NodeUtils = preload("res://addons/simpleassetplacer/utils/node_utils.gd")
 const TransformState = preload("res://addons/simpleassetplacer/core/transform_state.gd")
 const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
+const NumericInputManager = preload("res://addons/simpleassetplacer/managers/numeric_input_manager.gd")
 
 # Dependencies (injected via ServiceRegistry)
 var _services: ServiceRegistry
@@ -186,14 +187,34 @@ func process_input(
 	var rotation_input = _services.input_handler.get_rotation_input()
 	var scale_input = _services.input_handler.get_scale_input()
 	
+	# Check for numeric input confirmation and application
+	var numeric_mgr = _services.numeric_input_manager
+	if numeric_mgr.is_confirmed():
+		_apply_numeric_input(placement_data, transform_state, settings)
+		numeric_mgr.reset()
+	
+	# Track action key presses for numeric input system
+	_track_action_for_numeric_input(rotation_input, scale_input, position_input)
+	
+	# Update numeric input overlay if active
+	if numeric_mgr.is_active() and numeric_mgr.is_within_grace_period():
+		var action_name = numeric_mgr.get_action_display_name()
+		var input_string = numeric_mgr.get_input_string()
+		_services.overlay_manager.show_numeric_input(action_name, input_string)
+	
+	# If numeric input is active, skip normal input processing (except mouse/position tracking)
+	var skip_normal_input = numeric_mgr.is_active() and not numeric_mgr.is_confirmed()
+	
 	# Set half-step mode based on configured fine increment modifier
 	_services.position_manager.set_use_half_step(position_input.fine_increment_modifier_held)
 	
-	# Handle height adjustments
-	_process_height_input(position_input, transform_state, settings)
-	
-	# Handle position adjustments (WASD-style movement)
-	_process_position_input(camera, position_input, transform_state, settings)
+	# Handle input if not in numeric mode
+	if not skip_normal_input:
+		# Handle height adjustments
+		_process_height_input(position_input, transform_state, settings)
+		
+		# Handle position adjustments (WASD-style movement)
+		_process_position_input(camera, position_input, transform_state, settings)
 	
 	# Update position from mouse AFTER processing WASD input
 	var mouse_pos = position_input.mouse_position
@@ -218,24 +239,30 @@ func process_input(
 	else:
 		_services.rotation_manager.reset_surface_alignment(transform_state)
 	
-	# Handle rotation input (this will be combined with surface alignment)
-	# Don't rotate position offset - this makes rotation behave like transform mode (in-place)
-	# Reuse preview_mesh variable from above
-	_process_rotation_input(rotation_input, preview_mesh, transform_state, settings, false)
-	
-	# Apply the combined rotation (surface alignment + manual rotation) to the preview mesh
-	if preview_mesh:
-		_services.rotation_manager.apply_rotation_to_node(transform_state, preview_mesh)
-	
-	# Handle scale input
-	_process_scale_input(scale_input, preview_mesh, transform_state, settings)
-	
-	# Handle asset cycling
-	process_asset_cycling_input(placement_data)
+	# Skip transformation input if numeric mode is active
+	if not skip_normal_input:
+		# Handle rotation input (this will be combined with surface alignment)
+		# Don't rotate position offset - this makes rotation behave like transform mode (in-place)
+		# Reuse preview_mesh variable from above
+		_process_rotation_input(rotation_input, preview_mesh, transform_state, settings, false)
+		
+		# Apply the combined rotation (surface alignment + manual rotation) to the preview mesh
+		if preview_mesh:
+			_services.rotation_manager.apply_rotation_to_node(transform_state, preview_mesh)
+		
+		# Handle scale input
+		_process_scale_input(scale_input, preview_mesh, transform_state, settings)
+		
+		# Handle asset cycling
+		process_asset_cycling_input(placement_data)
 	
 	# Handle placement action
 	if position_input.confirm_action:
-		place_at_current_position(placement_data, transform_state)
+		# If numeric input is active, confirm it instead of placing
+		if numeric_mgr.is_active():
+			numeric_mgr.confirm_action()
+		else:
+			place_at_current_position(placement_data, transform_state)
 	
 	# Update overlays with current state
 	update_overlays(placement_data, transform_state)
@@ -600,3 +627,140 @@ func _reset_transforms_on_exit(transform_state: TransformState, settings: Dictio
 	
 	# Always reset surface alignment when exiting modes
 	_services.rotation_manager.reset_surface_alignment(transform_state)
+
+## Numeric Input Integration
+
+func _track_action_for_numeric_input(rotation_input: Dictionary, scale_input: Dictionary, position_input: Dictionary) -> void:
+	"""Track when action keys are TAPPED (not held) to set context for numeric input.
+	The numeric input will only activate when user actually types a number."""
+	var numeric_mgr = _services.numeric_input_manager
+	if not numeric_mgr:
+		return
+	
+	var ActionType = NumericInputManager.ActionType
+	
+	# Track rotation actions (only on tap, not on hold/repeat)
+	if rotation_input.get("x_tapped", false):
+		numeric_mgr.set_action_context(ActionType.ROTATE_X)
+	elif rotation_input.get("y_tapped", false):
+		numeric_mgr.set_action_context(ActionType.ROTATE_Y)
+	elif rotation_input.get("z_tapped", false):
+		numeric_mgr.set_action_context(ActionType.ROTATE_Z)
+	
+	# Track scale actions (only on tap, not on hold/repeat)
+	elif scale_input.get("up_tapped", false) or scale_input.get("down_tapped", false):
+		numeric_mgr.set_action_context(ActionType.SCALE)
+	
+	# Track height actions (only on tap, not on hold/repeat)
+	elif position_input.get("height_up_tapped", false) or position_input.get("height_down_tapped", false):
+		numeric_mgr.set_action_context(ActionType.HEIGHT)
+	
+	# Track position actions (only on tap, not on hold/repeat)
+	elif position_input.get("position_forward_tapped", false):
+		numeric_mgr.set_action_context(ActionType.POSITION_FORWARD)
+	elif position_input.get("position_backward_tapped", false):
+		numeric_mgr.set_action_context(ActionType.POSITION_BACKWARD)
+	elif position_input.get("position_left_tapped", false):
+		numeric_mgr.set_action_context(ActionType.POSITION_LEFT)
+	elif position_input.get("position_right_tapped", false):
+		numeric_mgr.set_action_context(ActionType.POSITION_RIGHT)
+
+func _apply_numeric_input(placement_data: Dictionary, transform_state: TransformState, settings: Dictionary) -> void:
+	"""Apply the confirmed numeric input value to the transformation"""
+	var numeric_mgr = _services.numeric_input_manager
+	if not numeric_mgr or not numeric_mgr.is_active():
+		return
+	
+	var action = numeric_mgr.get_active_action()
+	var ActionType = NumericInputManager.ActionType
+	var preview_mesh = _services.preview_manager.get_preview_mesh()
+	
+	match action:
+		ActionType.ROTATE_X, ActionType.ROTATE_Y, ActionType.ROTATE_Z:
+			_apply_numeric_rotation(action, numeric_mgr, preview_mesh, transform_state)
+		
+		ActionType.SCALE:
+			_apply_numeric_scale(numeric_mgr, preview_mesh, transform_state)
+		
+		ActionType.HEIGHT:
+			_apply_numeric_height(numeric_mgr, transform_state)
+		
+		ActionType.POSITION_FORWARD, ActionType.POSITION_BACKWARD, ActionType.POSITION_LEFT, ActionType.POSITION_RIGHT:
+			_apply_numeric_position(action, numeric_mgr, transform_state)
+
+func _apply_numeric_rotation(action, numeric_mgr, preview_mesh: Node3D, transform_state: TransformState) -> void:
+	"""Apply numeric input to rotation"""
+	if not preview_mesh:
+		return
+	
+	var ActionType = NumericInputManager.ActionType
+	var axis = ""
+	match action:
+		ActionType.ROTATE_X:
+			axis = "X"
+		ActionType.ROTATE_Y:
+			axis = "Y"
+		ActionType.ROTATE_Z:
+			axis = "Z"
+	
+	if axis == "":
+		return
+	
+	# Get current rotation
+	var current_rotation_deg = rad_to_deg(preview_mesh.rotation[axis.to_lower()])
+	
+	# Apply numeric value
+	var new_rotation_deg = numeric_mgr.apply_to_value(current_rotation_deg)
+	var rotation_step = new_rotation_deg - current_rotation_deg
+	
+	# Apply the rotation
+	_services.rotation_manager.apply_rotation_step(transform_state, preview_mesh, axis, rotation_step, Vector3.ZERO, false)
+	_services.rotation_manager.apply_rotation_to_node(transform_state, preview_mesh)
+
+func _apply_numeric_scale(numeric_mgr, preview_mesh: Node3D, transform_state: TransformState) -> void:
+	"""Apply numeric input to scale"""
+	var current_scale = _services.scale_manager.get_scale(transform_state)
+	var new_scale = numeric_mgr.apply_to_value(current_scale)
+	
+	# Set the scale directly
+	_services.scale_manager.set_scale(transform_state, new_scale)
+	
+	# Apply to preview mesh
+	if preview_mesh:
+		_services.scale_manager.apply_uniform_scale_to_node(transform_state, preview_mesh, Vector3.ONE)
+
+func _apply_numeric_height(numeric_mgr, transform_state: TransformState) -> void:
+	"""Apply numeric input to height"""
+	var current_height = transform_state.height_offset
+	var new_height = numeric_mgr.apply_to_value(current_height)
+	
+	# Set height offset directly
+	transform_state.height_offset = new_height
+
+func _apply_numeric_position(action, numeric_mgr, transform_state: TransformState) -> void:
+	"""Apply numeric input to position offset"""
+	var ActionType = NumericInputManager.ActionType
+	
+	var value = numeric_mgr.get_numeric_value()
+	if numeric_mgr.get_prefix_mode() == NumericInputManager.PrefixMode.ABSOLUTE:
+		# Absolute positioning
+		match action:
+			ActionType.POSITION_FORWARD, ActionType.POSITION_BACKWARD:
+				transform_state.manual_position_offset.z = -value if action == ActionType.POSITION_FORWARD else value
+			ActionType.POSITION_LEFT, ActionType.POSITION_RIGHT:
+				transform_state.manual_position_offset.x = -value if action == ActionType.POSITION_LEFT else value
+	else:
+		# Relative positioning
+		var delta = value
+		if numeric_mgr.get_prefix_mode() == NumericInputManager.PrefixMode.RELATIVE_SUB:
+			delta = -delta
+		
+		match action:
+			ActionType.POSITION_FORWARD:
+				transform_state.manual_position_offset.z -= delta
+			ActionType.POSITION_BACKWARD:
+				transform_state.manual_position_offset.z += delta
+			ActionType.POSITION_LEFT:
+				transform_state.manual_position_offset.x -= delta
+			ActionType.POSITION_RIGHT:
+				transform_state.manual_position_offset.x += delta

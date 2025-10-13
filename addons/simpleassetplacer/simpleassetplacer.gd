@@ -26,6 +26,7 @@ const TransformApplicator = preload("res://addons/simpleassetplacer/core/transfo
 const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placement/placement_strategy_manager.gd")
 const UtilityManager = preload("res://addons/simpleassetplacer/managers/utility_manager.gd")
 const CategoryManager = preload("res://addons/simpleassetplacer/managers/category_manager.gd")
+const NumericInputManager = preload("res://addons/simpleassetplacer/managers/numeric_input_manager.gd")
 const ThumbnailGenerator = preload("res://addons/simpleassetplacer/thumbnails/thumbnail_generator.gd")
 const ThumbnailQueueManager = preload("res://addons/simpleassetplacer/thumbnails/thumbnail_queue_manager.gd")
 
@@ -59,7 +60,17 @@ func _disable_plugin() -> void:
 	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Plugin disabled")
 
 func _enter_tree() -> void:
+	# RELOAD TEST: This message proves the plugin code has been reloaded
+	print("========================================")
+	print("=== PLUGIN CODE RELOADED SUCCESSFULLY ===")
+	print("=== VERSION: Numeric Input Debug v2   ===")
+	print("========================================")
+	
 	PluginLogger.log_initialization(PluginConstants.COMPONENT_MAIN)
+	
+	# Enable debug logging for numeric input troubleshooting
+	PluginLogger.enable_debug_mode()
+	print("=== DEBUG MODE ENABLED ===")
 	
 	# Initialize systems in order
 	_initialize_systems()
@@ -106,6 +117,9 @@ func _initialize_systems():
 	
 	# Input handler (instance-based with ServiceRegistry)
 	service_registry.input_handler = InputHandler.new(service_registry)
+	
+	# Numeric input manager (instance-based with ServiceRegistry)
+	service_registry.numeric_input_manager = NumericInputManager.new(service_registry)
 	
 	# Position manager (instance-based with ServiceRegistry)
 	service_registry.position_manager = PositionManager.new(service_registry)
@@ -493,6 +507,7 @@ func _forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 				return EditorPlugin.AFTER_GUI_INPUT_STOP
 	
 	# Handle key events to prevent conflicts with Godot shortcuts
+	# Note: Don't filter event.echo here - let individual handlers decide
 	if event is InputEventKey and event.pressed:
 		var key_string = OS.get_keycode_string(event.keycode)
 		

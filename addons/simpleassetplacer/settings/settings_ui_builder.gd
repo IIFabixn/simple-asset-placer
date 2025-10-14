@@ -17,10 +17,9 @@ static func build_settings_ui(container: Control, owner_node: Node, settings_dat
 		"basic": "Basic Settings",
 		"advanced_grid": "Advanced Grid Settings",
 		"reset_behavior": "Reset Behavior",
-		"rotation": "Rotation Controls",
-		"scale": "Scale Controls",
+		"control_modes": "Modal Control Keys (Blender-Style)",
 		"height": "Height Adjustment",
-		"position": "Position Adjustment (XZ Manual Movement)",
+		"numeric_input": "Numeric Input Increments",
 		"modifiers": "Modifier Keys",
 		"control": "Control Keys"
 	}

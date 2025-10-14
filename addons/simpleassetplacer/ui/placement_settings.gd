@@ -43,6 +43,10 @@ var snap_y_step: float = 1.0
 var snap_center_x: bool = false
 var snap_center_y: bool = false
 var snap_center_z: bool = false
+var snap_rotation_enabled: bool = false
+var snap_rotation_step: float = 15.0
+var snap_scale_enabled: bool = false
+var snap_scale_step: float = 0.1
 
 # Reset Behavior
 var reset_height_on_exit: bool = false

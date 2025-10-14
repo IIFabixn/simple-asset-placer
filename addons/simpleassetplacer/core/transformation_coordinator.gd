@@ -13,6 +13,7 @@ const ModeStateMachine = preload("res://addons/simpleassetplacer/core/mode_state
 const GridManager = preload("res://addons/simpleassetplacer/managers/grid_manager.gd")
 const ScaleManager = preload("res://addons/simpleassetplacer/managers/scale_manager.gd")
 const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placement/placement_strategy_manager.gd")
+const TransformApplicator = preload("res://addons/simpleassetplacer/core/transform_applicator.gd")
 
 var _services: ServiceRegistry
 var _transform_state: TransformState = null
@@ -27,11 +28,15 @@ var _focus_grab_counter: int = 0
 func _init(services: ServiceRegistry) -> void:
     _services = services
 
-func start_placement_mode(mesh: Mesh = null, meshlib: MeshLibrary = null, item_id: int = -1, asset_path: String = "", placement_settings: Dictionary = {}, dock_instance = null) -> void:
+func start_placement_mode(mesh: Mesh, meshlib, item_id, asset_path, placement_settings, dock_instance = null) -> void:
     exit_any_mode()
     if not _services.mode_state_machine.transition_to_mode(ModeStateMachine.Mode.PLACEMENT):
         return
-    _settings = placement_settings
+    
+    # Reset control mode (deactivate modal) when entering placement mode
+    if _services.control_mode_state:
+        _services.control_mode_state.reset()
+    
     _dock_reference = dock_instance
     _transform_state = TransformState.new()
     _transform_state.configure_from_settings(placement_settings)
@@ -47,10 +52,22 @@ func start_transform_mode(target_nodes: Variant, dock_instance = null) -> void:
     exit_any_mode()
     if not _services.mode_state_machine.transition_to_mode(ModeStateMachine.Mode.TRANSFORM):
         return
+    
+    # Reset control mode (deactivate modal) when entering transform mode
+    if _services.control_mode_state:
+        _services.control_mode_state.reset()
+    
     _dock_reference = dock_instance
     _transform_state = TransformState.new()
-    if not _settings.is_empty():
-        _transform_state.configure_from_settings(_settings)
+    # Always pull latest combined settings (ensures snap_* keys present)
+    _settings = SettingsManager.get_combined_settings()
+    _transform_state.configure_from_settings(_settings)
+    PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, "Transform mode settings loaded | snap_rot:%s step:%s snap_scale:%s step:%s" % [
+        _transform_state.snap_rotation_enabled,
+        _transform_state.snap_rotation_step,
+        _transform_state.snap_scale_enabled,
+        _transform_state.snap_scale_step
+    ])
     _ensure_undo_redo()
     _transform_data = _services.transform_mode_handler.enter_transform_mode(target_nodes, _settings, _transform_state, _services.undo_redo)
     if _transform_data:
@@ -65,6 +82,9 @@ func exit_placement_mode() -> void:
     # Cancel any active numeric input
     if _services.numeric_input_manager:
         _services.numeric_input_manager.reset()
+    # Deactivate modal control
+    if _services.control_mode_state:
+        _services.control_mode_state.deactivate_modal()
     _services.placement_mode_handler.exit_placement_mode(_placement_data, _transform_state, _placement_end_callback, _settings)
     _placement_data.clear()
     _services.mode_state_machine.clear_mode()
@@ -75,6 +95,9 @@ func exit_transform_mode(confirm_changes: bool = true) -> void:
     # Cancel any active numeric input
     if _services.numeric_input_manager:
         _services.numeric_input_manager.reset()
+    # Deactivate modal control
+    if _services.control_mode_state:
+        _services.control_mode_state.deactivate_modal()
     _services.transform_mode_handler.exit_transform_mode(_transform_data, _transform_state, confirm_changes, _settings)
     _transform_data.clear()
     _services.mode_state_machine.clear_mode()
@@ -196,10 +219,14 @@ func handle_mouse_wheel_input(event: InputEventMouseButton) -> bool:
             _apply_height_adjustment(wheel_input)
         "scale":
             _apply_scale_adjustment(wheel_input)
+        "scale_axis":
+            _apply_scale_axis_adjustment(wheel_input)
         "rotation":
             _apply_rotation_adjustment(wheel_input)
         "position":
             _apply_position_adjustment(wheel_input)
+        "position_axis":
+            _apply_position_axis_adjustment(wheel_input)
     return true
 
 func handle_tab_key_activation(dock_instance = null) -> void:
@@ -302,7 +329,7 @@ func _process_navigation_input() -> void:
     var nav_input = _services.input_handler.get_navigation_input()
     if nav_input.tab_just_pressed:
         handle_tab_key_activation(_dock_reference)
-    if nav_input.cancel_pressed or nav_input.escape_pressed:
+    if nav_input.cancel_pressed:
         exit_any_mode()
     # Allow cycling placement strategy in both PLACEMENT and TRANSFORM modes
     if _services.input_handler.should_cycle_placement_mode():
@@ -350,7 +377,7 @@ func _apply_scale_adjustment(wheel_input: Dictionary) -> void:
                 _services.scale_manager.increase_scale(_transform_state, step)
             else:
                 _services.scale_manager.decrease_scale(_transform_state, step)
-            _services.scale_manager.apply_uniform_scale_to_node(_transform_state, target_node, Vector3.ONE)
+            TransformApplicator.apply_scale_only(target_node, _transform_state)
     elif mode == ModeStateMachine.Mode.TRANSFORM:
         var target_nodes = _transform_data.get("target_nodes", [])
         var original_transforms = _transform_data.get("original_transforms", {})
@@ -362,7 +389,56 @@ func _apply_scale_adjustment(wheel_input: Dictionary) -> void:
             for node in target_nodes:
                 if node and node.is_inside_tree():
                     var node_original_scale = original_transforms.get(node, Transform3D()).basis.get_scale()
-                    _services.scale_manager.apply_uniform_scale_to_node(_transform_state, node, node_original_scale)
+                    TransformApplicator.apply_scale_only(node, _transform_state, node_original_scale)
+
+func _apply_scale_axis_adjustment(wheel_input: Dictionary) -> void:
+    """Apply mouse wheel scale adjustments along constrained axes in L mode"""
+    var direction = wheel_input.get("direction", 0)
+    var axes = wheel_input.get("axes", {})  # Dictionary with X/Y/Z: bool
+    var fine = wheel_input.get("fine_increment", false)
+    var large = wheel_input.get("large_increment", false)
+    
+    # Determine step size based on modifiers using configured increment settings
+    var step: float
+    if fine:
+        step = _settings.get("fine_scale_increment", 0.01)
+    elif large:
+        step = _settings.get("large_scale_increment", 0.5)
+    else:
+        step = _settings.get("fine_scale_increment", 0.01)  # Default to fine for wheel
+    
+    # Apply direction to step
+    step *= direction
+    
+    # Get current scale vector
+    var current_scale = _services.scale_manager.get_scale_vector(_transform_state)
+    var new_scale = current_scale
+    
+    # Apply scale change only to constrained axes
+    if axes.get("X", false):
+        new_scale.x = clamp(current_scale.x + step, 0.01, 100.0)
+    if axes.get("Y", false):
+        new_scale.y = clamp(current_scale.y + step, 0.01, 100.0)
+    if axes.get("Z", false):
+        new_scale.z = clamp(current_scale.z + step, 0.01, 100.0)
+    
+    # Update scale in transform state
+    _services.scale_manager.set_non_uniform_multiplier(_transform_state, new_scale)
+    
+    # Apply to nodes based on mode
+    var mode = _services.mode_state_machine.get_current_mode()
+    if mode == ModeStateMachine.Mode.PLACEMENT:
+        var target_node = _services.preview_manager.preview_mesh
+        if target_node:
+            var base_scale = _transform_state.original_scale if _transform_state.has("original_scale") else Vector3.ONE
+            TransformApplicator.apply_scale_only(target_node, _transform_state, base_scale)
+    elif mode == ModeStateMachine.Mode.TRANSFORM:
+        var target_nodes = _transform_data.get("target_nodes", [])
+        var original_transforms = _transform_data.get("original_transforms", {})
+        for node in target_nodes:
+            if node and node.is_inside_tree():
+                var node_original_scale = original_transforms.get(node, Transform3D()).basis.get_scale()
+                TransformApplicator.apply_scale_only(node, _transform_state, node_original_scale)
 
 func _apply_rotation_adjustment(wheel_input: Dictionary) -> void:
     var direction = wheel_input.get("direction", 0)
@@ -381,7 +457,8 @@ func _apply_rotation_adjustment(wheel_input: Dictionary) -> void:
     if mode == ModeStateMachine.Mode.PLACEMENT:
         var target_node = _services.preview_manager.preview_mesh
         if target_node:
-            _services.rotation_manager.apply_rotation_step(_transform_state, target_node, axis, step, Vector3.ZERO, false)
+            _services.rotation_manager.rotate_axis(_transform_state, axis, step)
+            TransformApplicator.apply_rotation_only(target_node, _transform_state)
     elif mode == ModeStateMachine.Mode.TRANSFORM:
         # For transform mode with multiple nodes, rotate around the group center
         _services.transform_mode_handler.rotate_group_by_step(axis, step, _transform_data, _transform_state)
@@ -453,6 +530,65 @@ func _apply_position_adjustment(wheel_input: Dictionary) -> void:
         var manual_offset = _transform_data.get("manual_position_offset", Vector3.ZERO)
         manual_offset += movement
         _transform_data["manual_position_offset"] = manual_offset
+
+func _apply_position_axis_adjustment(wheel_input: Dictionary) -> void:
+    """Apply mouse wheel position adjustments along constrained axes in G mode"""
+    var direction = wheel_input.get("direction", 0)
+    var axes = wheel_input.get("axes", {})  # Dictionary with X/Y/Z: bool
+    var fine = wheel_input.get("fine_increment", false)
+    var large = wheel_input.get("large_increment", false)
+    var reverse = wheel_input.get("reverse_modifier", false)
+    
+    # Determine step size based on modifiers using configured increment settings
+    var step: float
+    if fine:
+        step = _settings.get("fine_position_increment", 0.01)
+    elif large:
+        step = _settings.get("large_position_increment", 1.0)
+    else:
+        # Default: Use snap_step if snapping enabled, otherwise position_increment
+        if _settings.get("snap_enabled", false):
+            step = _settings.get("snap_step", 1.0)
+        else:
+            step = _settings.get("position_increment", 0.1)
+    
+    # Apply reverse modifier
+    var actual_direction = direction
+    if reverse:
+        actual_direction = -direction
+    
+    # Calculate movement along constrained axes
+    var movement = Vector3.ZERO
+    var axis_count = 0
+    
+    if axes.get("X", false):
+        movement.x = actual_direction
+        axis_count += 1
+    if axes.get("Y", false):
+        movement.y = actual_direction
+        axis_count += 1
+    if axes.get("Z", false):
+        movement.z = actual_direction
+        axis_count += 1
+    
+    # Normalize if multiple axes (diagonal movement)
+    if axis_count > 1:
+        movement = movement.normalized()
+    
+    movement *= step
+    
+    # Apply movement based on mode
+    var mode = _services.mode_state_machine.get_current_mode()
+    if mode == ModeStateMachine.Mode.PLACEMENT:
+        # In placement mode, directly adjust position
+        _transform_state.position += movement
+        _transform_state.target_position += movement
+    elif mode == ModeStateMachine.Mode.TRANSFORM:
+        # In transform mode, adjust center position
+        var center_pos = _transform_data.get("center_position", _transform_state.position)
+        center_pos += movement
+        _transform_data["center_position"] = center_pos
+        _transform_state.position = center_pos
 
 func _grab_3d_viewport_focus() -> void:
     var viewport_3d = _services.editor_facade.get_editor_viewport_3d(0)

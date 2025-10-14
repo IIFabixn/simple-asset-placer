@@ -238,6 +238,35 @@ func place_direct_mesh(
 	PluginLogger.info("UtilityManager", "Successfully placed direct mesh as: " + mesh_instance.name + " with final scale: " + str(mesh_instance.scale))
 	return mesh_instance
 
+## PLACEMENT WRAPPERS (for PlacementModeHandler compatibility)
+
+func place_meshlib_item_in_scene(
+	meshlib: MeshLibrary,
+	item_id: int,
+	position: Vector3,
+	settings: Dictionary = {},
+	transform_state: TransformState = null
+) -> Node3D:
+	"""Wrapper for placing MeshLibrary items (called by PlacementModeHandler)"""
+	var mesh = meshlib.get_item_mesh(item_id)
+	if not mesh:
+		PluginLogger.error("UtilityManager", "Failed to get mesh for item_id: " + str(item_id))
+		return null
+	
+	return place_from_meshlib(mesh, meshlib, item_id, position, Vector3.ZERO, transform_state, settings)
+
+func place_mesh_in_scene(
+	mesh: Mesh,
+	position: Vector3,
+	settings: Dictionary = {},
+	transform_state: TransformState = null
+) -> Node3D:
+	"""Wrapper for placing direct meshes (called by PlacementModeHandler)"""
+	if not mesh:
+		PluginLogger.error("UtilityManager", "Cannot place null mesh")
+		return null
+	
+	return place_direct_mesh(mesh, position, Vector3.ZERO, transform_state, settings)
 
 
 

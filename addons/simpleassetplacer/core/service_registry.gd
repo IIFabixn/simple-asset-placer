@@ -39,6 +39,7 @@ var rotation_manager
 var scale_manager
 var grid_manager
 var mode_state_machine
+var control_mode_state
 
 # UI managers
 var preview_manager
@@ -49,6 +50,7 @@ var numeric_input_manager
 # Transform managers
 var smooth_transform_manager
 var transform_applicator
+# transform_accumulator removed - TransformState is used as single source of truth
 
 # Placement system
 var placement_strategy_manager
@@ -122,12 +124,14 @@ func cleanup() -> void:
 	scale_manager = null
 	grid_manager = null
 	mode_state_machine = null
+	control_mode_state = null
 	preview_manager = null
 	overlay_manager = null
 	input_handler = null
 	numeric_input_manager = null
 	smooth_transform_manager = null
 	transform_applicator = null
+	# transform_accumulator removed - nothing to clear here
 	placement_strategy_manager = null
 	utility_manager = null
 	category_manager = null

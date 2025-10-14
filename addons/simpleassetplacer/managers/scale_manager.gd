@@ -177,48 +177,6 @@ func multiply_axis_scale(state: TransformState, axis: String, factor: float):
 	# Update uniform scale multiplier
 	state.scale_multiplier = (state.non_uniform_multiplier.x + state.non_uniform_multiplier.y + state.non_uniform_multiplier.z) / 3.0
 
-## Node Application (DEPRECATED - Use TransformApplicator)
-
-func apply_uniform_scale_to_node(state: TransformState, node: Node3D, original_scale: Vector3 = Vector3.ONE):
-	"""Apply uniform scale multiplier to a node's original scale
-	
-	Uses ADDITIVE scaling logic:
-	- scale_multiplier represents an additive offset
-	- multiplier 1.0 = no change (original scale)
-	- multiplier 1.2 = original + 0.2 per axis
-	- multiplier 0.8 = original - 0.2 per axis
-	
-	This allows symmetric stepping: original(1.2) +0.2 → 1.4, then -0.2 → 1.2
-	
-	Args:
-		state: TransformState containing scale data
-		node: The Node3D to apply scale to
-		original_scale: The node's original scale (from transform mode) or Vector3.ONE for placement mode
-	
-	NOTE: This function does NOT handle smooth transforms - caller must handle that
-	      (to avoid cross-manager dependencies in pure utility class)
-	"""
-	if node and node.is_inside_tree():
-		# ADDITIVE SCALING: Add offset to each axis
-		# offset = multiplier - 1.0
-		# target = original + offset (per axis)
-		var offset = state.scale_multiplier - 1.0
-		var target_scale = original_scale + Vector3(offset, offset, offset)
-		
-		# Round to 3 decimal places to avoid floating point precision issues
-		# This prevents 0.999999 or 1.000001 instead of 1.0
-		target_scale.x = snappedf(target_scale.x, 0.001)
-		target_scale.y = snappedf(target_scale.y, 0.001)
-		target_scale.z = snappedf(target_scale.z, 0.001)
-		
-		# Prevent negative or zero scale
-		target_scale.x = max(0.01, target_scale.x)
-		target_scale.y = max(0.01, target_scale.y)
-		target_scale.z = max(0.01, target_scale.z)
-		
-		# Apply scale directly (no smooth transform - caller handles that)
-		node.scale = target_scale
-
 ## Scale Constraints and Validation
 
 func clamp_scale(state: TransformState, min_multiplier: float = 0.01, max_multiplier: float = 100.0):
@@ -320,6 +278,7 @@ func get_scale_info(state: TransformState) -> Dictionary:
 		"is_default": is_scale_at_default(state),
 		"display_text": get_scale_display_text(state)
 	}
+
 
 
 

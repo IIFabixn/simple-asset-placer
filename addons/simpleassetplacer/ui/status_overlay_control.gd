@@ -39,8 +39,18 @@ func _ready() -> void:
 	if overlay_control:
 		overlay_control.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-func show_transform_info(mode: int, node_name: String = "", position: Vector3 = Vector3.ZERO, rotation: Vector3 = Vector3.ZERO, scale_value: float = 1.0, height_offset: float = 0.0) -> void:
-	"""Show unified transform overlay with all current transformation data"""
+func show_transform_info(mode: int, node_name: String = "", position: Vector3 = Vector3.ZERO, rotation: Vector3 = Vector3.ZERO, scale_value: float = 1.0, height_offset: float = 0.0, control_mode_state = null) -> void:
+	"""Show unified transform overlay with all current transformation data
+	
+	Args:
+		mode: Base mode (PLACEMENT or TRANSFORM)
+		node_name: Name of the node being transformed
+		position: Current position
+		rotation: Current rotation in radians
+		scale_value: Current scale multiplier
+		height_offset: Current height offset
+		control_mode_state: ControlModeState instance for displaying G/R/L mode and axis constraints
+	"""
 	if not mode_label or not position_label:
 		return
 	
@@ -48,16 +58,32 @@ func show_transform_info(mode: int, node_name: String = "", position: Vector3 = 
 	var strategy_name = PlacementStrategyManager.get_active_strategy_name()
 	var strategy_icon = "🎯" if PlacementStrategyManager.get_active_strategy_type() == "collision" else "📐"
 	
+	# Get control mode info if available - ONLY show when modal is actually active
+	var control_mode_text = ""
+	var axis_constraint_text = ""
+	if control_mode_state and control_mode_state.is_modal_active():
+		var ControlModeState = preload("res://addons/simpleassetplacer/core/control_mode_state.gd")
+		match control_mode_state.get_control_mode():
+			ControlModeState.ControlMode.POSITION:
+				control_mode_text = " [G:Position]"
+			ControlModeState.ControlMode.ROTATION:
+				control_mode_text = " [R:Rotation]"
+			ControlModeState.ControlMode.SCALE:
+				control_mode_text = " [L:Scale]"
+		
+		if control_mode_state.has_axis_constraint():
+			axis_constraint_text = " | Axis: " + control_mode_state.get_axis_constraint_string()
+	
 	# Update mode label and color
 	match mode:
 		ModeStateMachine.Mode.PLACEMENT:
-			mode_label.text = "🎯 PLACEMENT MODE"
+			mode_label.text = "🎯 PLACEMENT MODE" + control_mode_text + axis_constraint_text
 			mode_label.add_theme_color_override("font_color", Color.YELLOW)
 		ModeStateMachine.Mode.TRANSFORM:
-			mode_label.text = "⚙️ TRANSFORM MODE"
+			mode_label.text = "⚙️ TRANSFORM MODE" + control_mode_text + axis_constraint_text
 			mode_label.add_theme_color_override("font_color", Color.CYAN)
 		_:
-			mode_label.text = "🔧 Asset Placer Active"
+			mode_label.text = "🔧 Asset Placer Active" + control_mode_text + axis_constraint_text
 			mode_label.add_theme_color_override("font_color", Color.GREEN)
 	
 	# Update node name label
@@ -90,23 +116,17 @@ func show_transform_info(mode: int, node_name: String = "", position: Vector3 = 
 		else:
 			# Get actual keybinds from settings
 			var settings = SettingsManager.get_combined_settings()
-			var move_keys = "%s%s%s%s" % [
-				settings.get("position_forward_key", "W"),
-				settings.get("position_left_key", "A"),
-				settings.get("position_back_key", "S"),
-				settings.get("position_right_key", "D")
-			]
+			var g_key = settings.get("position_control_key", "G")
+			var r_key = settings.get("rotation_control_key", "R")
+			var l_key = settings.get("scale_control_key", "L")
 			var height_up = settings.get("height_up_key", "Q")
 			var height_down = settings.get("height_down_key", "E")
-			var scale_up = settings.get("scale_up_key", "PageUp")
-			var scale_down = settings.get("scale_down_key", "PageDown")
-			var cycle_mode = settings.get("cycle_placement_mode_key", "P")
 			
-			# Show mode-specific keybinds with actual keys
+			# Show modal control keybinds
 			if mode == ModeStateMachine.Mode.PLACEMENT:
-				keybinds_label.text = "%s (Move)  %s/%s (Height)  %s/%s (Scale)  Mouse (Rotate)  %s (Mode)" % [move_keys, height_up, height_down, scale_up, scale_down, cycle_mode]
+				keybinds_label.text = "%s (Position)  %s (Rotation)  %s (Scale)  %s/%s (Quick Height)  X/Y/Z (Axis)  Mouse Wheel (Adjust)  ENTER (Place)" % [g_key, r_key, l_key, height_up, height_down]
 			else:  # transform mode
-				keybinds_label.text = "%s (Move)  %s/%s (Height)  %s/%s (Scale)  Mouse+X/Y/Z (Rotate)  %s (Mode)  CTRL/ALT (Modifiers)" % [move_keys, height_up, height_down, scale_up, scale_down, cycle_mode]
+				keybinds_label.text = "%s (Position)  %s (Rotation)  %s (Scale)  %s/%s (Quick Height)  X/Y/Z (Axis)  Mouse Wheel (Adjust)  ENTER (Confirm)  CTRL/ALT (Fine/Large)" % [g_key, r_key, l_key, height_up, height_down]
 	
 	visible = true
 

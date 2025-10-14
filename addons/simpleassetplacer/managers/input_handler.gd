@@ -207,6 +207,33 @@ func _update_key_states():
 	_track_key_press_time("cycle_previous_asset", current_time)
 	_track_key_press_time("cycle_placement_mode", current_time)
 	
+	# Control mode keys (G/R/L for Position/Rotation/Scale)
+	var position_control_key = _settings.get("position_control_key", "G")
+	var rotation_control_key = _settings.get("rotation_control_key", "R")
+	var scale_control_key = _settings.get("scale_control_key", "L")
+	_current_keys["position_control"] = _check_key_with_modifiers(position_control_key)
+	_current_keys["rotation_control"] = _check_key_with_modifiers(rotation_control_key)
+	_current_keys["scale_control"] = _check_key_with_modifiers(scale_control_key)
+	
+	# Track control mode key press times for edge detection
+	_track_key_press_time("position_control", current_time)
+	_track_key_press_time("rotation_control", current_time)
+	_track_key_press_time("scale_control", current_time)
+	
+	# Axis constraint keys (X/Y/Z) - for double-tap toggle
+	# NOTE: These share keys with rotation, but context determines usage
+	var axis_x_key = _settings.get("rotate_x_key", "X")
+	var axis_y_key = _settings.get("rotate_y_key", "Y")
+	var axis_z_key = _settings.get("rotate_z_key", "Z")
+	_current_keys["axis_x"] = _check_key_with_modifiers(axis_x_key)
+	_current_keys["axis_y"] = _check_key_with_modifiers(axis_y_key)
+	_current_keys["axis_z"] = _check_key_with_modifiers(axis_z_key)
+	
+	# Track axis key press times for double-tap detection
+	_track_key_press_time("axis_x", current_time)
+	_track_key_press_time("axis_y", current_time)
+	_track_key_press_time("axis_z", current_time)
+	
 	# Numeric input special keys - CHECK THESE FIRST before digits to avoid conflicts
 	_current_keys["decimal_point"] = Input.is_key_pressed(KEY_PERIOD)
 	_current_keys["minus"] = Input.is_key_pressed(KEY_MINUS)
@@ -576,14 +603,6 @@ func get_position_input() -> Dictionary:
 	var pos_left_just_pressed = is_key_just_pressed("position_left")
 	var pos_right_just_pressed = is_key_just_pressed("position_right")
 	
-	# Apply right mouse held check for tapped flags (for numeric input context)
-	var height_up_tapped = height_up_just_pressed and not right_mouse_held
-	var height_down_tapped = height_down_just_pressed and not right_mouse_held
-	var pos_forward_tapped = pos_forward_just_pressed and not right_mouse_held
-	var pos_backward_tapped = pos_backward_just_pressed and not right_mouse_held
-	var pos_left_tapped = pos_left_just_pressed and not right_mouse_held
-	var pos_right_tapped = pos_right_just_pressed and not right_mouse_held
-	
 	return {
 		"height_up_pressed": (height_up_just_pressed or is_action_key_held_with_repeat("height_up", "height")) and not right_mouse_held,
 		"height_down_pressed": (height_down_just_pressed or is_action_key_held_with_repeat("height_down", "height")) and not right_mouse_held,
@@ -599,20 +618,40 @@ func get_position_input() -> Dictionary:
 		"large_increment_modifier_held": is_large_increment_modifier_held(),
 		"fine_increment_modifier_held": is_fine_increment_modifier_held(),
 		# Tap detection for numeric input
-		"height_up_tapped": height_up_tapped,
-		"height_down_tapped": height_down_tapped,
-		"position_forward_tapped": pos_forward_tapped,
-		"position_backward_tapped": pos_backward_tapped,
-		"position_left_tapped": pos_left_tapped,
-		"position_right_tapped": pos_right_tapped
+		"height_up_tapped": height_up_just_pressed and not right_mouse_held,
+		"height_down_tapped": height_down_just_pressed and not right_mouse_held,
+		"position_forward_tapped": pos_forward_just_pressed and not right_mouse_held,
+		"position_backward_tapped": pos_backward_just_pressed and not right_mouse_held,
+		"position_left_tapped": pos_left_just_pressed and not right_mouse_held,
+		"position_right_tapped": pos_right_just_pressed and not right_mouse_held
 	}
 
 func get_navigation_input() -> Dictionary:
 	"""Get navigation and control input state"""
 	return {
 		"tab_just_pressed": is_key_just_pressed("tab"),
-		"cancel_pressed": is_key_just_pressed("cancel") or is_action_pressed("ui_cancel"),
-		"escape_pressed": is_key_just_pressed("escape")
+		"cancel_pressed": is_key_just_pressed("cancel")
+	}
+
+func get_control_mode_input() -> Dictionary:
+	"""Get control mode input state (G/R/L keys and axis constraints)
+	
+	Returns:
+		Dictionary with control mode transitions and axis constraints:
+		- position_control_pressed: G key just pressed
+		- rotation_control_pressed: R key just pressed
+		- scale_control_pressed: L key just pressed
+		- axis_x_pressed: X key just pressed
+		- axis_y_pressed: Y key just pressed
+		- axis_z_pressed: Z key just pressed
+	"""
+	return {
+		"position_control_pressed": is_key_just_pressed("position_control"),
+		"rotation_control_pressed": is_key_just_pressed("rotation_control"),
+		"scale_control_pressed": is_key_just_pressed("scale_control"),
+		"axis_x_pressed": is_key_just_pressed("axis_x"),
+		"axis_y_pressed": is_key_just_pressed("axis_y"),
+		"axis_z_pressed": is_key_just_pressed("axis_z"),
 	}
 
 func get_numeric_input() -> Dictionary:
@@ -638,9 +677,17 @@ func get_numeric_input() -> Dictionary:
 	return result
 
 func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
-	"""Interpret mouse wheel event based on currently held action keys
+	"""Interpret mouse wheel event based on control mode or held action keys
+	
+	Priority order:
+	1. If action keys (Q/E/PageUp/X/Y/Z) are held, use those (legacy/precise control)
+	2. Otherwise, use current control mode (G/R/L) to determine wheel action
+	   - G (Position) mode: Adjust height
+	   - R (Rotation) mode: Rotate on constrained axis (or Y if none)
+	   - L (Scale) mode: Adjust scale
+	
 	Returns semantic action data: what should be adjusted and by how much
-	Returns empty dict if no action key is held (event should not be consumed)"""
+	Returns empty dict if no control mode is active and no action key is held"""
 	
 	if not event.pressed:
 		return {}
@@ -757,7 +804,66 @@ func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 			"reverse_modifier": is_reverse_modifier_held()
 		}
 	
-	# No action key held - return empty dict (don't consume event, allow viewport zoom)
+	# No specific action key held - check control mode
+	# This allows mouse wheel to work based on current G/R/L mode
+	if _services and _services.control_mode_state:
+		const ControlModeState = preload("res://addons/simpleassetplacer/core/control_mode_state.gd")
+		var control_mode = _services.control_mode_state.get_control_mode()
+		
+		match control_mode:
+			ControlModeState.ControlMode.POSITION:
+				# G mode: Check if axis constraint is active for fine position adjustments
+				if _services.control_mode_state.has_axis_constraint():
+					# Axis constraint active: Mouse wheel adjusts position along constrained axis(es)
+					return {
+						"action": "position_axis",
+						"axes": _services.control_mode_state.get_constrained_axes(),
+						"direction": wheel_direction,
+						"fine_increment": is_fine_increment_modifier_held(),
+						"large_increment": is_large_increment_modifier_held(),
+						"reverse_modifier": is_reverse_modifier_held()
+					}
+				else:
+					# No axis constraint: Mouse wheel adjusts height (default G mode behavior)
+					return {
+						"action": "height",
+						"direction": wheel_direction,
+						"reverse_modifier": is_reverse_modifier_held()
+					}
+			
+			ControlModeState.ControlMode.ROTATION:
+				# R mode: Rotate on constrained axis, or Y if no constraint
+				var axis = "Y"  # Default to Y axis
+				if _services.control_mode_state.has_axis_constraint():
+					axis = _services.control_mode_state.get_axis_constraint_string()
+				return {
+					"action": "rotation",
+					"axis": axis,
+					"direction": wheel_direction,
+					"large_increment": is_large_increment_modifier_held(),
+					"reverse_modifier": is_reverse_modifier_held()
+				}
+			
+			ControlModeState.ControlMode.SCALE:
+				# L mode: Check if axis constraint is active for per-axis scaling
+				if _services.control_mode_state.has_axis_constraint():
+					# Axis constraint active: Mouse wheel adjusts scale on constrained axis(es)
+					return {
+						"action": "scale_axis",
+						"axes": _services.control_mode_state.get_constrained_axes(),
+						"direction": wheel_direction,
+						"fine_increment": is_fine_increment_modifier_held(),
+						"large_increment": is_large_increment_modifier_held()
+					}
+				else:
+					# No axis constraint: Mouse wheel adjusts uniform scale
+					return {
+						"action": "scale",
+						"direction": wheel_direction,
+						"large_increment": is_large_increment_modifier_held()
+					}
+	
+	# No action key held and no control mode - return empty dict (don't consume event, allow viewport zoom)
 	return {}
 
 ## Asset Cycling Input Detection

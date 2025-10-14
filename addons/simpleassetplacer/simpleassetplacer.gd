@@ -70,7 +70,6 @@ func _enter_tree() -> void:
 	
 	# Enable debug logging for numeric input troubleshooting
 	PluginLogger.enable_debug_mode()
-	print("=== DEBUG MODE ENABLED ===")
 	
 	# Initialize systems in order
 	_initialize_systems()
@@ -144,6 +143,10 @@ func _initialize_systems():
 	
 	# Mode state machine (instance-based with ServiceRegistry)
 	service_registry.mode_state_machine = ModeStateMachine.new(service_registry)
+	
+	# Control mode state (instance-based, no ServiceRegistry needed - pure state)
+	const ControlModeState = preload("res://addons/simpleassetplacer/core/control_mode_state.gd")
+	service_registry.control_mode_state = ControlModeState.new()
 	
 	# Utility manager (instance-based with ServiceRegistry)
 	service_registry.utility_manager = UtilityManager.new(service_registry)

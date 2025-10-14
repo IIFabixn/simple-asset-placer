@@ -23,6 +23,7 @@ const MAX_AABB_DEPTH = 15  # Maximum recursion depth for AABB calculation
 const MAX_NODES_PER_AABB = 200  # Maximum nodes to process in AABB calculation
 const YIELD_INTERVAL = 10  # Yield control every N nodes to prevent UI freeze
 static var _nodes_processed: int = 0  # Track nodes processed in current AABB calculation
+static var _max_nodes_warning_logged: bool = false  # Track if we've logged the max nodes warning
 
 static func _cleanup_generation():
 	generation_mutex.unlock()
@@ -368,6 +369,7 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 		
 		# Calculate AABB from all VisualInstance3D children (async for better performance)
 		_nodes_processed = 0  # Reset node counter
+		_max_nodes_warning_logged = false  # Reset warning flag
 		var first = true
 		if scene_container and is_instance_valid(scene_container):
 			for child in scene_container.get_children():
@@ -391,8 +393,10 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 		
 		# Log AABB calculation stats
 		if _nodes_processed > 0:
+			var reached_limit = _nodes_processed > MAX_NODES_PER_AABB
+			var limit_msg = " (limit reached)" if reached_limit else ""
 			PluginLogger.debug(PluginConstants.COMPONENT_THUMBNAIL, 
-				"AABB calculated from %d nodes" % _nodes_processed)
+				"AABB calculated from %d nodes%s" % [_nodes_processed, limit_msg])
 		
 		# Position camera to view the entire scene
 		if scene_aabb.has_volume():
@@ -620,8 +624,11 @@ static func _get_node_aabb_recursive_async(node: Node, depth: int = 0) -> AABB:
 	
 	# Early exit: Check node count limit
 	if _nodes_processed > MAX_NODES_PER_AABB:
-		PluginLogger.debug(PluginConstants.COMPONENT_THUMBNAIL, 
-			"AABB calculation reached max nodes: %d" % MAX_NODES_PER_AABB)
+		# Only log once per thumbnail generation to avoid spam
+		if not _max_nodes_warning_logged:
+			_max_nodes_warning_logged = true
+			PluginLogger.debug(PluginConstants.COMPONENT_THUMBNAIL, 
+				"AABB calculation reached max nodes: %d (this is normal for complex scenes)" % MAX_NODES_PER_AABB)
 		return combined_aabb
 	
 	# Increment node counter

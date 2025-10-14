@@ -36,6 +36,7 @@ const NodeUtils = preload("res://addons/simpleassetplacer/utils/node_utils.gd")
 const TransformState = preload("res://addons/simpleassetplacer/core/transform_state.gd")
 const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
 const NumericInputManager = preload("res://addons/simpleassetplacer/managers/numeric_input_manager.gd")
+const TransformApplicator = preload("res://addons/simpleassetplacer/core/transform_applicator.gd")
 
 # Dependencies (injected via ServiceRegistry)
 var _services: ServiceRegistry
@@ -127,6 +128,11 @@ func enter_placement_mode(
 	if transform_state and not settings.get("keep_rotation_between_placements", false):
 		_services.rotation_manager.reset_all_rotation(transform_state)
 	
+	# Start in Position control mode (G) by default
+	if _services.control_mode_state:
+		_services.control_mode_state.switch_to_position_mode()
+		PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, "Auto-activated Position control (G) on placement mode entry")
+	
 	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Started placement mode")
 	
 	return placement_data
@@ -183,18 +189,32 @@ func process_input(
 	if not camera:
 		return
 	
+	# Process control mode transitions (G/R/L keys) and axis constraints (X/Y/Z keys)
+	_process_control_mode_input(placement_data, transform_state)
+	
+	# Get control mode state to determine input routing
+	var control_mode = _services.control_mode_state
+	var modal_active = control_mode.is_modal_active() if control_mode else false
+	
+	# Get input dictionaries (InputHandler already suppresses numeric taps when modal active)
 	var position_input = _services.input_handler.get_position_input()
 	var rotation_input = _services.input_handler.get_rotation_input()
 	var scale_input = _services.input_handler.get_scale_input()
-	
-	# Check for numeric input confirmation and application
+	var numeric_input = _services.input_handler.get_numeric_input()
 	var numeric_mgr = _services.numeric_input_manager
-	if numeric_mgr.is_confirmed():
-		_apply_numeric_input(placement_data, transform_state, settings)
-		numeric_mgr.reset()
 	
-	# Track action key presses for numeric input system
-	_track_action_for_numeric_input(rotation_input, scale_input, position_input)
+	# === INPUT ROUTING ===
+	# Simple rule: If modal active (G/R/L pressed), skip keyboard input tracking
+	# Otherwise, process keyboard input for numeric system and direct controls
+	
+	if not modal_active:
+		# Check for numeric input confirmation and application
+		if numeric_mgr.is_confirmed():
+			_apply_numeric_input(placement_data, transform_state, settings)
+			numeric_mgr.reset()
+		
+		# Track action key presses for numeric input system
+		_track_action_for_numeric_input(rotation_input, scale_input, position_input)
 	
 	# Update numeric input overlay if active
 	if numeric_mgr.is_active() and numeric_mgr.is_within_grace_period():
@@ -206,54 +226,100 @@ func process_input(
 	var skip_normal_input = numeric_mgr.is_active() and not numeric_mgr.is_confirmed()
 	
 	# Set half-step mode based on configured fine increment modifier
-	_services.position_manager.set_use_half_step(position_input.fine_increment_modifier_held)
+	var fine_modifier_held = position_input.fine_increment_modifier_held
+	_services.position_manager.set_use_half_step(fine_modifier_held)
+	transform_state.use_half_step = fine_modifier_held
 	
-	# Handle input if not in numeric mode
+	# Handle height adjustments (Q/E for quick vertical adjustments)
 	if not skip_normal_input:
-		# Handle height adjustments
 		_process_height_input(position_input, transform_state, settings)
-		
-		# Handle position adjustments (WASD-style movement)
-		_process_position_input(camera, position_input, transform_state, settings)
 	
-	# Update position from mouse AFTER processing WASD input
+	# Get mouse position and preview mesh
 	var mouse_pos = position_input.mouse_position
+	var preview_mesh = _services.preview_manager.get_preview_mesh()
 	
 	# IMPORTANT: Exclude preview mesh from collision detection to prevent self-collision
 	var exclude_nodes = []
-	var preview_mesh = _services.preview_manager.get_preview_mesh()
 	if NodeUtils.is_valid(preview_mesh):
 		exclude_nodes.append(preview_mesh)
 	
-	_services.position_manager.update_position_from_mouse(transform_state, camera, mouse_pos, 1, true, exclude_nodes)
+	# === MODAL CONTROL PROCESSING ===
+	# Process modal controls (G/R/L + mouse) when modal is active
+	const ControlModeState = preload("res://addons/simpleassetplacer/core/control_mode_state.gd")
 	
-	# Get the updated position
-	var preview_pos = _services.position_manager.get_current_position(transform_state)
+	# Check if exclusive mode is enabled (modal_active already defined above)
+	var modal_exclusive = settings.get("modal_control_exclusive", true)
+	var should_lock_rotation = modal_active and modal_exclusive and control_mode.is_position_mode()
 	
-	# Update preview position
-	_services.preview_manager.update_preview_position(preview_pos)
+	if modal_active:
+		match control_mode.get_control_mode():
+			ControlModeState.ControlMode.POSITION:
+				# Position mode: Mouse controls position
+				# Store previous position for axis constraint
+				var prev_pos = _services.position_manager.get_current_position(transform_state)
+				
+				# Calculate new position based on axis constraints
+				var new_pos = Vector3.ZERO
+				
+				if control_mode.has_axis_constraint():
+					# Use plane intersection for constrained movement
+					new_pos = _calculate_constrained_position(camera, mouse_pos, prev_pos, control_mode)
+				else:
+					# No constraints: Use raycast for precise surface-based positioning
+					# This gives better control by snapping to actual geometry
+					new_pos = _services.position_manager.update_position_from_mouse(
+						transform_state, camera, mouse_pos, 1, false, exclude_nodes
+					)
+				
+				# Apply grid snapping if enabled (for modal G mode positioning)
+				# Pass fine modifier state for half-step sub-grid
+				if transform_state.snap_enabled or transform_state.snap_y_enabled:
+					var use_half_step = position_input.fine_increment_modifier_held
+					new_pos = TransformApplicator.apply_grid_snap(new_pos, transform_state, use_half_step)
+				
+				# Update transform state with new position
+				transform_state.position = new_pos
+				transform_state.target_position = new_pos
+				
+				# Update preview position
+				if preview_mesh:
+					preview_mesh.global_position = new_pos
+				
+				# Handle rotation updates based on modal state
+				if should_lock_rotation:
+					# G mode explicitly active with exclusive controls: Don't update rotation
+					pass
+				else:
+					# Normal mode OR non-exclusive: Update surface normal alignment if enabled
+					if settings.get("align_with_normal", false):
+						_services.rotation_manager.align_with_surface_normal(transform_state, _services.position_manager.get_surface_normal(transform_state))
+						# Apply rotation to preview
+						if preview_mesh:
+							TransformApplicator.apply_rotation_only(preview_mesh, transform_state)
+					else:
+						_services.rotation_manager.reset_surface_alignment(transform_state)
+			
+			ControlModeState.ControlMode.ROTATION:
+				# R mode: Mouse controls rotation
+				if not skip_normal_input:
+					_process_mouse_rotation(camera, mouse_pos, transform_state, settings)
+					
+					# Apply rotation to preview mesh immediately (bypass smooth transforms)
+					if preview_mesh:
+						TransformApplicator.apply_rotation_only(preview_mesh, transform_state)
+			
+			ControlModeState.ControlMode.SCALE:
+				# L mode: Mouse controls scale (vertical movement, per-axis or uniform)
+				if not skip_normal_input:
+					_process_mouse_scale(mouse_pos, transform_state, settings)
+					
+					# Apply scale to preview mesh immediately (bypass smooth transforms)
+					if preview_mesh:
+						var base_scale = transform_state.original_scale if transform_state.has("original_scale") else Vector3.ONE
+						TransformApplicator.apply_scale_only(preview_mesh, transform_state, base_scale)
 	
-	# Update surface normal alignment if enabled, otherwise reset it
-	if settings.get("align_with_normal", false):
-		_services.rotation_manager.align_with_surface_normal(transform_state, _services.position_manager.get_surface_normal(transform_state))
-	else:
-		_services.rotation_manager.reset_surface_alignment(transform_state)
-	
-	# Skip transformation input if numeric mode is active
+	# Handle asset cycling (always available)
 	if not skip_normal_input:
-		# Handle rotation input (this will be combined with surface alignment)
-		# Don't rotate position offset - this makes rotation behave like transform mode (in-place)
-		# Reuse preview_mesh variable from above
-		_process_rotation_input(rotation_input, preview_mesh, transform_state, settings, false)
-		
-		# Apply the combined rotation (surface alignment + manual rotation) to the preview mesh
-		if preview_mesh:
-			_services.rotation_manager.apply_rotation_to_node(transform_state, preview_mesh)
-		
-		# Handle scale input
-		_process_scale_input(scale_input, preview_mesh, transform_state, settings)
-		
-		# Handle asset cycling
 		process_asset_cycling_input(placement_data)
 	
 	# Handle placement action
@@ -266,6 +332,42 @@ func process_input(
 	
 	# Update overlays with current state
 	update_overlays(placement_data, transform_state)
+
+## CONTROL MODE MANAGEMENT
+
+func _process_control_mode_input(placement_data: Dictionary, transform_state: TransformState) -> void:
+	"""Process control mode transitions (G/R/L) and axis constraints (X/Y/Z)
+	
+	This handles Blender-style modal controls:
+	- G = Position control mode
+	- R = Rotation control mode
+	- L = Scale control mode
+	- X/Y/Z = Axis constraint toggle (double-tap to disable)
+	"""
+	var control_input = _services.input_handler.get_control_mode_input()
+	var control_mode = _services.control_mode_state
+	var current_time = Time.get_ticks_msec() / 1000.0
+	
+	# Handle control mode transitions
+	if control_input.position_control_pressed:
+		control_mode.switch_to_position_mode()
+		PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, "Switched to Position control (G)")
+	elif control_input.rotation_control_pressed:
+		control_mode.switch_to_rotation_mode()
+		PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, "Switched to Rotation control (R)")
+	elif control_input.scale_control_pressed:
+		control_mode.switch_to_scale_mode()
+		PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, "Switched to Scale control (L)")
+	
+	# Handle axis constraints (X/Y/Z keys)
+	# Pass current position so it can be stored as constraint origin
+	var current_pos = transform_state.position
+	if control_input.axis_x_pressed:
+		control_mode.process_axis_key_press("X", current_time, current_pos)
+	elif control_input.axis_y_pressed:
+		control_mode.process_axis_key_press("Y", current_time, current_pos)
+	elif control_input.axis_z_pressed:
+		control_mode.process_axis_key_press("Z", current_time, current_pos)
 
 ## INPUT HELPERS
 
@@ -305,147 +407,276 @@ func _process_height_input(
 	elif position_input.reset_height_pressed:
 		_services.position_manager.reset_height(transform_state)
 
-func _process_position_input(
+func _process_mouse_rotation(
 	camera: Camera3D,
-	position_input: Dictionary,
+	mouse_pos: Vector2,
 	transform_state: TransformState,
 	settings: Dictionary
 ) -> void:
-	"""Process WASD position adjustment input
+	"""Process mouse movement for rotation control (R mode)
+	
+	Uses horizontal mouse movement to rotate around the constrained axis,
+	or around Y-axis if no constraint is active.
 	
 	Args:
-		camera: Camera for calculating relative directions
-		position_input: Position input dictionary from InputHandler
+		camera: The 3D camera
+		mouse_pos: Current mouse position in viewport
 		transform_state: Transform state to modify
 		settings: Settings dictionary
 	"""
-	var position_delta = settings.get("position_increment", 0.1)
-	if position_input.fine_increment_modifier_held:
-		position_delta = settings.get("fine_position_increment", 0.01)
-	elif position_input.large_increment_modifier_held:
-		position_delta = settings.get("large_position_increment", 1.0)
-	
-	# Get camera-relative directions snapped to nearest axis
-	var camera_forward = Vector3(0, 0, -1)
-	var camera_right = Vector3(1, 0, 0)
-	
-	if camera:
-		# Get camera forward and project to XZ plane
-		var cam_forward = -camera.global_transform.basis.z
-		cam_forward.y = 0
-		cam_forward = cam_forward.normalized()
-		
-		# Snap forward to nearest axis (Z or X)
-		if abs(cam_forward.z) > abs(cam_forward.x):
-			camera_forward = Vector3(0, 0, sign(cam_forward.z))
-		else:
-			camera_forward = Vector3(sign(cam_forward.x), 0, 0)
-		
-		# Get camera right and project to XZ plane
-		var cam_right = camera.global_transform.basis.x
-		cam_right.y = 0
-		cam_right = cam_right.normalized()
-		
-		# Snap right to nearest axis (X or Z)
-		if abs(cam_right.x) > abs(cam_right.z):
-			camera_right = Vector3(sign(cam_right.x), 0, 0)
-		else:
-			camera_right = Vector3(0, 0, sign(cam_right.z))
-	
-	# Handle position adjustments (WASD-style movement) - directly modify manual offset
-	if position_input.position_left_pressed:
-		transform_state.manual_position_offset -= camera_right * position_delta
-	elif position_input.position_right_pressed:
-		transform_state.manual_position_offset += camera_right * position_delta
-	
-	if position_input.position_forward_pressed:
-		transform_state.manual_position_offset += camera_forward * position_delta
-	elif position_input.position_backward_pressed:
-		transform_state.manual_position_offset -= camera_forward * position_delta
-	
-	# Handle position reset
-	if position_input.reset_position_pressed:
-		_services.position_manager.reset_position(transform_state)
-
-func _process_rotation_input(
-	rotation_input: Dictionary,
-	target_node: Node3D,
-	transform_state: TransformState,
-	settings: Dictionary,
-	rotate_position_offset: bool = false
-) -> void:
-	"""Process rotation input for preview mesh
-	
-	Args:
-		rotation_input: Rotation input dictionary from InputHandler
-		target_node: The node to apply rotation to
-		transform_state: Transform state to modify
-		settings: Settings dictionary
-		rotate_position_offset: If true, also rotates manual position offset
-	"""
-	if not target_node:
+	if not camera:
 		return
 	
-	# Determine which increment to use based on modifiers
-	var rotation_step: float
-	if rotation_input.large_increment_modifier_held:
-		rotation_step = settings.get("large_rotation_increment", 90.0)
-	elif rotation_input.fine_increment_modifier_held:
-		rotation_step = settings.get("fine_rotation_increment", 5.0)
+	# Get viewport for delta calculation and cursor warping
+	var viewport = _services.editor_facade.get_editor_viewport_3d(0)
+	if not viewport:
+		return
+	
+	# Store previous mouse position for delta calculation
+	if not transform_state.has("_prev_mouse_pos"):
+		transform_state.set("_prev_mouse_pos", mouse_pos)
+		return
+	
+	var prev_mouse_pos = transform_state.get("_prev_mouse_pos")
+	var mouse_delta = mouse_pos - prev_mouse_pos
+	
+	# Cursor warping: If mouse is near screen edges, warp to center
+	# This allows infinite rotation without hitting screen boundaries
+	var viewport_rect = viewport.get_visible_rect()
+	var viewport_size = viewport_rect.size
+	var warp_margin = 50  # pixels from edge before warping
+	var should_warp = false
+	var warp_target_local = mouse_pos  # Target in viewport-local space
+	
+	# Check if we need to warp (using viewport-local coordinates)
+	if mouse_pos.x < warp_margin or mouse_pos.x > viewport_size.x - warp_margin:
+		warp_target_local.x = viewport_size.x / 2
+		should_warp = true
+	if mouse_pos.y < warp_margin or mouse_pos.y > viewport_size.y - warp_margin:
+		warp_target_local.y = viewport_size.y / 2
+		should_warp = true
+	
+	if should_warp:
+		# Convert viewport-local position to global screen position
+		# SubViewport doesn't have get_screen_position(), so we use get_screen_transform()
+		var viewport_screen_transform = viewport.get_screen_transform()
+		var warp_target_global = viewport_screen_transform * warp_target_local
+		
+		# Warp cursor using global screen coordinates
+		Input.warp_mouse(warp_target_global)
+		
+		# Update tracking to new position (prevents jump in delta)
+		transform_state.set("_prev_mouse_pos", warp_target_local)
 	else:
-		rotation_step = settings.get("rotation_increment", 15.0)
+		transform_state.set("_prev_mouse_pos", mouse_pos)
 	
-	# Apply reverse modifier
-	if rotation_input.reverse_modifier_held:
-		rotation_step = -rotation_step
+	# Determine which axis to rotate around
+	# In rotation mode, axis constraints specify which axis to rotate around
+	# If multiple axes are constrained, use the first one (X > Y > Z priority)
+	# If no constraint, rotate around camera Y axis (Blender default)
+	var control_mode = _services.control_mode_state
+	var rotate_around_axis = ""
 	
-	if rotation_input.x_pressed:
-		_services.rotation_manager.apply_rotation_step(transform_state, target_node, "X", rotation_step, Vector3.ZERO, rotate_position_offset)
-	elif rotation_input.y_pressed:
-		_services.rotation_manager.apply_rotation_step(transform_state, target_node, "Y", rotation_step, Vector3.ZERO, rotate_position_offset)
-	elif rotation_input.z_pressed:
-		_services.rotation_manager.apply_rotation_step(transform_state, target_node, "Z", rotation_step, Vector3.ZERO, rotate_position_offset)
-	elif rotation_input.reset_pressed:
-		_services.rotation_manager.reset_node_rotation(target_node)
+	if control_mode.has_axis_constraint():
+		# Priority: X > Y > Z (if multiple constraints, use first one)
+		if control_mode.is_x_constrained():
+			rotate_around_axis = "X"
+		elif control_mode.is_y_constrained():
+			rotate_around_axis = "Y"
+		elif control_mode.is_z_constrained():
+			rotate_around_axis = "Z"
+	else:
+		# No constraint: Rotate around Y axis (default)
+		rotate_around_axis = "Y"
+	
+	# Calculate rotation based on horizontal mouse movement
+	# Sensitivity: pixels to degrees
+	var rotation_sensitivity = settings.get("mouse_rotation_sensitivity", 0.5)
+	var rotation_amount = -mouse_delta.x * rotation_sensitivity
+	
+	# Apply fine/large increment modifiers
+	var input_handler = _services.input_handler
+	if input_handler.is_fine_increment_modifier_held():
+		# Fine modifier: More precise control (default 0.1x)
+		var fine_multiplier = settings.get("fine_sensitivity_multiplier", PluginConstants.FINE_SENSITIVITY_MULTIPLIER)
+		rotation_amount *= fine_multiplier
+	elif input_handler.is_large_increment_modifier_held():
+		# Large modifier: Faster control (default 2.0x)
+		var large_multiplier = settings.get("large_sensitivity_multiplier", PluginConstants.LARGE_SENSITIVITY_MULTIPLIER)
+		rotation_amount *= large_multiplier
+	
+	# Apply rotation snapping if enabled
+	if transform_state.snap_rotation_enabled:
+		PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, "Rotation snapping ACTIVE - step: %s, half_step: %s" % [transform_state.snap_rotation_step, transform_state.use_half_step])
+		# Get current rotation in degrees for the target axis
+		var current_rotation_deg = 0.0
+		match rotate_around_axis:
+			"X":
+				current_rotation_deg = rad_to_deg(transform_state.manual_rotation_offset.x)
+			"Y":
+				current_rotation_deg = rad_to_deg(transform_state.manual_rotation_offset.y)
+			"Z":
+				current_rotation_deg = rad_to_deg(transform_state.manual_rotation_offset.z)
+		
+		# Add the rotation amount (in degrees)
+		var new_rotation_deg = current_rotation_deg + rotation_amount
+		
+		# Apply snapping with half-step support
+		var snap_step = transform_state.snap_rotation_step
+		if transform_state.use_half_step:
+			snap_step = snap_step / 2.0
+		
+		# Snap to nearest increment
+		new_rotation_deg = round(new_rotation_deg / snap_step) * snap_step
+		
+		# Set the snapped rotation (convert back to radians)
+		match rotate_around_axis:
+			"X":
+				transform_state.manual_rotation_offset.x = deg_to_rad(new_rotation_deg)
+			"Y":
+				transform_state.manual_rotation_offset.y = deg_to_rad(new_rotation_deg)
+			"Z":
+				transform_state.manual_rotation_offset.z = deg_to_rad(new_rotation_deg)
+	else:
+		# No snapping - apply rotation directly
+		# Convert to radians
+		rotation_amount = deg_to_rad(rotation_amount)
+		
+		# Apply rotation to transform state
+		match rotate_around_axis:
+			"X":
+				transform_state.manual_rotation_offset.x += rotation_amount
+			"Y":
+				transform_state.manual_rotation_offset.y += rotation_amount
+			"Z":
+				transform_state.manual_rotation_offset.z += rotation_amount
 
-func _process_scale_input(
-	scale_input: Dictionary,
-	target_node: Node3D,
+func _process_mouse_scale(
+	mouse_pos: Vector2,
 	transform_state: TransformState,
 	settings: Dictionary
 ) -> void:
-	"""Process scale input for preview mesh
+	"""Process mouse movement for scale control (L mode)
+	
+	Uses vertical mouse movement to adjust scale.
 	
 	Args:
-		scale_input: Scale input dictionary from InputHandler
-		target_node: The node to apply scale to
+		mouse_pos: Current mouse position in viewport
 		transform_state: Transform state to modify
 		settings: Settings dictionary
 	"""
-	if not target_node:
+	# Get viewport for cursor warping
+	var viewport = _services.editor_facade.get_editor_viewport_3d(0)
+	
+	# Store previous mouse position for delta calculation
+	if not transform_state.has("_prev_mouse_pos_scale"):
+		transform_state.set("_prev_mouse_pos_scale", mouse_pos)
 		return
 	
-	# Determine which increment to use based on modifiers
-	var scale_step: float
-	if scale_input.large_increment_modifier_held:
-		scale_step = settings.get("large_scale_increment", 0.5)
-	elif scale_input.fine_increment_modifier_held:
-		scale_step = settings.get("fine_scale_increment", 0.01)
-	else:
-		scale_step = settings.get("scale_increment", 0.1)
+	var prev_mouse_pos = transform_state.get("_prev_mouse_pos_scale")
+	var mouse_delta = mouse_pos - prev_mouse_pos
 	
-	if scale_input.up_pressed:
-		_services.scale_manager.increase_scale(transform_state, scale_step)
-		var new_scale = _services.scale_manager.get_scale_vector(transform_state)
-		_services.preview_manager.update_preview_scale(new_scale)
-	elif scale_input.down_pressed:
-		_services.scale_manager.decrease_scale(transform_state, scale_step)
-		var new_scale = _services.scale_manager.get_scale_vector(transform_state)
-		_services.preview_manager.update_preview_scale(new_scale)
-	elif scale_input.reset_pressed:
-		_services.scale_manager.reset_scale(transform_state)
-		var new_scale = _services.scale_manager.get_scale_vector(transform_state)
-		_services.preview_manager.update_preview_scale(new_scale)
+	# Cursor warping: If mouse is near screen edges, warp to center
+	# This allows infinite scaling without hitting screen boundaries
+	if viewport:
+		var viewport_rect = viewport.get_visible_rect()
+		var viewport_size = viewport_rect.size
+		var warp_margin = 50  # pixels from edge before warping
+		var should_warp = false
+		var warp_target_local = mouse_pos
+		
+		if mouse_pos.x < warp_margin or mouse_pos.x > viewport_size.x - warp_margin:
+			warp_target_local.x = viewport_size.x / 2
+			should_warp = true
+		if mouse_pos.y < warp_margin or mouse_pos.y > viewport_size.y - warp_margin:
+			warp_target_local.y = viewport_size.y / 2
+			should_warp = true
+		
+		if should_warp:
+			# Convert viewport-local position to global screen position
+			# SubViewport doesn't have get_screen_position(), so we use get_screen_transform()
+			var viewport_screen_transform = viewport.get_screen_transform()
+			var warp_target_global = viewport_screen_transform * warp_target_local
+			
+			# Warp cursor using global screen coordinates
+			Input.warp_mouse(warp_target_global)
+			
+			transform_state.set("_prev_mouse_pos_scale", warp_target_local)
+		else:
+			transform_state.set("_prev_mouse_pos_scale", mouse_pos)
+	else:
+		transform_state.set("_prev_mouse_pos_scale", mouse_pos)
+	
+	# Calculate scale change based on vertical mouse movement
+	# Sensitivity: pixels to scale factor
+	var scale_sensitivity = settings.get("mouse_scale_sensitivity", 0.01)
+	var scale_delta = -mouse_delta.y * scale_sensitivity
+	
+	# Apply fine/large increment modifiers
+	var input_handler = _services.input_handler
+	if input_handler.is_fine_increment_modifier_held():
+		# Fine modifier: More precise control (default 0.1x)
+		var fine_multiplier = settings.get("fine_sensitivity_multiplier", PluginConstants.FINE_SENSITIVITY_MULTIPLIER)
+		scale_delta *= fine_multiplier
+	elif input_handler.is_large_increment_modifier_held():
+		# Large modifier: Faster control (default 2.0x)
+		var large_multiplier = settings.get("large_sensitivity_multiplier", PluginConstants.LARGE_SENSITIVITY_MULTIPLIER)
+		scale_delta *= large_multiplier
+	
+	# Check for axis constraints (L + X/Y/Z for per-axis scaling)
+	var control_mode = _services.control_mode_state
+	var has_constraint = control_mode.has_axis_constraint()
+	
+	if has_constraint:
+		# Per-axis scaling: Apply delta only to constrained axes
+		var current_scale_vector = _services.scale_manager.get_scale_vector(transform_state)
+		var new_scale_vector = current_scale_vector
+		
+		if control_mode.is_x_constrained():
+			new_scale_vector.x = current_scale_vector.x + scale_delta
+		if control_mode.is_y_constrained():
+			new_scale_vector.y = current_scale_vector.y + scale_delta
+		if control_mode.is_z_constrained():
+			new_scale_vector.z = current_scale_vector.z + scale_delta
+		
+		# Apply scale snapping if enabled (per-axis)
+		if transform_state.snap_scale_enabled:
+			var snap_step = transform_state.snap_scale_step
+			if transform_state.use_half_step:
+				snap_step = snap_step / 2.0
+			
+			if control_mode.is_x_constrained():
+				new_scale_vector.x = round(new_scale_vector.x / snap_step) * snap_step
+			if control_mode.is_y_constrained():
+				new_scale_vector.y = round(new_scale_vector.y / snap_step) * snap_step
+			if control_mode.is_z_constrained():
+				new_scale_vector.z = round(new_scale_vector.z / snap_step) * snap_step
+		
+		# Clamp to reasonable values
+		new_scale_vector.x = clamp(new_scale_vector.x, 0.01, 100.0)
+		new_scale_vector.y = clamp(new_scale_vector.y, 0.01, 100.0)
+		new_scale_vector.z = clamp(new_scale_vector.z, 0.01, 100.0)
+		
+		_services.scale_manager.set_non_uniform_multiplier(transform_state, new_scale_vector)
+	else:
+		# Uniform scaling: Apply delta to all axes equally
+		var current_scale = _services.scale_manager.get_scale(transform_state)
+		var new_scale = current_scale + scale_delta
+		
+		# Apply scale snapping if enabled (uniform)
+		if transform_state.snap_scale_enabled:
+			PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, "Scale snapping ACTIVE - step: %s, half_step: %s" % [transform_state.snap_scale_step, transform_state.use_half_step])
+			var snap_step = transform_state.snap_scale_step
+			if transform_state.use_half_step:
+				snap_step = snap_step / 2.0
+			
+			# Snap to nearest increment
+			new_scale = round(new_scale / snap_step) * snap_step
+		
+		# Clamp scale to reasonable values
+		new_scale = clamp(new_scale, 0.01, 100.0)
+		
+		_services.scale_manager.set_scale_multiplier(transform_state, new_scale)
 
 ## ASSET CYCLING
 
@@ -632,20 +863,33 @@ func _reset_transforms_on_exit(transform_state: TransformState, settings: Dictio
 
 func _track_action_for_numeric_input(rotation_input: Dictionary, scale_input: Dictionary, position_input: Dictionary) -> void:
 	"""Track when action keys are TAPPED (not held) to set context for numeric input.
-	The numeric input will only activate when user actually types a number."""
+	The numeric input will only activate when user actually types a number.
+	
+	IMPORTANT CONTEXT-AWARE ROUTING:
+	- In Position mode (G): X/Y/Z are axis constraints ONLY (no numeric input)
+	- In Rotation mode (R): X/Y/Z trigger numeric rotation input (+ axis constraints)
+	- In Scale mode (L): X/Y/Z trigger numeric scale input (+ axis constraints)
+	- When no modal active: X/Y/Z trigger rotation numeric input
+	"""
 	var numeric_mgr = _services.numeric_input_manager
 	if not numeric_mgr:
 		return
 	
+	# Check current control mode to determine X/Y/Z behavior
+	var control_mode = _services.control_mode_state
+	var is_position_mode = control_mode.is_position_mode() if control_mode else false
+	
 	var ActionType = NumericInputManager.ActionType
 	
 	# Track rotation actions (only on tap, not on hold/repeat)
-	if rotation_input.get("x_tapped", false):
-		numeric_mgr.set_action_context(ActionType.ROTATE_X)
-	elif rotation_input.get("y_tapped", false):
-		numeric_mgr.set_action_context(ActionType.ROTATE_Y)
-	elif rotation_input.get("z_tapped", false):
-		numeric_mgr.set_action_context(ActionType.ROTATE_Z)
+	# X/Y/Z keys for numeric input - BUT skip in Position mode (they're pure axis constraints there)
+	if not is_position_mode:
+		if rotation_input.get("x_tapped", false):
+			numeric_mgr.set_action_context(ActionType.ROTATE_X)
+		elif rotation_input.get("y_tapped", false):
+			numeric_mgr.set_action_context(ActionType.ROTATE_Y)
+		elif rotation_input.get("z_tapped", false):
+			numeric_mgr.set_action_context(ActionType.ROTATE_Z)
 	
 	# Track scale actions (only on tap, not on hold/repeat)
 	elif scale_input.get("up_tapped", false) or scale_input.get("down_tapped", false):
@@ -714,8 +958,9 @@ func _apply_numeric_rotation(action, numeric_mgr, preview_mesh: Node3D, transfor
 	var rotation_step = new_rotation_deg - current_rotation_deg
 	
 	# Apply the rotation
-	_services.rotation_manager.apply_rotation_step(transform_state, preview_mesh, axis, rotation_step, Vector3.ZERO, false)
-	_services.rotation_manager.apply_rotation_to_node(transform_state, preview_mesh)
+	_services.rotation_manager.rotate_axis(transform_state, axis, rotation_step)
+	if preview_mesh:
+		TransformApplicator.apply_rotation_only(preview_mesh, transform_state)
 
 func _apply_numeric_scale(numeric_mgr, preview_mesh: Node3D, transform_state: TransformState) -> void:
 	"""Apply numeric input to scale"""
@@ -723,11 +968,11 @@ func _apply_numeric_scale(numeric_mgr, preview_mesh: Node3D, transform_state: Tr
 	var new_scale = numeric_mgr.apply_to_value(current_scale)
 	
 	# Set the scale directly
-	_services.scale_manager.set_scale(transform_state, new_scale)
+	_services.scale_manager.set_scale_multiplier(transform_state, new_scale)
 	
 	# Apply to preview mesh
 	if preview_mesh:
-		_services.scale_manager.apply_uniform_scale_to_node(transform_state, preview_mesh, Vector3.ONE)
+		TransformApplicator.apply_scale_only(preview_mesh, transform_state)
 
 func _apply_numeric_height(numeric_mgr, transform_state: TransformState) -> void:
 	"""Apply numeric input to height"""
@@ -764,3 +1009,170 @@ func _apply_numeric_position(action, numeric_mgr, transform_state: TransformStat
 				transform_state.manual_position_offset.x -= delta
 			ActionType.POSITION_RIGHT:
 				transform_state.manual_position_offset.x += delta
+
+## AXIS CONSTRAINT HELPERS
+
+func _calculate_constrained_position(camera: Camera3D, mouse_pos: Vector2, current_pos: Vector3, control_mode) -> Vector3:
+	"""Calculate position with axis constraints using plane intersection
+	
+	Projects the mouse ray onto a plane/line defined by the constrained axes.
+	Uses the constraint origin (position when first axis was activated) as the reference point.
+	
+	Args:
+		camera: The 3D camera
+		mouse_pos: Mouse position in viewport
+		current_pos: Current object position (fallback if no constraint origin)
+		control_mode: ControlModeState with axis constraints
+		
+	Returns:
+		New constrained position
+	"""
+	# Use constraint origin if available, otherwise fall back to current position
+	var constraint_origin = current_pos
+	if control_mode.has_constraint_origin():
+		constraint_origin = control_mode.get_constraint_origin()
+	
+	# Create ray from camera through mouse
+	var ray_origin = camera.project_ray_origin(mouse_pos)
+	var ray_direction = camera.project_ray_normal(mouse_pos)
+	
+	# Validate ray direction
+	if ray_direction.length_squared() < 0.0001:
+		PluginLogger.warning(PluginConstants.COMPONENT_TRANSFORM, "Invalid ray direction in constraint calculation")
+		return constraint_origin
+	
+	var x_constrained = control_mode.is_x_constrained()
+	var y_constrained = control_mode.is_y_constrained()
+	var z_constrained = control_mode.is_z_constrained()
+	
+	# Count constrained axes
+	var constraint_count = 0
+	if x_constrained: constraint_count += 1
+	if y_constrained: constraint_count += 1
+	if z_constrained: constraint_count += 1
+	
+	var result_pos = constraint_origin
+	
+	if constraint_count == 0:
+		# No constraints - shouldn't happen, but return constraint origin
+		result_pos = constraint_origin
+	elif constraint_count == 1:
+		# Single axis constraint - use line projection
+		result_pos = _project_to_line(ray_origin, ray_direction, constraint_origin, x_constrained, y_constrained, z_constrained)
+	elif constraint_count == 2:
+		# Two axes constrained - use plane intersection
+		# Plane normal is the axis that's NOT constrained
+		var plane_normal = Vector3.ZERO
+		if not x_constrained:
+			plane_normal = Vector3.RIGHT  # YZ plane (normal points along X)
+		elif not y_constrained:
+			plane_normal = Vector3.UP  # XZ plane (normal points along Y)
+		else:  # not z_constrained
+			plane_normal = Vector3.FORWARD  # XY plane (normal points along Z) - Changed from BACK
+		
+		# Check if ray is nearly parallel to plane (dot product near 0)
+		var ray_plane_dot = abs(ray_direction.dot(plane_normal))
+		if ray_plane_dot < 0.0001:
+			# Ray is parallel to plane, can't intersect properly
+			return constraint_origin
+		
+		# Intersect ray with plane
+		var plane = Plane(plane_normal, constraint_origin.dot(plane_normal))
+		var intersection = plane.intersects_ray(ray_origin, ray_direction)
+		
+		if intersection != null:
+			result_pos = intersection
+		else:
+			result_pos = constraint_origin
+	else:
+		# All three axes constrained - no movement possible
+		result_pos = constraint_origin
+	
+	# Safety check: Ensure result is reasonable distance from constraint origin
+	# This prevents extreme values from calculation errors
+	var max_distance = 100000.0  # Maximum total allowed distance from origin
+	var distance = result_pos.distance_to(constraint_origin)
+	if distance > max_distance:
+		PluginLogger.warning(PluginConstants.COMPONENT_TRANSFORM, 
+			"Constraint calculation produced extreme value (distance from origin: %.2f), clamping" % distance)
+		# Clamp to max distance from origin
+		var direction = (result_pos - constraint_origin).normalized()
+		result_pos = constraint_origin + direction * max_distance
+	
+	return result_pos
+
+func _project_to_line(ray_origin: Vector3, ray_direction: Vector3, line_point: Vector3, x_axis: bool, y_axis: bool, z_axis: bool) -> Vector3:
+	"""Project mouse ray onto a constrained line (single axis)
+	
+	Args:
+		ray_origin: Ray origin from camera
+		ray_direction: Ray direction
+		line_point: Point on the line (current position)
+		x_axis: True if X is the constrained axis
+		y_axis: True if Y is the constrained axis
+		z_axis: True if Z is the constrained axis
+		
+	Returns:
+		Closest point on the line to the ray
+	"""
+	# Determine line direction based on constrained axis
+	# Note: Using Godot's standard axis directions
+	# X = RIGHT (1, 0, 0) → Positive X is to the right
+	# Y = UP (0, 1, 0) → Positive Y is up
+	# Z = FORWARD (0, 0, -1) → Positive Z is away from camera (Godot uses -Z as forward)
+	var line_direction = Vector3.ZERO
+	if x_axis:
+		line_direction = Vector3.RIGHT  # (1, 0, 0)
+	elif y_axis:
+		line_direction = Vector3.UP  # (0, 1, 0)
+	else:  # z_axis
+		line_direction = Vector3.FORWARD  # (0, 0, -1) - Changed from BACK to FORWARD
+	
+	# Simpler approach: Find where ray intersects a plane perpendicular to constraint axis,
+	# then project that point onto the constraint line
+	
+	# Create two perpendicular vectors to the line direction (for the perpendicular plane)
+	# We'll use the plane that the camera ray is most aligned with
+	var perp1 = Vector3.ZERO
+	var perp2 = Vector3.ZERO
+	
+	if abs(line_direction.x) < 0.9:
+		perp1 = Vector3.RIGHT.cross(line_direction).normalized()
+	else:
+		perp1 = Vector3.UP.cross(line_direction).normalized()
+	perp2 = line_direction.cross(perp1).normalized()
+	
+	# Choose the perpendicular vector most aligned with the ray direction
+	var plane_normal = perp1 if abs(ray_direction.dot(perp1)) > abs(ray_direction.dot(perp2)) else perp2
+	
+	# Check if ray is nearly parallel to our perpendicular plane
+	var ray_plane_dot = abs(ray_direction.dot(plane_normal))
+	if ray_plane_dot < 0.01:
+		# Ray is parallel, can't get good intersection
+		return line_point
+	
+	# Intersect ray with plane perpendicular to constraint axis
+	var plane = Plane(plane_normal, line_point.dot(plane_normal))
+	var intersection = plane.intersects_ray(ray_origin, ray_direction)
+	
+	if intersection == null:
+		return line_point
+	
+	# Project the intersection point onto the constraint line
+	# This is simple: just take the component along the line direction
+	var offset_from_origin = intersection - line_point
+	var distance_along_line = offset_from_origin.dot(line_direction)
+	
+	# Safety check: Clamp to reasonable values
+	var max_distance = 100000.0
+	if abs(distance_along_line) > max_distance:
+		distance_along_line = clamp(distance_along_line, -max_distance, max_distance)
+	
+	var result = line_point + line_direction * distance_along_line
+	
+	# Additional safety: Ensure result is reasonable
+	# If result is astronomically far, return current position (silent fallback)
+	if result.length() > 1000000.0:  # More than 1 million units from origin
+		return line_point
+	
+	return result

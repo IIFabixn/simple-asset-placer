@@ -12,14 +12,16 @@ Simple Asset Placer brings professional-grade asset placement capabilities to Go
 
 ## ✨ Core Features
 
-- 🚀 **Dual Placement Modes**: Traditional placement mode for new asset placement, plus innovative **Transform Mode** for modifying existing Node3D objects with a customizable key (TAB by default).
+- 🚀 **Dual Placement Modes**: Traditional placement mode for new asset placement, plus innovative **Transform Mode** for modifying existing Node3D objects with a customizable key (TAB by default). Full undo/redo support for all operations.
+- 🔢 **Direct Numeric Input**: Type exact values for transformations - press rotation keys and type `45` for precise 45° rotation. Works for rotation, scale, height, and position adjustments in both modes.
 - 🔄 **Asset Cycling System**: Browse and switch between assets directly in the viewport with `[` and `]` keys - stay in your creative flow without returning to the dock. Supports tap or hold to rapidly cycle, with context-aware filtering and auto-scroll.
-- 🌍 **Universal Keyboard Support**: ALL keybinds work with international keyboards! Configure any key with modifier combinations (CTRL+ALT+key) for perfect compatibility with German, French, and other keyboard layouts.
+- � **Multi-Object Transformation**: Select multiple Node3D objects and transform them simultaneously with full group coordination and atomic undo/redo tracking.
+- �🌍 **Universal Keyboard Support**: ALL keybinds work with international keyboards! Configure any key with modifier combinations (CTRL+ALT+key) for perfect compatibility with German, French, and other keyboard layouts.
 - 🏷️ **Advanced Category System**: Intelligent asset organization with automatic folder-based categories, custom tags, favorites, and recent assets tracking.
 - 🎮 **Professional Input Handling**: Advanced conflict prevention system ensures plugin shortcuts never interfere with Godot's built-in commands. Full modifier key support (CTRL, ALT, SHIFT, META) for every keybind.
 - 🔧 **Complete Customization**: Every aspect is configurable - from key bindings and reset behaviors to placement settings and visual feedback.
-- ⚡ **Performance Optimized**: Fast thumbnail generation with isolated rendering, efficient asset loading, and smooth real-time placement with instant visual feedback.
-- 🎨 **Clean Architecture**: Modular, decoupled design built for reliability and extensibility.
+- ⚡ **Performance Optimized**: Frame-based settings caching, double-buffered AABB calculations, fast thumbnail generation with isolated rendering, and smooth real-time placement with instant visual feedback.
+- 🎨 **Clean Architecture**: Modern instance-based design with service registry pattern, dedicated mode handlers, and specialized utility classes for maintainability and extensibility.
 
 ## 🚀 Quick Start
 
@@ -47,13 +49,15 @@ Simple Asset Placer brings professional-grade asset placement capabilities to Go
 </div>
 
 ### **Advanced Usage - Transform Mode**
-```
-1. Select any Node3D object(s) in the scene tree.
+``` 
+1. Select any Node3D object(s) in the scene tree (single or multiple).
 2. Press TAB (or your configured key) to enter Transform Mode.
 3. Use mouse movement to reposition the object(s).
 4. Use Q/E for rotation, W/A/S/D for precise positioning.
-5. All placement controls work in Transform Mode.
-6. Left-click to confirm changes, or ESC to cancel and restore original state.
+5. Type numbers after pressing transform keys for exact values (e.g., Q → 45 → Enter).
+6. All placement controls work in Transform Mode.
+7. Left-click or Enter to confirm changes, ESC to cancel and restore original state.
+8. All changes are tracked in undo/redo history (Ctrl+Z/Ctrl+Shift+Z).
 ```
 
 <div align="center">
@@ -74,19 +78,37 @@ Simple Asset Placer brings professional-grade asset placement capabilities to Go
 </div>
 
 ### **Essential Controls**
+
+**🎮 Modal Transform Controls (Blender-style):**
+- **G**: Position control mode - Move object with mouse, type numbers for exact offsets
+- **R**: Rotation control mode - Rotate with mouse, type numbers for exact angles
+- **L**: Scale control mode - Scale with mouse wheel, type numbers for exact scale
+- **X / Y / Z**: Axis constraint toggle (double-tap to disable) - Works in any control mode
+- **Mouse Wheel**: Context-aware adjustment based on current control mode (G=height, R=rotation, L=scale)
+
+**⌨️ Quick Actions:**
+- **Q / E**: Quick height adjustment (works in any control mode)
+- **W/A/S/D**: Alternative position controls in G mode (camera-relative)
 - **Left-Click**: Place asset (Placement Mode) / Confirm changes (Transform Mode)
-- **TAB**: Enter/exit Transform Mode (customizable)
-- **[ / ]**: Cycle to previous/next asset during placement (customizable)
-- **Mouse Movement**: Position object in 3D space via raycasting
-- **Q / E**: Rotate around Y-axis
-- **X / Y / Z**: Rotate around respective axes (customizable)
-- **Mouse Wheel**: Fine rotation control
-- **W/A/S/D**: Manual position adjustments (camera-relative)
-- **Page Up/Down**: Scale up/down (customizable)
+- **Enter**: Confirm numeric input or placement/transformation
+- **ESC**: Cancel numeric input / Cancel and exit current mode
+
+**🔄 Mode Management:**
+- **TAB**: Enter/exit Transform Mode (when Node3D selected)
+- **[ / ]**: Cycle to previous/next asset during placement
+
+**🎯 Modifiers:**
 - **CTRL**: Fine adjustment mode (smaller increments)
 - **ALT**: Large adjustment mode (bigger increments)
-- **SHIFT**: Reverse direction for height adjustments
-- **ESC**: Cancel and exit current mode
+- **SHIFT**: Reverse direction for certain adjustments
+- **Ctrl+Z / Ctrl+Shift+Z**: Undo / Redo transformations and placements
+
+**💡 Example Workflows:**
+- Position → **G** → Move mouse → **Enter**
+- Rotate 90° on Y → **R** → **Y** → Type `90` → **Enter**
+- Scale to 2x → **L** → Type `2` → **Enter**
+- Height adjust → **Q/E** or **G** + **Mouse Wheel**
+- Constrained move on Z → **G** → **Z** → Move mouse → **Enter**
 
 ## 🔄 Asset Cycling - Stay in Your Flow
 
@@ -135,6 +157,45 @@ If your keyboard requires modifier keys for brackets:
 5. Press your other bracket (e.g., `CTRL+ALT+8`)
 6. Done! Cycling now works perfectly with your layout
 
+## 🔢 Numeric Input System
+
+**New in v1.5.0!** Type exact values for precise transformations instead of repeatedly tapping keys.
+
+### **How Numeric Input Works**
+1. **Press any transform key** (Q, E, W, A, S, D, Page Up/Down, etc.)
+2. **Type the desired number** (e.g., `45` for 45 degrees, `1.5` for 1.5 scale)
+3. **Press Enter** to apply the exact value, or **ESC** to cancel
+4. **Visual feedback** appears in the overlay showing your input
+
+### **Supported Operations**
+- **Rotation**: Press Q/E/X/Z and type angle in degrees (e.g., `90`, `45.5`, `-30`)
+- **Scale**: Press Page Up/Down and type scale value (e.g., `2.0`, `0.5`, `1.25`)
+- **Height**: Press height adjustment keys and type distance (e.g., `5.0`, `-2.5`)
+- **Position**: Press W/A/S/D and type distance to move (e.g., `3.0`, `0.5`)
+
+### **Examples**
+```
+Rotate exactly 45 degrees clockwise:
+  Q → 4 → 5 → Enter
+
+Scale to exactly 2.5x:
+  Page Up → 2 → . → 5 → Enter
+
+Move 3 units forward:
+  W → 3 → Enter
+
+Adjust height by -1.5 units:
+  Height Down → 1 → . → 5 → Enter (or type: - → 1 → . → 5)
+```
+
+### **Features**
+- ✅ Works in both **Placement Mode** and **Transform Mode**
+- ✅ Supports **positive and negative values**
+- ✅ Supports **decimal numbers** (e.g., 1.5, 0.25)
+- ✅ Visual overlay shows current input
+- ✅ ESC to cancel without applying
+- ✅ Invalid input rejected with feedback
+
 ## ⌨️ Controls & Key Bindings
 
 ### **Core Controls**
@@ -142,36 +203,39 @@ If your keyboard requires modifier keys for brackets:
 |----------------------|------------------|--------------|------------------------------------------------|
 | Transform Mode       | TAB              | ✅           | Enter/exit transform mode for selected objects |
 | Place/Confirm        | Left-Click       | ❌           | Place asset or confirm transform changes       |
-| Cancel               | ESC              | ✅           | Exit mode without placing/saving changes       |
+| Confirm Action       | Enter            | ✅           | Confirm numeric input or placement             |
+| Cancel               | ESC              | ✅           | Cancel numeric input / Exit mode               |
 | Cycle Next Asset     | ]                | ✅           | Switch to next asset in filtered view          |
 | Cycle Previous Asset | [                | ✅           | Switch to previous asset in filtered view      |
+| Undo                 | Ctrl+Z           | ❌           | Undo last placement or transformation          |
+| Redo                 | Ctrl+Shift+Z     | ❌           | Redo previously undone action                  |
 
 ### **Rotation Controls**
 | Action               | Default Key      | Customizable | Description                                    |
 |----------------------|------------------|--------------|------------------------------------------------|
-| Rotate Y-Axis        | Q / E            | ✅           | Rotate around Y-axis (yaw)                     |
-| Rotate X-Axis        | X                | ✅           | Rotate around X-axis (pitch)                   |
-| Rotate Z-Axis        | Z                | ✅           | Rotate around Z-axis (roll)                    |
+| Rotate Y-Axis        | Q / E            | ✅           | Rotate around Y-axis (type number for exact)   |
+| Rotate X-Axis        | X                | ✅           | Rotate around X-axis (type number for exact)   |
+| Rotate Z-Axis        | Z                | ✅           | Rotate around Z-axis (type number for exact)   |
 | Fine Rotation        | Mouse Wheel      | ❌           | Precise rotation control                       |
 | Reset Rotation       | T                | ✅           | Reset all rotation offsets to zero             |
 
 ### **Position Controls**
 | Action               | Default Key      | Customizable | Description                                    |
 |----------------------|------------------|--------------|------------------------------------------------|
-| Move Forward         | W                | ✅           | Move along camera forward axis                 |
-| Move Backward        | S                | ✅           | Move along camera back axis                    |
-| Move Left            | A                | ✅           | Move along camera left axis                    |
-| Move Right           | D                | ✅           | Move along camera right axis                   |
-| Height Up            | Q (when rotated) | ✅           | Increase height offset                         |
-| Height Down          | E (when rotated) | ✅           | Decrease height offset                         |
+| Move Forward         | W                | ✅           | Move along camera forward (type for exact)     |
+| Move Backward        | S                | ✅           | Move along camera back (type for exact)        |
+| Move Left            | A                | ✅           | Move along camera left (type for exact)        |
+| Move Right           | D                | ✅           | Move along camera right (type for exact)       |
+| Height Up            | Q (when rotated) | ✅           | Increase height offset (type for exact)        |
+| Height Down          | E (when rotated) | ✅           | Decrease height offset (type for exact)        |
 | Reset Height         | R                | ✅           | Reset height offset to zero                    |
 | Reset Position       | G                | ✅           | Reset position offsets to zero                 |
 
 ### **Scale Controls**
 | Action               | Default Key      | Customizable | Description                                    |
 |----------------------|------------------|--------------|------------------------------------------------|
-| Scale Up             | Page Up          | ✅           | Increase scale multiplier                      |
-| Scale Down           | Page Down        | ✅           | Decrease scale multiplier                      |
+| Scale Up             | Page Up          | ✅           | Increase scale (type number for exact value)   |
+| Scale Down           | Page Down        | ✅           | Decrease scale (type number for exact value)   |
 | Reset Scale          | Home             | ✅           | Reset scale multiplier to 1.0                  |
 
 ### **Modifier Keys**
@@ -435,50 +499,96 @@ Every key can be remapped via the Settings tab:
 
 ## 🏗️ Architecture
 
-Simple Asset Placer uses a clean, modular architecture with clear separation of concerns for maintainability and extensibility:
+Simple Asset Placer uses a modern, instance-based architecture with clear separation of concerns for maintainability and extensibility:
 
 ### **Main Plugin**
 - **simpleassetplacer.gd** (extends `EditorPlugin`): Main entry point
   - Handles plugin lifecycle (`_enter_tree`, `_exit_tree`)
-  - Sets up the dock interface
-  - Forwards input events to managers
+  - Sets up the dock interface and service registry
+  - Forwards input events to mode handlers
   - Provides high-priority input interception to prevent conflicts with Godot shortcuts
   - Manages asset selection callbacks from the dock
+  - Reduced from 2000+ to ~500 lines through mode handler pattern
+
+### **Core Architecture Patterns**
+
+#### **Service Registry Pattern**
+- **ServiceRegistry**: Centralized service locator for dependency management
+  - Single source of truth for all manager instances
+  - Eliminates circular dependencies
+  - Simplifies initialization and cleanup
+  - Makes testing and mocking easier
+  - All managers registered and accessed through registry
+
+#### **Mode Handler Pattern**
+- **PlacementModeHandler**: Dedicated controller for asset placement
+  - Manages placement mode state and lifecycle
+  - Processes placement-specific input
+  - Handles asset cycling during placement
+  - Creates undo/redo entries for placements
+  
+- **TransformModeHandler**: Dedicated controller for object transformation
+  - Manages transform mode state for single/multiple objects
+  - Processes transformation input (position, rotation, scale)
+  - Group-based AABB calculation for multi-object transforms
+  - Confirmation/cancellation with original state restoration
+  - Creates undo/redo entries for transformations
+
+- **ModeStateMachine**: Coordinates mode transitions
+  - Manages mode lifecycle (enter/exit/process)
+  - Ensures clean state transitions
+  - Prevents mode conflicts
+
+#### **Instance-Based Managers**
+- **InstanceManagerBase**: Base class for all singleton managers
+  - Unified instance lifecycle management
+  - Automatic cleanup on plugin disable
+  - Better encapsulation than static classes
+  - Improved resource management
 
 ### **Core Managers**
-- **TransformationManager**: Central coordinator for all transform operations
-  - Manages dual modes: `Mode.PLACEMENT` and `Mode.TRANSFORM`
-  - Coordinates between all specialist managers
-  - Handles mode switching and state management
-  - Processes frame-by-frame input and updates
-  - Implements asset cycling logic
+- **TransformationCoordinator**: Central coordinator for transform operations
+  - Coordinates between specialist managers
+  - Delegates to appropriate mode handler
+  - Manages smooth transform interpolation
+  - Provides unified interface for transformations
 
-- **InputHandler**: Advanced input detection with edge detection
+- **InputHandler**: Advanced input detection (extends InstanceManagerBase)
   - Single source of truth for all input state
   - Provides tap vs. hold detection for cycling
   - Handles modifier key combinations (CTRL, ALT, SHIFT, META)
-  - Universal keyboard layout support via `_check_key_with_modifiers()`
-  - Polls input once per frame for consistency
+  - Universal keyboard layout support
+  - Frame-based input polling for consistency
+
+- **NumericInputManager**: Numeric input processing
+  - Tracks input context (rotation, scale, height, position)
+  - Validates and parses numeric input
+  - Provides visual feedback through overlay
+  - Supports positive/negative and decimal numbers
 
 - **PositionManager**: 3D spatial calculations and positioning
   - Raycast-based mouse-to-world position conversion
   - Grid snapping with customizable offsets
-  - Height offset management (independent from raycasted position)
+  - Height offset management
   - Manual position offsets (WASD adjustments)
   - Surface normal detection for alignment
-  - Snap center options for flexible snapping behavior
+  - Snap center options for flexible snapping
 
-- **OverlayManager**: Visual feedback and UI overlay system
+- **GridManager**: Grid functionality
+  - Centralized grid snapping logic
+  - Grid visualization management
+  - Offset and spacing calculations
+
+- **OverlayManager**: Visual feedback system (extends InstanceManagerBase)
   - Real-time transform information display
   - Grid visualization with dynamic updates
+  - Numeric input feedback display
   - Status messages and notifications
-  - Mode-specific overlay content
 
 - **CategoryManager**: Asset organization and metadata
   - Automatic folder-based category detection
   - Custom tag management via JSON (`.assetcategories`)
-  - Favorites and recent assets tracking (EditorSettings)
-  - Ignored assets management
+  - Favorites and recent assets tracking
   - Tag usage statistics for sorting
 
 ### **Specialized Transformation Managers**
@@ -488,17 +598,27 @@ Simple Asset Placer uses a clean, modular architecture with clear separation of 
   - Combined rotation calculation: `original + surface_alignment + manual_offset`
   - Multi-axis rotation (X, Y, Z)
   - Rotation around group center for multi-object transforms
+  - Dictionary-based configuration
 
 - **ScaleManager**: Multiplier-based scaling system
   - Uniform and non-uniform scale multipliers
   - Preserves original object scales
   - Final scale calculation: `original_scale * multiplier`
+  - Shows actual scale values instead of percentages
+  - Dictionary-based configuration
 
-- **PreviewManager**: Real-time visual feedback
+- **PreviewManager**: Real-time visual feedback (extends InstanceManagerBase)
   - Preview mesh instance management
   - Position, rotation, and scale updates
   - Asset loading and cleanup
   - Isolated preview rendering
+  - Target transform tracking for smooth interpolation
+
+- **SmoothTransformManager**: Transform interpolation (extends InstanceManagerBase)
+  - Smooth position, rotation, and scale transitions
+  - Configurable lerp speeds
+  - Target transform management
+  - Prevents jarring transform updates
 
 ### **UI Components**
 - **AssetPlacerDock**: Main dock interface
@@ -525,9 +645,16 @@ Simple Asset Placer uses a clean, modular architecture with clear separation of 
   - Settings persistence to EditorSettings
 
 ### **Support Systems**
+- **EditorFacade**: Unified Godot editor API interface
+  - Wraps `EditorInterface` for consistent access
+  - Provides scene root, selection, undo manager access
+  - Simplifies testing with mockable interface
+  - Reduces coupling to Godot's editor API
+
 - **SettingsManager**: Centralized configuration management
   - Plugin settings (key bindings, etc.)
   - Dock settings (snap, grid, etc.)
+  - Frame-based settings caching for performance
   - Combined settings dictionary for managers
   - File-based and EditorSettings persistence
 
@@ -546,6 +673,26 @@ Simple Asset Placer uses a clean, modular architecture with clear separation of 
   - Node creation and parenting
   - Transform application helpers
   - Scene validation
+
+### **Utility Classes**
+- **UndoRedoHelper** (326 lines): Centralized undo/redo management
+  - Validates nodes and scene state before creating actions
+  - Handles single and multi-object transform undo
+  - Placement action tracking
+  - Consistent action naming for History panel
+
+- **NodeUtils** (378 lines): Node validation and operations
+  - Safe node validation (`is_valid`, `is_valid_and_in_tree`)
+  - Safe method calling with validation
+  - Query helpers for finding children by class
+  - Replaces repetitive `if node and is_instance_valid(node)` patterns
+  - Debug helpers for node tree inspection
+
+- **LayoutCalculator** (300+ lines): Responsive UI layout calculations
+  - Dynamic column calculation for thumbnails
+  - Responsive thumbnail sizing based on dock width
+  - Grid layout positioning and sizing
+  - Breakpoint system for different screen sizes
 
 - **ErrorHandler**: Error reporting integration
   - EditorInterface integration for proper error display
@@ -568,39 +715,69 @@ addons/simpleassetplacer/
 ├── plugin.cfg                      # Plugin metadata and configuration
 ├── simpleassetplacer.gd            # Main plugin (extends EditorPlugin)
 │
-├── Core Managers
-├── transformation_manager.gd       # Mode coordinator (Placement/Transform)
-├── input_handler.gd                # Input detection and edge detection
-├── position_manager.gd             # 3D positioning and raycasting
-├── overlay_manager.gd              # Visual feedback overlays
-├── settings_manager.gd             # Settings persistence
+├── core/                           # Core architecture components
+│   ├── editor_facade.gd            # Editor API wrapper
+│   ├── instance_manager_base.gd    # Base class for instance managers
+│   ├── mode_state_machine.gd       # Mode state management
+│   ├── service_registry.gd         # Service locator pattern
+│   ├── transform_applicator.gd     # Transform application logic
+│   ├── transform_state.gd          # Transform state container
+│   └── transformation_coordinator.gd # Transform coordination
 │
-├── Transformation Managers
-├── rotation_manager.gd             # Rotation offset calculations
-├── scale_manager.gd                # Scale multiplier calculations
-├── preview_manager.gd              # Preview mesh management
+├── modes/                          # Mode handler implementations
+│   ├── placement_mode_handler.gd   # Placement mode logic
+│   └── transform_mode_handler.gd   # Transform mode logic
 │
-├── UI Components
-├── asset_placer_dock.gd            # Main dock interface
-├── placement_settings.gd           # Settings UI
-├── modellib_browser.gd             # 3D model asset browser
-├── meshlib_browser.gd              # MeshLibrary browser
-├── asset_thumbnail_item.gd         # Thumbnail item widget
-├── tag_management_dialog.gd        # Bulk tag operations dialog
+├── managers/                       # Specialized manager classes
+│   ├── category_manager.gd         # Categories, tags, favorites
+│   ├── grid_manager.gd             # Grid snapping and visualization
+│   ├── input_handler.gd            # Input detection and edge detection
+│   ├── numeric_input_manager.gd    # Numeric input processing
+│   ├── overlay_manager.gd          # Visual feedback overlays
+│   ├── position_manager.gd         # 3D positioning and raycasting
+│   ├── preview_manager.gd          # Preview mesh management
+│   ├── rotation_manager.gd         # Rotation offset calculations
+│   ├── scale_manager.gd            # Scale multiplier calculations
+│   ├── smooth_transform_manager.gd # Transform interpolation
+│   └── utility_manager.gd          # Scene manipulation helpers
 │
-├── Asset Management
-├── category_manager.gd             # Categories, tags, favorites
-├── asset_scanner.gd                # Asset discovery
-├── thumbnail_generator.gd          # Thumbnail rendering
-├── thumbnail_queue_manager.gd      # Thumbnail queue
+├── placement/                      # Placement strategy pattern
+│   ├── placement_strategy.gd       # Base strategy class
+│   ├── collision_placement_strategy.gd # Raycast placement
+│   ├── plane_placement_strategy.gd # Plane projection
+│   └── placement_strategy_manager.gd # Strategy coordinator
 │
-├── Utilities
-├── utility_manager.gd              # Scene manipulation helpers
-├── error_handler.gd                # Error reporting
-├── plugin_logger.gd                # Structured logging
-├── plugin_constants.gd             # Shared constants
+├── ui/                             # User interface components
+│   ├── asset_placer_dock.gd        # Main dock interface
+│   ├── asset_thumbnail_item.gd     # Thumbnail item widget
+│   ├── meshlib_browser.gd          # MeshLibrary browser
+│   ├── modellib_browser.gd         # 3D model asset browser
+│   ├── placement_settings.gd       # Settings UI
+│   ├── status_overlay.tscn         # Status overlay scene
+│   ├── status_overlay_control.gd   # Status overlay controller
+│   ├── tag_management_dialog.gd    # Bulk tag operations dialog
+│   ├── toolbar_buttons.tscn        # Toolbar button scene
+│   └── toolbar_buttons.gd          # Toolbar controller
 │
-└── controls/                       # UI control components (if any)
+├── settings/                       # Settings management system
+│   ├── settings_definition.gd      # Settings metadata
+│   ├── settings_manager.gd         # Settings persistence
+│   ├── settings_persistence.gd     # Save/load operations
+│   └── settings_ui_builder.gd      # Automated UI generation
+│
+├── thumbnails/                     # Thumbnail generation system
+│   ├── asset_scanner.gd            # Asset discovery
+│   ├── thumbnail_generator.gd      # Thumbnail rendering
+│   └── thumbnail_queue_manager.gd  # Thumbnail queue
+│
+└── utils/                          # Utility classes and helpers
+    ├── error_handler.gd            # Error reporting
+    ├── increment_calculator.gd     # Increment calculations
+    ├── layout_calculator.gd        # UI layout calculations
+    ├── node_utils.gd               # Node validation and utilities
+    ├── plugin_constants.gd         # Shared constants
+    ├── plugin_logger.gd            # Structured logging
+    └── undo_redo_helper.gd         # Undo/redo action creation
 ```
 
 ### **Optional Project Files**
@@ -659,7 +836,7 @@ The plugin automatically discovers and displays models in these formats:
 - 🔄 **Batch Operations**: Use Transform Mode to adjust multiple objects simultaneously
 
 ### **Placement Best Practices**
-- 🎯 **Surface Placement**: Use "Collision" placement strategy for natural object placement on terrain
+- 🎯 **Surface Placement**: Use "Collision" placement strategy (now default) for natural object placement on terrain
 - 🔄 **Surface Normal Alignment**: Enable "Align with Surface Normal" for objects that should match terrain slope
 - 📏 **Grid Snapping**: Enable grid snap for architectural precision and consistent spacing
 - 🌐 **Grid Visualization**: Enable "Show Grid" to see the snap grid during placement
@@ -667,13 +844,17 @@ The plugin automatically discovers and displays models in these formats:
 - 🛠️ **Terrain3D Collision**: When using Terrain3D plugin separately, enable its Collision option (set to "Dynamic / Editor") so raycasts detect the terrain surface
 - ⌨️ **Hotkey Efficiency**: Customize keys in Settings tab for your most common operations
 - 🔄 **Asset Cycling**: Use `[` and `]` keys to quickly browse asset variations without leaving the viewport
+- 🔢 **Numeric Precision**: Type exact values for perfect alignment (e.g., R → 45 → Enter for 45° rotation)
+- ↩️ **Experiment Freely**: Full undo/redo support means you can try different placements without worry
 
 ### **Transform Mode Workflow**
 - 🎯 **Multi-Object Selection**: Select multiple Node3D objects to transform them as a group
-- � **Group Center**: Objects rotate around their collective center while maintaining relative positions
+- 📐 **Group Center**: Objects rotate around their collective center while maintaining relative positions
 - 🔄 **Non-Destructive**: Original transforms preserved - ESC to cancel and restore
-- ✅ **Confirm Changes**: Left-click to apply transforms or ESC to cancel
+- ✅ **Confirm Changes**: Left-click or Enter to apply transforms, ESC to cancel
 - 🎮 **Same Controls**: All placement controls work identically in Transform Mode
+- 🔢 **Precise Values**: Use numeric input for exact transformations (Q → 90 → Enter)
+- ↩️ **Full Undo Support**: All transformations tracked in undo history (Ctrl+Z/Ctrl+Shift+Z)
 
 ### **Performance Optimization**
 - 🖼️ **Thumbnail Cache**: Clear cache in Settings if thumbnails become corrupted or to free memory
@@ -715,6 +896,7 @@ The plugin automatically discovers and displays models in these formats:
 - ✅ Make sure you're in the 3D viewport (not Scene Tree or other panels)
 - ✅ Plugin must be enabled in Project Settings → Plugins
 - ✅ Check if TAB key is bound to another shortcut in Godot's Editor Settings
+- ✅ Verify selected nodes are valid Node3D objects (not Node2D or other types)
 
 ### **Placement Mode Issues**
 - ✅ Verify you're working in a 3D scene with objects that have collision
@@ -746,6 +928,21 @@ The plugin automatically discovers and displays models in these formats:
 - ✅ Verify there are multiple assets visible in the current filtered view
 - ✅ Try filtering by category to narrow down assets for cycling
 
+### **Numeric Input Not Working**
+- ✅ Ensure you're in Placement Mode or Transform Mode (not idle)
+- ✅ Press a transform key first (Q, E, W, A, S, D, Page Up/Down, etc.)
+- ✅ Check overlay for numeric input feedback
+- ✅ Only digits, decimal point (.), and minus (-) are accepted
+- ✅ Press Enter to confirm, ESC to cancel
+- ✅ Some keys may conflict with Godot shortcuts - try in Transform Mode
+
+### **Undo/Redo Not Working**
+- ✅ Verify you're using Godot's standard undo/redo shortcuts (Ctrl+Z / Ctrl+Shift+Z)
+- ✅ Check Godot's History panel to see tracked actions
+- ✅ Ensure you confirmed the action (left-click or Enter), not canceled (ESC)
+- ✅ Only completed placements and transformations create undo entries
+- ✅ Check Output panel for any error messages about undo system
+
 ### **Performance Issues**
 - ✅ Clear thumbnail cache if using many large assets (Settings tab)
 - ✅ Reduce grid extent value if grid overlay causes lag
@@ -773,29 +970,43 @@ The plugin automatically discovers and displays models in these formats:
 
 For developers interested in understanding or extending the plugin:
 
-### **Dual Mode System**
-The plugin uses an enum-based mode system defined in `TransformationManager`:
-```gdscript
-enum Mode {
-    NONE,        # No active mode
-    PLACEMENT,   # Placing new assets
-    TRANSFORM    # Transforming selected objects
-}
-```
+### **Instance-Based Architecture**
+The plugin uses a modern instance-based design with singleton pattern:
+- **InstanceManagerBase**: Base class for all managers providing lifecycle management
+- **ServiceRegistry**: Central registry for all manager instances
+- Eliminates static variables in favor of instance variables
+- Better encapsulation and resource management
+- Automatic cleanup when plugin disabled
+
+### **Mode Handler Pattern**
+The plugin uses dedicated mode handlers instead of a monolithic manager:
+- **PlacementModeHandler**: Handles all placement mode logic
+- **TransformModeHandler**: Handles all transform mode logic
+- **ModeStateMachine**: Coordinates mode transitions
+- Each handler is self-contained and testable
+- Main plugin delegates to appropriate handler based on current mode
 
 **Placement Mode Flow:**
 1. User selects asset from dock → `_on_asset_selected()` callback
-2. Plugin starts placement mode via `TransformationManager.start_placement_mode()`
+2. `PlacementModeHandler.enter_mode()` activates placement
 3. `PreviewManager` creates a preview mesh instance
-4. Each frame: `process_frame_input()` updates preview position via raycasting
-5. User clicks → `place_at_preview_position()` instantiates the asset in the scene
+4. Each frame: `process_input()` updates preview position via raycasting
+5. User clicks or Enter → `confirm_placement()` instantiates asset and creates undo entry
 
 **Transform Mode Flow:**
 1. User selects Node3D(s) and presses TAB
-2. Plugin enters transform mode via `TransformationManager.start_transform_mode()`
-3. Original transforms stored in `transform_data` dictionary
-4. Each frame: mouse position updates target nodes' positions
-5. User clicks → changes confirmed; ESC → original transforms restored
+2. `TransformModeHandler.enter_mode()` stores original transforms
+3. Group AABB calculated for multi-object center point
+4. Each frame: mouse position updates all target nodes' positions
+5. User clicks/Enter → `confirm_transform()` creates undo entry; ESC → restores originals
+
+### **Undo/Redo System**
+Full integration with Godot's EditorUndoRedoManager:
+- **UndoRedoHelper**: Validates nodes and creates undo actions
+- **Placement Undo**: Tracks node addition/removal
+- **Transform Undo**: Single and multi-object transform tracking
+- **Atomic Operations**: Multi-object transforms treated as single undo action
+- **Node Ownership**: Placed nodes correctly assigned scene root as owner
 
 ### **Input Priority Chain**
 The plugin uses multiple input interception points to ensure keys are captured before Godot:
@@ -820,10 +1031,25 @@ Grid snapping happens in `PositionManager._apply_grid_snap()`:
 3. Apply per-axis (X, Y, Z independently controlled)
 4. Grid overlay updates when object moves beyond threshold distance
 
+### **Numeric Input System**
+Direct numeric input for precise transformations:
+1. `InputHandler` detects transform key press (Q, E, W, etc.)
+2. `NumericInputManager` activates and tracks input context
+3. User types digits, decimal point, minus sign
+4. `OverlayManager` displays current input value
+5. Enter key confirms → value applied to transformation
+6. ESC cancels → input cleared without applying
+
+**Supported Contexts:**
+- Rotation (degrees)
+- Scale (multiplier value)
+- Height (world units)
+- Position (world units per direction)
+
 ### **Asset Cycling Mechanism**
 Cycling leverages the existing filtering system:
 1. `InputHandler` detects `[` or `]` key press (with tap/hold detection)
-2. `TransformationManager._process_asset_cycling_input()` calls dock's cycle methods
+2. `PlacementModeHandler` calls dock's cycle methods
 3. Dock determines current filtered view (category, search, favorites, etc.)
 4. Browser finds current asset index in filtered list
 5. Cycles to next/previous index (with wrap-around)
@@ -856,6 +1082,11 @@ Two storage mechanisms:
 - **Project File** (`.assetcategories`): Custom tags (shared via version control)
 
 Settings auto-save on change via signal connections.
+
+**Performance Optimization:**
+- Frame-based settings caching reduces queries by 60x at 60 FPS
+- Cache invalidates automatically on settings changes
+- Significant performance boost during rapid input
 
 ### **Conflict Prevention Strategy**
 1. Plugin checks `SettingsManager.is_plugin_key()` for every input
@@ -924,19 +1155,23 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Author**: IIFabixn (aka LuckyTeapot)  
 **Repository**: [github.com/IIFabixn/simple-asset-placer](https://github.com/IIFabixn/simple-asset-placer)  
-**Version**: 1.2.0  
+**Version**: 1.5.0  
 **Godot Version**: 4.x (tested on 4.3+)  
 **License**: MIT
 
 ### **Technical Highlights**
-- **Architecture**: Modern decoupled design with 15+ specialized managers
-- **Input System**: Universal keyboard support with full modifier combinations
-- **Dual Modes**: Placement mode for new assets + Transform mode for existing objects
+- **Architecture**: Modern instance-based design with service registry pattern and mode handlers
+- **Input System**: Universal keyboard support with full modifier combinations and numeric input
+- **Dual Modes**: Placement mode for new assets + Transform mode for existing objects with undo/redo
 - **Asset Management**: Automatic categories, custom tags, favorites, recent assets
-- **Performance**: Isolated thumbnail rendering, efficient caching, non-blocking operations
+- **Performance**: Frame-based caching, double-buffered AABB, isolated thumbnail rendering, efficient asset loading
+- **Multi-Object Support**: Group transformations with unified AABB and atomic undo tracking
 
 ### **Key Features**
 ✨ Dual placement modes (Placement + Transform)  
+🔢 Direct numeric input for precise transformations  
+🎯 Multi-object transformation with group coordination  
+↩️ Full undo/redo integration  
 🔄 Asset cycling in viewport (tap or hold)  
 🌍 Universal keyboard layout support  
 🏷️ Advanced category system with tags  
@@ -944,8 +1179,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 🎯 Surface alignment and normal detection  
 ⌨️ Complete key binding customization  
 🛡️ Input conflict prevention  
-🎨 Real-time visual feedback  
-⚡ High performance with large asset libraries  
+🎨 Real-time visual feedback with numeric input overlay  
+⚡ High performance with frame-based caching  
+🏗️ Clean instance-based architecture with 50+ specialized classes  
 
 ### **Acknowledgments**
 - The **Godot Engine** team and community for creating an amazing open-source game engine

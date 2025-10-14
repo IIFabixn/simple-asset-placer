@@ -85,6 +85,17 @@ static func get_default_settings() -> Dictionary:
 		"last_meshlib_path": "",
 		"last_model_category": "",
 		"last_meshlib_category": "",
+
+		# --- New unified snapping keys (legacy compatibility preserved) ---
+		# Position snapping (legacy keys snap_to_grid + grid_size still honored elsewhere)
+		"snap_enabled": false,
+		"snap_step": 1.0,
+		# Rotation snapping
+		"snap_rotation_enabled": false,
+		"snap_rotation_step": 15.0,
+		# Scale snapping
+		"snap_scale_enabled": false,
+		"snap_scale_step": 0.1,
 	}
 
 ## Initialization
@@ -449,6 +460,8 @@ static func validate_settings() -> bool:
 		"position_increment",
 		"grid_size",
 		"snap_step",
+		"snap_rotation_step",
+		"snap_scale_step",
 		"preview_opacity",
 		"smooth_transform_speed"
 	]
@@ -463,6 +476,8 @@ static func validate_settings() -> bool:
 	var boolean_settings = [
 		"snap_enabled",
 		"snap_to_grid",
+		"snap_rotation_enabled",
+		"snap_scale_enabled",
 		"randomize_rotation",
 		"randomize_scale",
 		"show_grid",

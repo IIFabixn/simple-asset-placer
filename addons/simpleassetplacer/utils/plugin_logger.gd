@@ -90,10 +90,12 @@ static func set_log_level_from_string(level_string: String) -> void:
 static func enable_debug_mode() -> void:
 	"""Convenience function to enable debug logging"""
 	current_level = LogLevel.DEBUG
+	_log(LogLevel.INFO, "PluginLogger", "=== DEBUG MODE ENABLED ===")
 
 static func enable_production_mode() -> void:
 	"""Convenience function to show only warnings and errors"""
 	current_level = LogLevel.WARNING
+	_log(LogLevel.INFO, "PluginLogger", "=== PRODUCTION MODE ENABLED ===")
 
 ## Internal Implementation
 

@@ -56,6 +56,10 @@ const DEFAULT_POSITION_INCREMENT: float = 0.1
 const FINE_POSITION_INCREMENT: float = 0.01
 const LARGE_POSITION_INCREMENT: float = 1.0
 
+## Mouse Sensitivity Modifiers (for modal R/L modes)
+const FINE_SENSITIVITY_MULTIPLIER: float = 0.1  # CTRL modifier makes mouse 10x more precise
+const LARGE_SENSITIVITY_MULTIPLIER: float = 2.0  # ALT modifier makes mouse 2x faster
+
 ## Preview Settings
 const DEFAULT_PREVIEW_OPACITY: float = 0.6
 const PREVIEW_VALID_COLOR: Color = Color(0.0, 1.0, 0.0, 0.6)  # Green, semi-transparent

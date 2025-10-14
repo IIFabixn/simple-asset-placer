@@ -126,21 +126,22 @@ static func apply_scale(node: Node3D, scale: Vector3) -> void:
 
 ## GRID SNAPPING
 
-static func apply_grid_snap(position: Vector3, state: TransformState) -> Vector3:
+static func apply_grid_snap(position: Vector3, state: TransformState, use_half_step: bool = false) -> Vector3:
 	"""Apply grid snapping to a position based on state configuration
 	
 	Args:
 		position: Position to snap
 		state: TransformState containing snap configuration
+		use_half_step: Override to force half-step mode (for modal G mode with CTRL)
 		
 	Returns:
 		Snapped position
 	"""
 	var snapped_pos = position
 	
-	# Determine effective snap step (half-step if enabled)
+	# Determine effective snap step (half-step if enabled via state OR parameter)
 	var effective_snap_step = state.snap_step
-	if state.use_half_step:
+	if state.use_half_step or use_half_step:
 		effective_snap_step = state.snap_step / 2.0
 	
 	# Apply X-axis snapping
@@ -165,12 +166,16 @@ static func apply_grid_snap(position: Vector3, state: TransformState) -> Vector3
 	
 	# Apply Y-axis snapping (separate control)
 	if state.snap_y_enabled:
+		var effective_y_step = state.snap_y_step
+		if state.use_half_step or use_half_step:
+			effective_y_step = state.snap_y_step / 2.0
+		
 		var snap_y = position.y
 		var offset_y = state.snap_offset.y
 		if state.snap_center_y:
 			# Snap to center of grid cell (offset by half step before rounding)
-			offset_y += state.snap_y_step * 0.5
-		snap_y = round((position.y - offset_y) / state.snap_y_step) * state.snap_y_step + offset_y
+			offset_y += effective_y_step * 0.5
+		snap_y = round((position.y - offset_y) / effective_y_step) * effective_y_step + offset_y
 		snapped_pos.y = snap_y
 	
 	return snapped_pos

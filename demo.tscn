@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3 uid="uid://repnqsnpqatg"]
+[gd_scene load_steps=14 format=3 uid="uid://repnqsnpqatg"]
 
 [ext_resource type="PackedScene" uid="uid://bi526m4rgyylo" path="res://sample/building_a.tscn" id="1_m0rpm"]
 [ext_resource type="PackedScene" uid="uid://bs7orqq2mvo0n" path="res://sample/building_b.tscn" id="2_c6xj6"]
@@ -11,6 +11,7 @@
 [ext_resource type="PackedScene" uid="uid://bbcojnjnk0214" path="res://sample/assets/kenny_retro-medival-kit/overhang-round-railing.glb" id="9_d4o4o"]
 [ext_resource type="PackedScene" uid="uid://b6c0q5frrklx6" path="res://barrels_2.tscn" id="10_d4o4o"]
 [ext_resource type="PackedScene" uid="uid://c2hol86kdgqxl" path="res://sample/assets/kenny_retro-medival-kit/tree-large.glb" id="10_svejp"]
+[ext_resource type="PackedScene" uid="uid://lx2v8cjtwaf4" path="res://sample/assets/kenny_retro-medival-kit/floor-stairs-corner-outer.glb" id="12_svejp"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kem5a"]
 albedo_texture = ExtResource("5_6bw2v")
@@ -44,7 +45,7 @@ transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 3, -
 transform = Transform3D(7.549784e-08, 0, -0.9999991, 0, 1, 0, 0.9999991, 0, 7.549784e-08, 3, 1.4305115e-06, 1)
 
 [node name="tower-top" parent="." instance=ExtResource("4_c6xj6")]
-transform = Transform3D(-1.915947e-07, 9.809189e-07, 1.1760001, 6.206211e-08, 1.1760001, -9.809189e-07, -1.1760001, 6.206195e-08, -1.9159475e-07, 0, 0, -3)
+transform = Transform3D(-1.1729119e-06, 9.885695e-05, 1.1760001, 1.6391277e-07, 1.1760001, -9.885695e-05, -1.1760001, 1.6381418e-07, -1.1729256e-06, 0, 0, -3)
 
 [node name="building_d" parent="." instance=ExtResource("6_kem5a")]
 transform = Transform3D(-1, 0, -3.8941437e-07, 0, 1, 0, 3.8941437e-07, 0, -1, -4, -0.039298296, -2)
@@ -53,13 +54,13 @@ transform = Transform3D(-1, 0, -3.8941437e-07, 0, 1, 0, 3.8941437e-07, 0, -1, -4
 transform = Transform3D(1, 6.500875e-06, 5.960465e-07, -6.500875e-06, 1, 7.2849473e-09, -5.9604645e-07, -7.288822e-09, 1, -1.5, -0.039298326, -3.5)
 
 [node name="detail-crate" parent="." instance=ExtResource("8_884kg")]
-transform = Transform3D(-0.48748744, 8.959133e-08, 0.87313, -8.742389e-08, 1, -1.5142004e-07, -0.87313, -1.501478e-07, -0.48748744, -0.89277625, -3.5762787e-07, -8.137678)
+transform = Transform3D(0.82756186, -0.019257452, -0.5610438, 0.37671486, 0.7600185, 0.52958214, 0.41620544, -0.6496156, 0.63621706, 0.8946933, 0.03993893, -6.944595)
 
 [node name="detail-crate_2" parent="." instance=ExtResource("8_884kg")]
 transform = Transform3D(1.0999998, 0, 0, 0, 1.1, 0, 0, 0, 1.0999995, -0.5, 0, -9.5)
 
 [node name="detail-crate_3" parent="." instance=ExtResource("8_884kg")]
-transform = Transform3D(1.3068179, -0.18609099, 3.147125e-07, 0.18609099, 1.3068179, -5.9008616e-09, -3.1073773e-07, 5.020948e-08, 1.32, 0.5, 2.3841858e-07, -10.5)
+transform = Transform3D(1.3068179, -0.18609099, 3.147125e-07, 0.18609099, 1.3068179, -5.9008616e-09, -3.1073773e-07, 5.020948e-08, 1.32, 2.25, 0, -10.75)
 
 [node name="detail-crate_4" parent="." instance=ExtResource("8_884kg")]
 transform = Transform3D(0.7172076, 1.5014783e-07, 0.69685954, -4.5254616e-08, 1, -1.6888751e-07, -0.69685954, 8.95913e-08, 0.7172076, -2.1072237, -1.1920929e-07, -8.862323)
@@ -77,4 +78,16 @@ transform = Transform3D(0.20779155, 0, 0.97817314, 0, 1, 0, -0.97817314, 0, 0.20
 transform = Transform3D(0.5514238, 0, 0.8342253, 0, 1, 0, -0.8342253, 0, 0.5514238, -3.5, -0.039298773, -6.5)
 
 [node name="barrels_2" parent="." instance=ExtResource("10_d4o4o")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, -7.5)
+transform = Transform3D(1.099999, -2.9802322e-08, -2.6552354e-07, 2.9802322e-08, 1.0999992, 8.8763684e-08, 7.450581e-09, 0, 1.0999986, 423469.75, 0, -9)
+
+[node name="floor-stairs-corner-outer" type="Node3D" parent="." instance=ExtResource("12_svejp")]
+transform = Transform3D(1, 2.2000787e-15, -3.019916e-07, 0, 1, 7.2852315e-09, 3.019916e-07, -7.2852315e-09, 1, 1.5, 0, -9.5)
+
+[node name="floor-stairs-corner-outer_2" type="Node3D" parent="." instance=ExtResource("12_svejp")]
+transform = Transform3D(1.9470718e-07, -7.2852315e-09, 1, 0, 1, 7.2852315e-09, -1, -1.4184869e-15, 1.9470718e-07, 1.5, 0, -8.5)
+
+[node name="floor-stairs-corner-outer_3" type="Node3D" parent="." instance=ExtResource("12_svejp")]
+transform = Transform3D(-1, -1.1000394e-15, 1.509958e-07, 0, 1, 7.2852315e-09, -1.509958e-07, 7.2852315e-09, -1, 2.5, 0, -8.5)
+
+[node name="floor-stairs-corner-outer_4" type="Node3D" parent="." instance=ExtResource("12_svejp")]
+transform = Transform3D(-3.7252903e-08, 7.285233e-09, -1.0000001, -1.4901161e-08, 1.0000017, 7.2852697e-09, 1.0000019, 1.4901161e-08, -3.7252903e-08, 2.5, 0, -9.5)

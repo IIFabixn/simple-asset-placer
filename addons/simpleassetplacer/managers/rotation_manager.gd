@@ -153,41 +153,6 @@ func add_rotation_degrees(state: TransformState, delta_rotation_degrees: Vector3
 		deg_to_rad(delta_rotation_degrees.z)
 	))
 
-## Node Application (DEPRECATED - Use TransformApplicator)
-
-func apply_rotation_to_node(state: TransformState, node: Node3D, original_rotation: Vector3 = Vector3.ZERO):
-	"""Apply rotation offset to a Node3D's original rotation
-	Combines original rotation + surface alignment + manual offset
-	
-	DEPRECATED: Use TransformApplicator.apply_rotation_only() instead
-	
-	Args:
-		state: TransformState containing rotation data
-		node: The Node3D to apply rotation to
-		original_rotation: The node's original rotation (from transform mode) or Vector3.ZERO for placement mode
-	"""
-	if node and is_instance_valid(node) and node.is_inside_tree():
-		# Build the final rotation by combining:
-		# 1. Original rotation (from when transform mode started)
-		# 2. Surface alignment (base rotation from surface normal)
-		# 3. Manual offset (user input rotation changes)
-		
-		var original_transform = Transform3D(Basis.from_euler(original_rotation), Vector3.ZERO)
-		var surface_transform = Transform3D(Basis.from_euler(state.surface_alignment_rotation), Vector3.ZERO)
-		var manual_transform = Transform3D(Basis.from_euler(state.manual_rotation_offset), Vector3.ZERO)
-		
-		# Combine: original -> surface alignment -> manual offset
-		var combined_transform = original_transform * surface_transform * manual_transform
-		
-		# Extract the combined rotation
-		var target_rotation = combined_transform.basis.get_euler()
-		
-		# Apply to node with or without smoothing
-		if _services.smooth_transform_manager.is_smooth_transforms_enabled():
-			_services.smooth_transform_manager.set_target_rotation(node, target_rotation)
-		else:
-			node.rotation = target_rotation
-
 func align_with_surface_normal(state: TransformState, surface_normal: Vector3):
 	"""Calculate rotation to align object's up vector with surface normal
 	This creates a BASE rotation where the object's Y-axis points along the surface normal.
@@ -229,63 +194,6 @@ func align_with_surface_normal(state: TransformState, surface_normal: Vector3):
 	# This does NOT overwrite the user's manual rotation
 	state.surface_alignment_rotation = basis.get_euler()
 	_normalize_surface_rotation(state)
-
-func apply_rotation_step(state: TransformState, node: Node3D, axis: String, degrees: float, original_rotation: Vector3 = Vector3.ZERO, rotate_position_offset: bool = false):
-	"""Apply a rotation step to the MANUAL rotation offset and update the node
-	This rotation offset is combined with the original rotation and surface alignment
-	
-	DEPRECATED: Use rotate_axis() + TransformApplicator instead
-	
-	Args:
-		state: TransformState to modify
-		node: The Node3D to rotate
-		axis: Rotation axis ("X", "Y", or "Z")
-		degrees: Rotation amount in degrees
-		original_rotation: The node's original rotation (from transform mode) or Vector3.ZERO for placement mode
-		rotate_position_offset: If true, also rotates the manual position offset (for placement mode)
-	"""
-	if not node:
-		return
-	
-	var rotation_axis = axis.to_upper()
-	
-	# Update the internal manual rotation offset
-	match rotation_axis:
-		"X":
-			rotate_x(state, degrees)
-		"Y":
-			rotate_y(state, degrees)
-		"Z":
-			rotate_z(state, degrees)
-		_:
-			PluginLogger.warning("RotationManager", "Invalid axis: " + axis)
-			return
-	
-	# If in placement mode, also rotate the position offset so it follows the mesh rotation
-	if rotate_position_offset:
-		# Rotate the position offset to match the mesh rotation
-		_services.position_manager.rotate_manual_offset(state, rotation_axis, degrees)
-	
-	# Apply the combined rotation (original + surface alignment + manual offset) to the node
-	apply_rotation_to_node(state, node, original_rotation)
-	PluginLogger.debug("RotationManager", "Applied " + str(degrees) + "° manual rotation offset to " + axis + " axis")
-
-func apply_rotation_step_with_modifiers(state: TransformState, node: Node3D, axis: String, base_degrees: float, modifiers: Dictionary, original_rotation: Vector3 = Vector3.ZERO, rotate_position_offset: bool = false):
-	"""Apply a rotation step with modifier-adjusted increment
-	
-	DEPRECATED: Use rotate_axis_with_modifiers() + TransformApplicator instead
-	
-	Args:
-		state: TransformState to modify
-		node: The Node3D to rotate
-		axis: Rotation axis ("X", "Y", or "Z")
-		base_degrees: Base rotation step in degrees (e.g., 15.0)
-		modifiers: Modifier state from InputHandler.get_modifier_state()
-		original_rotation: The node's original rotation (from transform mode)
-		rotate_position_offset: If true, also rotates the manual position offset
-	"""
-	var step_degrees = IncrementCalculator.calculate_rotation_step(base_degrees, modifiers)
-	apply_rotation_step(state, node, axis, step_degrees, original_rotation, rotate_position_offset)
 
 func reset_node_rotation(node: Node3D):
 	"""Reset a node's rotation to zero"""

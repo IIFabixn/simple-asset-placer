@@ -63,6 +63,14 @@ var snap_center_y: bool = false
 var snap_center_z: bool = false
 var use_half_step: bool = false
 
+# Rotation snap configuration
+var snap_rotation_enabled: bool = false
+var snap_rotation_step: float = 15.0  # Degrees
+
+# Scale snap configuration
+var snap_scale_enabled: bool = false
+var snap_scale_step: float = 0.1
+
 ## PLACEMENT CONFIGURATION
 
 var align_with_normal: bool = false  # Align rotation with surface
@@ -83,12 +91,12 @@ func reset_position():
 	height_offset = 0.0
 	is_initial_position = true
 	last_raycast_xz = Vector2.ZERO
-	PluginLogger.debug("TransformState", "Position reset")
+	# Debug logging removed to reduce spam (called frequently during reset cycles)
 
 func reset_rotation():
 	"""Reset manual rotation offset (keeps surface alignment)"""
 	manual_rotation_offset = Vector3.ZERO
-	PluginLogger.debug("TransformState", "Manual rotation reset")
+	# Debug logging removed to reduce spam (called frequently during reset cycles)
 
 func reset_surface_alignment():
 	"""Reset surface alignment rotation"""
@@ -100,13 +108,13 @@ func reset_all_rotation():
 	manual_rotation_offset = Vector3.ZERO
 	surface_alignment_rotation = Vector3.ZERO
 	surface_normal = Vector3.UP
-	PluginLogger.debug("TransformState", "All rotation reset")
+	# Debug logging removed to reduce spam (called frequently during reset cycles)
 
 func reset_scale():
 	"""Reset scale multiplier to 1.0"""
 	scale_multiplier = 1.0
 	non_uniform_multiplier = Vector3.ONE
-	PluginLogger.debug("TransformState", "Scale reset")
+	# Debug logging removed to reduce spam (called frequently during reset cycles)
 
 func reset_all():
 	"""Reset all transform state to defaults"""
@@ -116,7 +124,7 @@ func reset_all():
 	reset_position()
 	reset_all_rotation()
 	reset_scale()
-	PluginLogger.debug("TransformState", "All state reset")
+	# Debug logging removed - this is called from _init() and frequently during normal operation
 
 ## GETTERS
 
@@ -175,15 +183,30 @@ func set_rotation_degrees(rotation_degrees: Vector3):
 ## CONFIGURATION
 
 func configure_from_settings(settings: Dictionary):
-	"""Configure state from settings dictionary"""
-	snap_enabled = settings.get("snap_to_grid", false)
-	snap_step = settings.get("grid_size", 1.0)
+	"""Configure state from settings dictionary.
+
+	IMPORTANT: Keys must match SettingMeta ids from settings_definition.gd.
+	Older aliases (snap_to_grid, grid_size) are still supported for backward compatibility.
+	"""
+	# Position snap
+	snap_enabled = settings.get("snap_enabled", settings.get("snap_to_grid", false))
+	snap_step = settings.get("snap_step", settings.get("grid_size", 1.0))
 	snap_offset = settings.get("snap_offset", Vector3.ZERO)
 	snap_y_enabled = settings.get("snap_y_enabled", false)
 	snap_y_step = settings.get("snap_y_step", 1.0)
 	snap_center_x = settings.get("snap_center_x", false)
 	snap_center_y = settings.get("snap_center_y", false)
 	snap_center_z = settings.get("snap_center_z", false)
+	
+	# Rotation and scale snap settings
+	snap_rotation_enabled = settings.get("snap_rotation_enabled", false)
+	snap_rotation_step = settings.get("snap_rotation_step", 15.0)
+	snap_scale_enabled = settings.get("snap_scale_enabled", false)
+	snap_scale_step = settings.get("snap_scale_step", 0.1)
+	
+	# Debug logging for snap settings
+	if snap_rotation_enabled or snap_scale_enabled or snap_enabled:
+		PluginLogger.debug("TransformState", "Snap settings | Pos:%s step:%s Rot:%s step:%s Scale:%s step:%s half_step:%s" % [snap_enabled, snap_step, snap_rotation_enabled, snap_rotation_step, snap_scale_enabled, snap_scale_step, use_half_step])
 	
 	align_with_normal = settings.get("use_surface_normal", false)
 	collision_mask = settings.get("collision_mask", 1)

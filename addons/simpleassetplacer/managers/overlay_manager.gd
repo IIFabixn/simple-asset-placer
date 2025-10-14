@@ -127,8 +127,11 @@ func show_transform_overlay(mode: int, node_name: String = "", position: Vector3
 	if not _is_overlay_ready():
 		return
 	
+	# Get control mode state from services
+	var control_mode_state = _services.control_mode_state if _services else null
+	
 	# Use the scene's controller method
-	_status_overlay.show_transform_info(mode, node_name, position, rotation, scale, height_offset)
+	_status_overlay.show_transform_info(mode, node_name, position, rotation, scale, height_offset, control_mode_state)
 	_current_mode = mode
 
 func refresh_overlay_buttons():

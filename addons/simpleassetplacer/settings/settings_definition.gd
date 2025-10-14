@@ -3,6 +3,8 @@ extends RefCounted
 
 class_name SettingsDefinition
 
+const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
+
 # Setting types
 enum SettingType {
 	BOOL,
@@ -91,18 +93,45 @@ static func get_all_settings() -> Array:
 	scale_multiplier.ui_tooltip = "Default scale multiplier for placed objects"
 	settings.append(scale_multiplier)
 	
-	var smooth_transforms = SettingMeta.new("smooth_transforms", "simple_asset_placer/smooth_transforms", true, SettingType.BOOL, "Smooth Transformations")
-	smooth_transforms.section = "basic"
-	smooth_transforms.ui_tooltip = "Smoothly animate transformations with lerping/easing"
-	settings.append(smooth_transforms)
+	# Modal Control Settings
+	var modal_control_exclusive = SettingMeta.new("modal_control_exclusive", "simple_asset_placer/modal_control_exclusive", true, SettingType.BOOL, "Exclusive Modal Controls")
+	modal_control_exclusive.section = "basic"
+	modal_control_exclusive.ui_tooltip = "When enabled, modal controls (G/R/L) disable other automatic transformations like surface alignment. Recommended for precise control."
+	settings.append(modal_control_exclusive)
 	
-	var smooth_transform_speed = SettingMeta.new("smooth_transform_speed", "simple_asset_placer/smooth_transform_speed", 8.0, SettingType.FLOAT, "Smooth Speed")
-	smooth_transform_speed.section = "basic"
-	smooth_transform_speed.min_value = 1.0
-	smooth_transform_speed.max_value = 20.0
-	smooth_transform_speed.step = 0.5
-	smooth_transform_speed.ui_tooltip = "Speed of smooth transformations (higher = faster)"
-	settings.append(smooth_transform_speed)
+	# Mouse control sensitivity
+	var mouse_rotation_sensitivity = SettingMeta.new("mouse_rotation_sensitivity", "simple_asset_placer/mouse_rotation_sensitivity", 0.5, SettingType.FLOAT, "Mouse Rotation Sensitivity")
+	mouse_rotation_sensitivity.section = "basic"
+	mouse_rotation_sensitivity.min_value = 0.1
+	mouse_rotation_sensitivity.max_value = 2.0
+	mouse_rotation_sensitivity.step = 0.1
+	mouse_rotation_sensitivity.ui_tooltip = "Sensitivity for mouse rotation in R mode (pixels to degrees)"
+	settings.append(mouse_rotation_sensitivity)
+	
+	var mouse_scale_sensitivity = SettingMeta.new("mouse_scale_sensitivity", "simple_asset_placer/mouse_scale_sensitivity", 0.01, SettingType.FLOAT, "Mouse Scale Sensitivity")
+	mouse_scale_sensitivity.section = "basic"
+	mouse_scale_sensitivity.min_value = 0.001
+	mouse_scale_sensitivity.max_value = 0.1
+	mouse_scale_sensitivity.step = 0.001
+	mouse_scale_sensitivity.ui_tooltip = "Sensitivity for mouse scaling in L mode (pixels to scale factor)"
+	settings.append(mouse_scale_sensitivity)
+	
+	# Mouse sensitivity modifiers
+	var fine_sensitivity_multiplier = SettingMeta.new("fine_sensitivity_multiplier", "simple_asset_placer/fine_sensitivity_multiplier", PluginConstants.FINE_SENSITIVITY_MULTIPLIER, SettingType.FLOAT, "Fine Sensitivity Multiplier")
+	fine_sensitivity_multiplier.section = "basic"
+	fine_sensitivity_multiplier.min_value = 0.01
+	fine_sensitivity_multiplier.max_value = 1.0
+	fine_sensitivity_multiplier.step = 0.05
+	fine_sensitivity_multiplier.ui_tooltip = "Multiplier for mouse sensitivity when CTRL is held in R/L modes (lower = more precise)"
+	settings.append(fine_sensitivity_multiplier)
+	
+	var large_sensitivity_multiplier = SettingMeta.new("large_sensitivity_multiplier", "simple_asset_placer/large_sensitivity_multiplier", PluginConstants.LARGE_SENSITIVITY_MULTIPLIER, SettingType.FLOAT, "Large Sensitivity Multiplier")
+	large_sensitivity_multiplier.section = "basic"
+	large_sensitivity_multiplier.min_value = 1.0
+	large_sensitivity_multiplier.max_value = 10.0
+	large_sensitivity_multiplier.step = 0.5
+	large_sensitivity_multiplier.ui_tooltip = "Multiplier for mouse sensitivity when ALT is held in R/L modes (higher = faster movement)"
+	settings.append(large_sensitivity_multiplier)
 	
 	# Advanced Grid Settings
 	var snap_offset = SettingMeta.new("snap_offset", "simple_asset_placer/snap_offset", Vector3.ZERO, SettingType.VECTOR3, "Grid Offset")
@@ -133,6 +162,34 @@ static func get_all_settings() -> Array:
 	snap_center_z.section = "advanced_grid"
 	settings.append(snap_center_z)
 	
+	# Rotation Snap Settings
+	var snap_rotation_enabled = SettingMeta.new("snap_rotation_enabled", "simple_asset_placer/snap_rotation_enabled", false, SettingType.BOOL, "Enable Rotation Snapping")
+	snap_rotation_enabled.section = "advanced_grid"
+	snap_rotation_enabled.ui_tooltip = "Snap rotation to grid increments in R mode"
+	settings.append(snap_rotation_enabled)
+	
+	var snap_rotation_step = SettingMeta.new("snap_rotation_step", "simple_asset_placer/snap_rotation_step", 15.0, SettingType.FLOAT, "Rotation Snap Step (degrees)")
+	snap_rotation_step.section = "advanced_grid"
+	snap_rotation_step.min_value = 1.0
+	snap_rotation_step.max_value = 90.0
+	snap_rotation_step.step = 1.0
+	snap_rotation_step.ui_tooltip = "Rotation snap increment in degrees (e.g., 15° = 24 steps per 360°)"
+	settings.append(snap_rotation_step)
+	
+	# Scale Snap Settings
+	var snap_scale_enabled = SettingMeta.new("snap_scale_enabled", "simple_asset_placer/snap_scale_enabled", false, SettingType.BOOL, "Enable Scale Snapping")
+	snap_scale_enabled.section = "advanced_grid"
+	snap_scale_enabled.ui_tooltip = "Snap scale to grid increments in L mode"
+	settings.append(snap_scale_enabled)
+	
+	var snap_scale_step = SettingMeta.new("snap_scale_step", "simple_asset_placer/snap_scale_step", 0.1, SettingType.FLOAT, "Scale Snap Step")
+	snap_scale_step.section = "advanced_grid"
+	snap_scale_step.min_value = 0.01
+	snap_scale_step.max_value = 1.0
+	snap_scale_step.step = 0.01
+	snap_scale_step.ui_tooltip = "Scale snap increment (e.g., 0.1 = snap to 0.0, 0.1, 0.2, etc.)"
+	settings.append(snap_scale_step)
+	
 	# Reset Behavior Settings
 	var reset_height_on_exit = SettingMeta.new("reset_height_on_exit", "simple_asset_placer/reset_height_on_exit", false, SettingType.BOOL, "Reset Height on Exit")
 	reset_height_on_exit.section = "reset_behavior"
@@ -150,33 +207,27 @@ static func get_all_settings() -> Array:
 	reset_position_on_exit.section = "reset_behavior"
 	settings.append(reset_position_on_exit)
 	
-	# Key Bindings - Rotation
-	_add_key_binding(settings, "rotate_y_key", "Y", "Rotate Y-Axis", "rotation")
-	_add_key_binding(settings, "rotate_x_key", "X", "Rotate X-Axis", "rotation")
-	_add_key_binding(settings, "rotate_z_key", "Z", "Rotate Z-Axis", "rotation")
-	_add_key_binding(settings, "reset_rotation_key", "T", "Reset Rotation", "rotation")
+	# Key Bindings - Modal Control Modes (Blender-style)
+	_add_key_binding(settings, "position_control_key", "G", "Position Control Mode (Grab)", "control_modes")
+	_add_key_binding(settings, "rotation_control_key", "R", "Rotation Control Mode", "control_modes")
+	_add_key_binding(settings, "scale_control_key", "L", "Scale Control Mode", "control_modes")
 	
-	# Key Bindings - Scale
-	_add_key_binding(settings, "scale_up_key", "PAGE_UP", "Scale Up", "scale")
-	_add_key_binding(settings, "scale_down_key", "PAGE_DOWN", "Scale Down", "scale")
-	_add_key_binding(settings, "scale_reset_key", "HOME", "Reset Scale", "scale")
+	# Key Bindings - Axis Constraints (used when modal control is active)
+	# Note: X/Y/Z keys serve dual purpose:
+	# - When G/R/L is pressed: Toggle axis constraints
+	# - When G/R/L is NOT pressed: Used for numeric input (rotation)
+	_add_key_binding(settings, "rotate_x_key", "X", "X-Axis Constraint/Rotate", "control_modes")
+	_add_key_binding(settings, "rotate_y_key", "Y", "Y-Axis Constraint/Rotate", "control_modes")
+	_add_key_binding(settings, "rotate_z_key", "Z", "Z-Axis Constraint/Rotate", "control_modes")
 	
-	# Key Bindings - Height
+	# Key Bindings - Quick Height Adjustment (always available)
 	_add_key_binding(settings, "height_up_key", "Q", "Raise Height", "height")
 	_add_key_binding(settings, "height_down_key", "E", "Lower Height", "height")
-	_add_key_binding(settings, "reset_height_key", "R", "Reset Height", "height")
-	
-	# Key Bindings - Position
-	_add_key_binding(settings, "position_left_key", "A", "Move Left (-X)", "position")
-	_add_key_binding(settings, "position_right_key", "D", "Move Right (+X)", "position")
-	_add_key_binding(settings, "position_forward_key", "W", "Move Forward (-Z)", "position")
-	_add_key_binding(settings, "position_backward_key", "S", "Move Backward (+Z)", "position")
-	_add_key_binding(settings, "reset_position_key", "G", "Reset Position Offset", "position")
 	
 	# Key Bindings - Modifiers
 	_add_key_binding(settings, "reverse_modifier_key", "SHIFT", "Reverse Direction", "modifiers")
-	_add_key_binding(settings, "large_increment_modifier_key", "ALT", "Large Increment", "modifiers")
-	_add_key_binding(settings, "fine_increment_modifier_key", "CTRL", "Fine Increment", "modifiers")
+	_add_key_binding(settings, "large_increment_modifier_key", "ALT", "Large Increment (2x)", "modifiers")
+	_add_key_binding(settings, "fine_increment_modifier_key", "CTRL", "Fine Increment (0.1x)", "modifiers")
 	
 	# Key Bindings - Control
 	_add_key_binding(settings, "cancel_key", "ESCAPE", "Cancel Placement", "control")
@@ -186,25 +237,22 @@ static func get_all_settings() -> Array:
 	_add_key_binding(settings, "cycle_next_asset_key", "BRACKETRIGHT", "Cycle Next Asset", "control")
 	_add_key_binding(settings, "cycle_previous_asset_key", "BRACKETLEFT", "Cycle Previous Asset", "control")
 	
-	# Increments - Rotation
-	_add_increment(settings, "rotation_increment", 15.0, "Rotation Step", "rotation", 1.0, 180.0, 1.0)
-	_add_increment(settings, "fine_rotation_increment", 5.0, "Fine Rotation Step", "rotation", 0.1, 45.0, 0.1)
-	_add_increment(settings, "large_rotation_increment", 90.0, "Large Rotation Step", "rotation", 15.0, 180.0, 1.0)
-	
-	# Increments - Scale
-	_add_increment(settings, "scale_increment", 0.1, "Scale Step", "scale", 0.01, 1.0, 0.01)
-	_add_increment(settings, "fine_scale_increment", 0.01, "Fine Scale Step", "scale", 0.001, 0.1, 0.001)
-	_add_increment(settings, "large_scale_increment", 0.5, "Large Scale Step", "scale", 0.1, 2.0, 0.1)
-	
-	# Increments - Height
+	# Increments - Height (Q/E quick adjustments)
 	_add_increment(settings, "height_adjustment_step", 0.1, "Height Step", "height", 0.01, 5.0, 0.01)
-	_add_increment(settings, "fine_height_increment", 0.01, "Fine Height Step", "height", 0.001, 0.5, 0.001)
-	_add_increment(settings, "large_height_increment", 1.0, "Large Height Step", "height", 0.5, 10.0, 0.1)
+	_add_increment(settings, "fine_height_increment", 0.01, "Fine Height Step (CTRL)", "height", 0.001, 0.5, 0.001)
+	_add_increment(settings, "large_height_increment", 1.0, "Large Height Step (ALT)", "height", 0.5, 10.0, 0.1)
 	
-	# Increments - Position
-	_add_increment(settings, "position_increment", 0.1, "Position Step", "position", 0.01, 10.0, 0.01)
-	_add_increment(settings, "fine_position_increment", 0.01, "Fine Position Step", "position", 0.001, 1.0, 0.001)
-	_add_increment(settings, "large_position_increment", 1.0, "Large Position Step", "position", 0.5, 10.0, 0.1)
+	# Increments - Numeric Input (for typed values)
+	# These are used when typing numbers after pressing rotation/scale/position keys
+	_add_increment(settings, "rotation_increment", 15.0, "Default Rotation (Numeric)", "numeric_input", 1.0, 180.0, 1.0)
+	_add_increment(settings, "fine_rotation_increment", 5.0, "Fine Rotation (Numeric)", "numeric_input", 0.1, 45.0, 0.1)
+	_add_increment(settings, "large_rotation_increment", 90.0, "Large Rotation (Numeric)", "numeric_input", 15.0, 180.0, 1.0)
+	_add_increment(settings, "scale_increment", 0.1, "Default Scale (Numeric)", "numeric_input", 0.01, 1.0, 0.01)
+	_add_increment(settings, "fine_scale_increment", 0.01, "Fine Scale (Numeric)", "numeric_input", 0.001, 0.1, 0.001)
+	_add_increment(settings, "large_scale_increment", 0.5, "Large Scale (Numeric)", "numeric_input", 0.1, 2.0, 0.1)
+	_add_increment(settings, "position_increment", 0.1, "Default Position (Numeric)", "numeric_input", 0.01, 10.0, 0.01)
+	_add_increment(settings, "fine_position_increment", 0.01, "Fine Position (Numeric)", "numeric_input", 0.001, 1.0, 0.001)
+	_add_increment(settings, "large_position_increment", 1.0, "Large Position (Numeric)", "numeric_input", 0.5, 10.0, 0.1)
 	
 	return settings
 

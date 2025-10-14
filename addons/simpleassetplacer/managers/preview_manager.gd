@@ -54,11 +54,6 @@ var _preview_color: Color = Color.WHITE
 
 func configure(settings: Dictionary) -> void:
 	"""Configure preview manager with settings"""
-	# Handle smooth transform settings
-	if settings.has("smooth_enabled") and settings.has("smooth_speed"):
-		if _services and _services.smooth_transform_manager:
-			_services.smooth_transform_manager.configure(settings.smooth_enabled, settings.smooth_speed)
-	
 	# Handle preview appearance settings
 	if settings.has("preview_opacity"):
 		set_preview_opacity(settings.preview_opacity)
@@ -72,10 +67,8 @@ func configure(settings: Dictionary) -> void:
 		_preview_material = null
 
 func update_smooth_transforms(delta: float) -> void:
-	"""Update smooth transformations - call every frame"""
-	# Always delegate to SmoothTransformManager - it handles enabled state internally
-	if _services and _services.smooth_transform_manager:
-		_services.smooth_transform_manager.update_smooth_transforms(delta)
+	"""Update smooth transformations - deprecated, kept for compatibility"""
+	pass
 
 ## Preview Creation
 
@@ -109,10 +102,6 @@ func start_preview_mesh(mesh: Mesh, settings: Dictionary = {}) -> void:
 	_preview_mesh.global_position = _current_position
 	_preview_mesh.rotation = _current_rotation
 	_preview_mesh.scale = _current_scale
-	
-	# Register with smooth transform manager
-	if _services and _services.smooth_transform_manager:
-		_services.smooth_transform_manager.register_object(_preview_mesh)
 	
 	PluginLogger.info("PreviewManager", "Started mesh preview")
 
@@ -171,10 +160,6 @@ func start_preview_asset(asset_path: String, settings: Dictionary = {}) -> void:
 	_preview_mesh.rotation = _current_rotation
 	_preview_mesh.scale = _current_scale
 	
-	# Register with smooth transform manager
-	if _services and _services.smooth_transform_manager:
-		_services.smooth_transform_manager.register_object(_preview_mesh)
-	
 	PluginLogger.info("PreviewManager", "Started asset preview for: " + asset_path)
 
 func _apply_preview_transparency_to_children(node: Node) -> void:
@@ -190,39 +175,33 @@ func _apply_preview_transparency_to_children(node: Node) -> void:
 ## Preview Updates
 
 func update_preview_position(position: Vector3) -> void:
-	"""Update preview position (with optional smoothing)"""
+	"""Update preview position"""
 	_current_position = position
 	if NodeUtils.is_valid_and_in_tree(_preview_mesh):
-		# Always delegate to SmoothTransformManager - it handles enabled/disabled state
-		if _services and _services.smooth_transform_manager:
-			_services.smooth_transform_manager.set_target_position(_preview_mesh, position)
+		_preview_mesh.global_position = position
 
 func update_preview_rotation(rotation: Vector3) -> void:
-	"""Update preview rotation (with optional smoothing)"""
+	"""Update preview rotation"""
 	_current_rotation = rotation
 	if NodeUtils.is_valid_and_in_tree(_preview_mesh):
-		# Always delegate to SmoothTransformManager - it handles enabled/disabled state
-		if _services and _services.smooth_transform_manager:
-			_services.smooth_transform_manager.set_target_rotation(_preview_mesh, rotation)
+		_preview_mesh.rotation = rotation
 
 func update_preview_scale(scale: Vector3) -> void:
-	"""Update preview scale (with optional smoothing)"""
+	"""Update preview scale"""
 	_current_scale = scale
 	if NodeUtils.is_valid_and_in_tree(_preview_mesh):
-		# Always delegate to SmoothTransformManager - it handles enabled/disabled state
-		if _services and _services.smooth_transform_manager:
-			_services.smooth_transform_manager.set_target_scale(_preview_mesh, scale)
+		_preview_mesh.scale = scale
 
 func update_preview_transform(position: Vector3, rotation: Vector3, scale: Vector3) -> void:
-	"""Update all preview transform components at once (with optional smoothing)"""
+	"""Update all preview transform components at once"""
 	_current_position = position
 	_current_rotation = rotation
 	_current_scale = scale
 	
 	if NodeUtils.is_valid_and_in_tree(_preview_mesh):
-		# Always delegate to SmoothTransformManager - it handles enabled/disabled state
-		if _services and _services.smooth_transform_manager:
-			_services.smooth_transform_manager.set_target_transform(_preview_mesh, position, rotation, scale)
+		_preview_mesh.global_position = position
+		_preview_mesh.rotation = rotation
+		_preview_mesh.scale = scale
 
 ## Preview State Queries
 
@@ -235,29 +214,20 @@ func get_preview_mesh() -> Node3D:
 	return _preview_mesh
 
 func get_preview_position() -> Vector3:
-	"""Get current preview position (returns target position when smooth transforms are enabled)"""
-	if has_preview() and _preview_mesh.is_inside_tree():
-		# If smooth transforms are enabled, return the target position instead of current
-		if _services and _services.smooth_transform_manager and _services.smooth_transform_manager.is_smooth_transforms_enabled():
-			return _services.smooth_transform_manager.get_target_position(_preview_mesh)
+	"""Get current preview position"""
+	if has_preview():
 		return _preview_mesh.global_position
 	return _current_position
 
 func get_preview_rotation() -> Vector3:
-	"""Get current preview rotation (returns target rotation when smooth transforms are enabled)"""
+	"""Get current preview rotation"""
 	if has_preview():
-		# If smooth transforms are enabled, return the target rotation instead of current
-		if _services and _services.smooth_transform_manager and _services.smooth_transform_manager.is_smooth_transforms_enabled():
-			return _services.smooth_transform_manager.get_target_rotation(_preview_mesh)
 		return _preview_mesh.rotation
 	return _current_rotation
 
 func get_preview_scale() -> Vector3:
-	"""Get current preview scale (returns target scale when smooth transforms are enabled)"""
+	"""Get current preview scale"""
 	if has_preview():
-		# If smooth transforms are enabled, return the target scale instead of current
-		if _services and _services.smooth_transform_manager and _services.smooth_transform_manager.is_smooth_transforms_enabled():
-			return _services.smooth_transform_manager.get_target_scale(_preview_mesh)
 		return _preview_mesh.scale
 	return _current_scale
 

@@ -6,6 +6,7 @@ class_name TransformationCoordinator
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
 const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
 const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
+const TransformSession = preload("res://addons/simpleassetplacer/core/transform_session.gd")
 const TransformState = preload("res://addons/simpleassetplacer/core/transform_state.gd")
 const SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
 const EditorFacade = preload("res://addons/simpleassetplacer/core/editor_facade.gd")
@@ -16,6 +17,7 @@ const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placeme
 const TransformApplicator = preload("res://addons/simpleassetplacer/core/transform_applicator.gd")
 
 var _services: ServiceRegistry
+var _transform_session: TransformSession = null
 var _transform_state: TransformState = null
 var _placement_data: Dictionary = {}
 var _transform_data: Dictionary = {}

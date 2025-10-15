@@ -29,29 +29,17 @@ USES: PreviewManager, PositionManager, RotationManager, ScaleManager, OverlayMan
       InputHandler, UtilityManager, SmoothTransformManager (all via ServiceRegistry)
 """
 
-# Import utilities
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
 const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
 const NodeUtils = preload("res://addons/simpleassetplacer/utils/node_utils.gd")
-const TransformState = preload("res://addons/simpleassetplacer/core/transform_state.gd")
 const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
-const NumericInputManager = preload("res://addons/simpleassetplacer/managers/numeric_input_manager.gd")
+const TransformState = preload("res://addons/simpleassetplacer/core/transform_state.gd")
 const TransformApplicator = preload("res://addons/simpleassetplacer/core/transform_applicator.gd")
 
-# Dependencies (injected via ServiceRegistry)
 var _services: ServiceRegistry
 
-## Initialization
-
 func _init(services: ServiceRegistry) -> void:
-	"""Initialize with service registry
-	
-	Args:
-		services: ServiceRegistry containing all manager instances
-	"""
 	_services = services
-
-## MODE ENTRY/EXIT
 
 func enter_placement_mode(
 	mesh: Mesh = null,
@@ -62,21 +50,6 @@ func enter_placement_mode(
 	transform_state: TransformState = null,
 	undo_redo: EditorUndoRedoManager = null
 ) -> Dictionary:
-	"""Initialize placement mode and return placement data
-	
-	Args:
-		mesh: Direct mesh to place
-		meshlib: MeshLibrary containing the item
-		item_id: ID of item in MeshLibrary
-		asset_path: Path to scene/asset to place
-		settings: Placement settings dictionary
-		transform_state: Transform state to configure
-		undo_redo: EditorUndoRedoManager for undo/redo support
-		
-	Returns:
-		Dictionary: placement_data containing all placement state
-	"""
-	# Store placement data
 	var placement_data = {
 		"mesh": mesh,
 		"meshlib": meshlib,
@@ -86,12 +59,10 @@ func enter_placement_mode(
 		"dock_reference": null,
 		"undo_redo": undo_redo
 	}
-	
-	# Initialize managers for placement mode
+
 	_services.overlay_manager.initialize_overlays()
-	_services.overlay_manager.set_mode(1)  # PLACEMENT mode (compatible with both old and new enum)
-	
-	# Setup preview if we have something to place
+	_services.overlay_manager.set_mode(1)
+
 	if mesh:
 		_services.preview_manager.start_preview_mesh(mesh, settings)
 	elif meshlib and item_id >= 0:
@@ -100,41 +71,35 @@ func enter_placement_mode(
 			_services.preview_manager.start_preview_mesh(preview_mesh, settings)
 	elif asset_path != "":
 		_services.preview_manager.start_preview_asset(asset_path, settings)
-	
-	# Configure position manager for placement
+
 	if transform_state:
 		_services.position_manager.configure(transform_state, settings)
-	
-	# Configure smooth transformations
+
 	var smooth_enabled = settings.get("smooth_transforms", true)
 	var smooth_speed = settings.get("smooth_transform_speed", 8.0)
 	var smooth_config = {
 		"smooth_enabled": smooth_enabled,
 		"smooth_speed": smooth_speed
 	}
-	
+
 	_services.preview_manager.configure(smooth_config)
 	_services.smooth_transform_manager.configure(smooth_enabled, smooth_speed)
 	_services.rotation_manager.configure(transform_state, smooth_config)
-	
-	# Reset position manager for new placement
-	# Reset height and position offsets only if the corresponding settings are enabled
+
 	var reset_height = settings.get("reset_height_on_exit", false)
 	var reset_position = settings.get("reset_position_on_exit", false)
 	if transform_state:
 		_services.position_manager.reset_for_new_placement(transform_state, reset_height, reset_position)
-	
-	# Reset rotation for new placement (unless user wants to keep rotation)
+
 	if transform_state and not settings.get("keep_rotation_between_placements", false):
 		_services.rotation_manager.reset_all_rotation(transform_state)
-	
-	# Start in Position control mode (G) by default
+
 	if _services.control_mode_state:
 		_services.control_mode_state.switch_to_position_mode()
 		PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, "Auto-activated Position control (G) on placement mode entry")
-	
+
 	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Started placement mode")
-	
+
 	return placement_data
 
 func exit_placement_mode(
@@ -143,32 +108,18 @@ func exit_placement_mode(
 	end_callback: Callable,
 	settings: Dictionary
 ) -> void:
-	"""Clean up placement mode
-	
-	Args:
-		placement_data: Placement data dictionary
-		transform_state: Transform state to reset
-		end_callback: Callback to call when placement ends
-		settings: Settings dictionary for reset behavior
-	"""
-	# Clean up preview (this also unregisters from smooth transforms)
 	_services.preview_manager.cleanup_preview()
-	
-	# Call end callback if set
+
 	if end_callback.is_valid():
 		end_callback.call()
-	
-	# Reset transforms based on user settings
-	_reset_transforms_on_exit(transform_state, settings)
-	
-	# Hide and cleanup overlays
-	_services.overlay_manager.hide_transform_overlay()
-	_services.overlay_manager.set_mode(0)  # NONE mode (compatible with both old and new enum)
-	_services.overlay_manager.remove_grid_overlay()
-	
-	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Exited placement mode")
 
-## INPUT PROCESSING
+	_reset_transforms_on_exit(transform_state, settings)
+
+	_services.overlay_manager.hide_transform_overlay()
+	_services.overlay_manager.set_mode(0)
+	_services.overlay_manager.remove_grid_overlay()
+
+	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Exited placement mode")
 
 func process_input(
 	camera: Camera3D,
@@ -177,209 +128,140 @@ func process_input(
 	settings: Dictionary,
 	delta: float
 ) -> void:
-	"""Process input for placement mode
-	
-	Args:
-		camera: The 3D camera for raycasting
-		placement_data: Placement data dictionary
-		transform_state: Current transform state
-		settings: Current settings dictionary
-		delta: Frame delta time
-	"""
 	if not camera:
 		return
-	
-	# Process control mode transitions (G/R/L keys) and axis constraints (X/Y/Z keys)
-	_process_control_mode_input(placement_data, transform_state)
-	
-	# Get control mode state to determine input routing
-	var control_mode = _services.control_mode_state
-	var modal_active = control_mode.is_modal_active() if control_mode else false
-	
-	# Get input dictionaries (InputHandler already suppresses numeric taps when modal active)
-	var position_input = _services.input_handler.get_position_input()
-	var rotation_input = _services.input_handler.get_rotation_input()
-	var scale_input = _services.input_handler.get_scale_input()
-	var numeric_input = _services.input_handler.get_numeric_input()
-	var numeric_mgr = _services.numeric_input_manager
-	
-	# === INPUT ROUTING ===
-	# Simple rule: If modal active (G/R/L pressed), skip keyboard input tracking
-	# Otherwise, process keyboard input for numeric system and direct controls
-	
-	if not modal_active:
-		# Check for numeric input confirmation and application
-		if numeric_mgr.is_confirmed():
-			_apply_numeric_input(placement_data, transform_state, settings)
-			numeric_mgr.reset()
-		
-		# Track action key presses for numeric input system
-		_track_action_for_numeric_input(rotation_input, scale_input, position_input)
-	
-	# Update numeric input overlay if active
-	if numeric_mgr.is_active() and numeric_mgr.is_within_grace_period():
-		var action_name = numeric_mgr.get_action_display_name()
-		var input_string = numeric_mgr.get_input_string()
-		_services.overlay_manager.show_numeric_input(action_name, input_string)
-	
-	# If numeric input is active, skip normal input processing (except mouse/position tracking)
-	var skip_normal_input = numeric_mgr.is_active() and not numeric_mgr.is_confirmed()
-	
-	# Set half-step mode based on configured fine increment modifier
+
+	var router = _services.transform_action_router
+	if not router:
+		return
+
+	var preview_mesh = _services.preview_manager.get_preview_mesh()
+	var exclude_nodes: Array = []
+	if NodeUtils.is_valid(preview_mesh):
+		exclude_nodes.append(preview_mesh)
+
+	var router_result = router.process({
+		"mode": _services.mode_state_machine.get_current_mode() if _services.mode_state_machine else null,
+		"transform_state": transform_state,
+		"axis_origin": transform_state.position,
+		"numeric_metadata": {"mode": "placement"},
+		"position_modal_callback": Callable(self, "_handle_position_modal").bind(camera, transform_state, settings, exclude_nodes, preview_mesh),
+		"rotation_modal_callback": Callable(self, "_handle_rotation_modal").bind(camera, transform_state, settings, preview_mesh),
+		"scale_modal_callback": Callable(self, "_handle_scale_modal").bind(transform_state, settings, preview_mesh)
+	})
+
+	var position_input: PositionInputState = router_result.get("position_input")
+	if not position_input:
+		return
+
+	var numeric_controller = _services.numeric_input_controller
+	var numeric_was_confirmed: bool = router_result.get("numeric_was_confirmed", false)
+	if numeric_was_confirmed and numeric_controller:
+		_apply_numeric_input(placement_data, transform_state, settings)
+		numeric_controller.reset()
+
+	var skip_normal_input: bool = router_result.get("skip_normal_input", false)
+
 	var fine_modifier_held = position_input.fine_increment_modifier_held
 	_services.position_manager.set_use_half_step(fine_modifier_held)
 	transform_state.use_half_step = fine_modifier_held
-	
-	# Handle height adjustments (Q/E for quick vertical adjustments)
+
 	if not skip_normal_input:
 		_process_height_input(position_input, transform_state, settings)
-	
-	# Get mouse position and preview mesh
-	var mouse_pos = position_input.mouse_position
-	var preview_mesh = _services.preview_manager.get_preview_mesh()
-	
-	# IMPORTANT: Exclude preview mesh from collision detection to prevent self-collision
-	var exclude_nodes = []
-	if NodeUtils.is_valid(preview_mesh):
-		exclude_nodes.append(preview_mesh)
-	
-	# === MODAL CONTROL PROCESSING ===
-	# Process modal controls (G/R/L + mouse) when modal is active
-	const ControlModeState = preload("res://addons/simpleassetplacer/core/control_mode_state.gd")
-	
-	# Check if exclusive mode is enabled (modal_active already defined above)
-	var modal_exclusive = settings.get("modal_control_exclusive", true)
-	var should_lock_rotation = modal_active and modal_exclusive and control_mode.is_position_mode()
-	
-	if modal_active:
-		match control_mode.get_control_mode():
-			ControlModeState.ControlMode.POSITION:
-				# Position mode: Mouse controls position
-				# Store previous position for axis constraint
-				var prev_pos = _services.position_manager.get_current_position(transform_state)
-				
-				# Calculate new position based on axis constraints
-				var new_pos = Vector3.ZERO
-				
-				if control_mode.has_axis_constraint():
-					# Use plane intersection for constrained movement
-					new_pos = _calculate_constrained_position(camera, mouse_pos, prev_pos, control_mode)
-				else:
-					# No constraints: Use raycast for precise surface-based positioning
-					# This gives better control by snapping to actual geometry
-					new_pos = _services.position_manager.update_position_from_mouse(
-						transform_state, camera, mouse_pos, 1, false, exclude_nodes
-					)
-				
-				# Apply grid snapping if enabled (for modal G mode positioning)
-				# Pass fine modifier state for half-step sub-grid
-				if transform_state.snap_enabled or transform_state.snap_y_enabled:
-					var use_half_step = position_input.fine_increment_modifier_held
-					new_pos = TransformApplicator.apply_grid_snap(new_pos, transform_state, use_half_step)
-				
-				# Update transform state with new position
-				transform_state.position = new_pos
-				transform_state.target_position = new_pos
-				
-				# Update preview position
-				if preview_mesh:
-					preview_mesh.global_position = new_pos
-				
-				# Handle rotation updates based on modal state
-				if should_lock_rotation:
-					# G mode explicitly active with exclusive controls: Don't update rotation
-					pass
-				else:
-					# Normal mode OR non-exclusive: Update surface normal alignment if enabled
-					if settings.get("align_with_normal", false):
-						_services.rotation_manager.align_with_surface_normal(transform_state, _services.position_manager.get_surface_normal(transform_state))
-						# Apply rotation to preview
-						if preview_mesh:
-							TransformApplicator.apply_rotation_only(preview_mesh, transform_state)
-					else:
-						_services.rotation_manager.reset_surface_alignment(transform_state)
-			
-			ControlModeState.ControlMode.ROTATION:
-				# R mode: Mouse controls rotation
-				if not skip_normal_input:
-					_process_mouse_rotation(camera, mouse_pos, transform_state, settings)
-					
-					# Apply rotation to preview mesh immediately (bypass smooth transforms)
-					if preview_mesh:
-						TransformApplicator.apply_rotation_only(preview_mesh, transform_state)
-			
-			ControlModeState.ControlMode.SCALE:
-				# L mode: Mouse controls scale (vertical movement, per-axis or uniform)
-				if not skip_normal_input:
-					_process_mouse_scale(mouse_pos, transform_state, settings)
-					
-					# Apply scale to preview mesh immediately (bypass smooth transforms)
-					if preview_mesh:
-						var base_scale = transform_state.original_scale if transform_state.has("original_scale") else Vector3.ONE
-						TransformApplicator.apply_scale_only(preview_mesh, transform_state, base_scale)
-	
-	# Handle asset cycling (always available)
+
 	if not skip_normal_input:
 		process_asset_cycling_input(placement_data)
-	
-	# Handle placement action
+
 	if position_input.confirm_action:
-		# If numeric input is active, confirm it instead of placing
-		if numeric_mgr.is_active():
-			numeric_mgr.confirm_action()
+		if numeric_controller != null and numeric_controller.is_active():
+			numeric_controller.confirm_action()
 		else:
 			place_at_current_position(placement_data, transform_state)
-	
-	# Update overlays with current state
+
 	update_overlays(placement_data, transform_state)
 
-## CONTROL MODE MANAGEMENT
+## ROUTER CALLBACKS
 
-func _process_control_mode_input(placement_data: Dictionary, transform_state: TransformState) -> void:
-	"""Process control mode transitions (G/R/L) and axis constraints (X/Y/Z)
-	
-	This handles Blender-style modal controls:
-	- G = Position control mode
-	- R = Rotation control mode
-	- L = Scale control mode
-	- X/Y/Z = Axis constraint toggle (double-tap to disable)
-	"""
-	var control_input = _services.input_handler.get_control_mode_input()
+func _handle_position_modal(
+	position_input: PositionInputState,
+	camera: Camera3D,
+	transform_state: TransformState,
+	settings: Dictionary,
+	exclude_nodes: Array,
+	preview_mesh: Node3D
+) -> void:
+	if not camera:
+		return
 	var control_mode = _services.control_mode_state
-	var current_time = Time.get_ticks_msec() / 1000.0
-	
-	# Handle control mode transitions
-	if control_input.position_control_pressed:
-		control_mode.switch_to_position_mode()
-		PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, "Switched to Position control (G)")
-	elif control_input.rotation_control_pressed:
-		control_mode.switch_to_rotation_mode()
-		PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, "Switched to Rotation control (R)")
-	elif control_input.scale_control_pressed:
-		control_mode.switch_to_scale_mode()
-		PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, "Switched to Scale control (L)")
-	
-	# Handle axis constraints (X/Y/Z keys)
-	# Pass current position so it can be stored as constraint origin
-	var current_pos = transform_state.position
-	if control_input.axis_x_pressed:
-		control_mode.process_axis_key_press("X", current_time, current_pos)
-	elif control_input.axis_y_pressed:
-		control_mode.process_axis_key_press("Y", current_time, current_pos)
-	elif control_input.axis_z_pressed:
-		control_mode.process_axis_key_press("Z", current_time, current_pos)
+	if not control_mode:
+		return
+
+	var prev_pos = _services.position_manager.get_current_position(transform_state)
+	var new_pos = Vector3.ZERO
+	if control_mode.has_axis_constraint():
+		new_pos = _calculate_constrained_position(camera, position_input.mouse_position, prev_pos, control_mode)
+	else:
+		new_pos = _services.position_manager.update_position_from_mouse(transform_state, camera, position_input.mouse_position, 1, false, exclude_nodes)
+
+	if transform_state.snap_enabled or transform_state.snap_y_enabled:
+		new_pos = TransformApplicator.apply_grid_snap(new_pos, transform_state, position_input.fine_increment_modifier_held)
+
+	transform_state.position = new_pos
+	transform_state.target_position = new_pos
+	if preview_mesh:
+		preview_mesh.global_position = new_pos
+
+	var modal_exclusive = settings.get("modal_control_exclusive", true)
+	var should_lock_rotation = modal_exclusive and control_mode.is_position_mode()
+	if should_lock_rotation:
+		return
+
+	if settings.get("align_with_normal", false):
+		var surface_normal = _services.position_manager.get_surface_normal(transform_state)
+		_services.rotation_manager.align_with_surface_normal(transform_state, surface_normal)
+		if preview_mesh:
+			TransformApplicator.apply_rotation_only(preview_mesh, transform_state)
+	else:
+		_services.rotation_manager.reset_surface_alignment(transform_state)
+
+func _handle_rotation_modal(
+	position_input: PositionInputState,
+	rotation_input: RotationInputState,
+	camera: Camera3D,
+	transform_state: TransformState,
+	settings: Dictionary,
+	preview_mesh: Node3D
+) -> void:
+	if not camera:
+		return
+	_process_mouse_rotation(camera, position_input.mouse_position, transform_state, settings)
+	if preview_mesh:
+		TransformApplicator.apply_rotation_only(preview_mesh, transform_state)
+
+func _handle_scale_modal(
+	position_input: PositionInputState,
+	scale_input: ScaleInputState,
+	transform_state: TransformState,
+	settings: Dictionary,
+	preview_mesh: Node3D
+) -> void:
+	_process_mouse_scale(position_input.mouse_position, transform_state, settings)
+	if preview_mesh:
+		var base_scale = transform_state.get_meta("original_scale") if transform_state.has_meta("original_scale") else Vector3.ONE
+		TransformApplicator.apply_scale_only(preview_mesh, transform_state, base_scale)
 
 ## INPUT HELPERS
 
+
 func _process_height_input(
-	position_input: Dictionary,
+	position_input: PositionInputState,
 	transform_state: TransformState,
 	settings: Dictionary
 ) -> void:
 	"""Process height adjustment input
 	
 	Args:
-		position_input: Position input dictionary from InputHandler
+		position_input: Position input state from InputHandler
 		transform_state: Transform state to modify
 		settings: Settings dictionary
 	"""
@@ -433,11 +315,11 @@ func _process_mouse_rotation(
 		return
 	
 	# Store previous mouse position for delta calculation
-	if not transform_state.has("_prev_mouse_pos"):
-		transform_state.set("_prev_mouse_pos", mouse_pos)
+	if not transform_state.has_meta("_prev_mouse_pos"):
+		transform_state.set_meta("_prev_mouse_pos", mouse_pos)
 		return
 	
-	var prev_mouse_pos = transform_state.get("_prev_mouse_pos")
+	var prev_mouse_pos = transform_state.get_meta("_prev_mouse_pos")
 	var mouse_delta = mouse_pos - prev_mouse_pos
 	
 	# Cursor warping: If mouse is near screen edges, warp to center
@@ -466,9 +348,9 @@ func _process_mouse_rotation(
 		Input.warp_mouse(warp_target_global)
 		
 		# Update tracking to new position (prevents jump in delta)
-		transform_state.set("_prev_mouse_pos", warp_target_local)
+		transform_state.set_meta("_prev_mouse_pos", warp_target_local)
 	else:
-		transform_state.set("_prev_mouse_pos", mouse_pos)
+		transform_state.set_meta("_prev_mouse_pos", mouse_pos)
 	
 	# Determine which axis to rotate around
 	# In rotation mode, axis constraints specify which axis to rotate around
@@ -569,11 +451,11 @@ func _process_mouse_scale(
 	var viewport = _services.editor_facade.get_editor_viewport_3d(0)
 	
 	# Store previous mouse position for delta calculation
-	if not transform_state.has("_prev_mouse_pos_scale"):
-		transform_state.set("_prev_mouse_pos_scale", mouse_pos)
+	if not transform_state.has_meta("_prev_mouse_pos_scale"):
+		transform_state.set_meta("_prev_mouse_pos_scale", mouse_pos)
 		return
 	
-	var prev_mouse_pos = transform_state.get("_prev_mouse_pos_scale")
+	var prev_mouse_pos = transform_state.get_meta("_prev_mouse_pos_scale")
 	var mouse_delta = mouse_pos - prev_mouse_pos
 	
 	# Cursor warping: If mouse is near screen edges, warp to center
@@ -601,11 +483,11 @@ func _process_mouse_scale(
 			# Warp cursor using global screen coordinates
 			Input.warp_mouse(warp_target_global)
 			
-			transform_state.set("_prev_mouse_pos_scale", warp_target_local)
+			transform_state.set_meta("_prev_mouse_pos_scale", warp_target_local)
 		else:
-			transform_state.set("_prev_mouse_pos_scale", mouse_pos)
+			transform_state.set_meta("_prev_mouse_pos_scale", mouse_pos)
 	else:
-		transform_state.set("_prev_mouse_pos_scale", mouse_pos)
+		transform_state.set_meta("_prev_mouse_pos_scale", mouse_pos)
 	
 	# Calculate scale change based on vertical mouse movement
 	# Sensitivity: pixels to scale factor
@@ -859,85 +741,35 @@ func _reset_transforms_on_exit(transform_state: TransformState, settings: Dictio
 	# Always reset surface alignment when exiting modes
 	_services.rotation_manager.reset_surface_alignment(transform_state)
 
-## Numeric Input Integration
-
-func _track_action_for_numeric_input(rotation_input: Dictionary, scale_input: Dictionary, position_input: Dictionary) -> void:
-	"""Track when action keys are TAPPED (not held) to set context for numeric input.
-	The numeric input will only activate when user actually types a number.
-	
-	IMPORTANT CONTEXT-AWARE ROUTING:
-	- In Position mode (G): X/Y/Z are axis constraints ONLY (no numeric input)
-	- In Rotation mode (R): X/Y/Z trigger numeric rotation input (+ axis constraints)
-	- In Scale mode (L): X/Y/Z trigger numeric scale input (+ axis constraints)
-	- When no modal active: X/Y/Z trigger rotation numeric input
-	"""
-	var numeric_mgr = _services.numeric_input_manager
-	if not numeric_mgr:
-		return
-	
-	# Check current control mode to determine X/Y/Z behavior
-	var control_mode = _services.control_mode_state
-	var is_position_mode = control_mode.is_position_mode() if control_mode else false
-	
-	var ActionType = NumericInputManager.ActionType
-	
-	# Track rotation actions (only on tap, not on hold/repeat)
-	# X/Y/Z keys for numeric input - BUT skip in Position mode (they're pure axis constraints there)
-	if not is_position_mode:
-		if rotation_input.get("x_tapped", false):
-			numeric_mgr.set_action_context(ActionType.ROTATE_X)
-		elif rotation_input.get("y_tapped", false):
-			numeric_mgr.set_action_context(ActionType.ROTATE_Y)
-		elif rotation_input.get("z_tapped", false):
-			numeric_mgr.set_action_context(ActionType.ROTATE_Z)
-	
-	# Track scale actions (only on tap, not on hold/repeat)
-	elif scale_input.get("up_tapped", false) or scale_input.get("down_tapped", false):
-		numeric_mgr.set_action_context(ActionType.SCALE)
-	
-	# Track height actions (only on tap, not on hold/repeat)
-	elif position_input.get("height_up_tapped", false) or position_input.get("height_down_tapped", false):
-		numeric_mgr.set_action_context(ActionType.HEIGHT)
-	
-	# Track position actions (only on tap, not on hold/repeat)
-	elif position_input.get("position_forward_tapped", false):
-		numeric_mgr.set_action_context(ActionType.POSITION_FORWARD)
-	elif position_input.get("position_backward_tapped", false):
-		numeric_mgr.set_action_context(ActionType.POSITION_BACKWARD)
-	elif position_input.get("position_left_tapped", false):
-		numeric_mgr.set_action_context(ActionType.POSITION_LEFT)
-	elif position_input.get("position_right_tapped", false):
-		numeric_mgr.set_action_context(ActionType.POSITION_RIGHT)
-
 func _apply_numeric_input(placement_data: Dictionary, transform_state: TransformState, settings: Dictionary) -> void:
 	"""Apply the confirmed numeric input value to the transformation"""
-	var numeric_mgr = _services.numeric_input_manager
-	if not numeric_mgr or not numeric_mgr.is_active():
+	var numeric_controller = _services.numeric_input_controller
+	if not numeric_controller or not numeric_controller.is_active():
 		return
 	
-	var action = numeric_mgr.get_active_action()
-	var ActionType = NumericInputManager.ActionType
+	var action = numeric_controller.get_active_action()
+	var ActionType = numeric_controller.action_types()
 	var preview_mesh = _services.preview_manager.get_preview_mesh()
 	
 	match action:
 		ActionType.ROTATE_X, ActionType.ROTATE_Y, ActionType.ROTATE_Z:
-			_apply_numeric_rotation(action, numeric_mgr, preview_mesh, transform_state)
+			_apply_numeric_rotation(action, numeric_controller, preview_mesh, transform_state)
 		
 		ActionType.SCALE:
-			_apply_numeric_scale(numeric_mgr, preview_mesh, transform_state)
+			_apply_numeric_scale(numeric_controller, preview_mesh, transform_state)
 		
 		ActionType.HEIGHT:
-			_apply_numeric_height(numeric_mgr, transform_state)
+			_apply_numeric_height(numeric_controller, transform_state)
 		
 		ActionType.POSITION_FORWARD, ActionType.POSITION_BACKWARD, ActionType.POSITION_LEFT, ActionType.POSITION_RIGHT:
-			_apply_numeric_position(action, numeric_mgr, transform_state)
+			_apply_numeric_position(action, numeric_controller, transform_state)
 
-func _apply_numeric_rotation(action, numeric_mgr, preview_mesh: Node3D, transform_state: TransformState) -> void:
+func _apply_numeric_rotation(action, numeric_controller, preview_mesh: Node3D, transform_state: TransformState) -> void:
 	"""Apply numeric input to rotation"""
 	if not preview_mesh:
 		return
 	
-	var ActionType = NumericInputManager.ActionType
+	var ActionType = numeric_controller.action_types()
 	var axis = ""
 	match action:
 		ActionType.ROTATE_X:
@@ -954,7 +786,7 @@ func _apply_numeric_rotation(action, numeric_mgr, preview_mesh: Node3D, transfor
 	var current_rotation_deg = rad_to_deg(preview_mesh.rotation[axis.to_lower()])
 	
 	# Apply numeric value
-	var new_rotation_deg = numeric_mgr.apply_to_value(current_rotation_deg)
+	var new_rotation_deg = numeric_controller.apply_to_value(current_rotation_deg)
 	var rotation_step = new_rotation_deg - current_rotation_deg
 	
 	# Apply the rotation
@@ -962,10 +794,10 @@ func _apply_numeric_rotation(action, numeric_mgr, preview_mesh: Node3D, transfor
 	if preview_mesh:
 		TransformApplicator.apply_rotation_only(preview_mesh, transform_state)
 
-func _apply_numeric_scale(numeric_mgr, preview_mesh: Node3D, transform_state: TransformState) -> void:
+func _apply_numeric_scale(numeric_controller, preview_mesh: Node3D, transform_state: TransformState) -> void:
 	"""Apply numeric input to scale"""
 	var current_scale = _services.scale_manager.get_scale(transform_state)
-	var new_scale = numeric_mgr.apply_to_value(current_scale)
+	var new_scale = numeric_controller.apply_to_value(current_scale)
 	
 	# Set the scale directly
 	_services.scale_manager.set_scale_multiplier(transform_state, new_scale)
@@ -974,20 +806,20 @@ func _apply_numeric_scale(numeric_mgr, preview_mesh: Node3D, transform_state: Tr
 	if preview_mesh:
 		TransformApplicator.apply_scale_only(preview_mesh, transform_state)
 
-func _apply_numeric_height(numeric_mgr, transform_state: TransformState) -> void:
+func _apply_numeric_height(numeric_controller, transform_state: TransformState) -> void:
 	"""Apply numeric input to height"""
 	var current_height = transform_state.height_offset
-	var new_height = numeric_mgr.apply_to_value(current_height)
+	var new_height = numeric_controller.apply_to_value(current_height)
 	
 	# Set height offset directly
 	transform_state.height_offset = new_height
 
-func _apply_numeric_position(action, numeric_mgr, transform_state: TransformState) -> void:
+func _apply_numeric_position(action, numeric_controller, transform_state: TransformState) -> void:
 	"""Apply numeric input to position offset"""
-	var ActionType = NumericInputManager.ActionType
+	var ActionType = numeric_controller.action_types()
 	
-	var value = numeric_mgr.get_numeric_value()
-	if numeric_mgr.get_prefix_mode() == NumericInputManager.PrefixMode.ABSOLUTE:
+	var value = numeric_controller.get_numeric_value()
+	if numeric_controller.get_prefix_mode() == numeric_controller.prefix_modes().ABSOLUTE:
 		# Absolute positioning
 		match action:
 			ActionType.POSITION_FORWARD, ActionType.POSITION_BACKWARD:
@@ -997,7 +829,7 @@ func _apply_numeric_position(action, numeric_mgr, transform_state: TransformStat
 	else:
 		# Relative positioning
 		var delta = value
-		if numeric_mgr.get_prefix_mode() == NumericInputManager.PrefixMode.RELATIVE_SUB:
+		if numeric_controller.get_prefix_mode() == numeric_controller.prefix_modes().RELATIVE_SUB:
 			delta = -delta
 		
 		match action:

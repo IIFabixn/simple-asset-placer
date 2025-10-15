@@ -15,7 +15,7 @@ class_name ToolbarButtons
 @onready var reset_transforms_button: Button = $ResetTransformsButton
 
 # Forward reference to managers
-const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placement/placement_strategy_manager.gd")
+const PlacementStrategyService = preload("res://addons/simpleassetplacer/placement/placement_strategy_service.gd")
 const SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
 const PlacementSettings = preload("res://addons/simpleassetplacer/ui/placement_settings.gd")
 const PositionManager = preload("res://addons/simpleassetplacer/managers/position_manager.gd")
@@ -32,10 +32,16 @@ var _coordinator: TransformationCoordinator = null
 
 # ServiceRegistry instance (injected)
 var _services: ServiceRegistry = null
+var _placement_service: PlacementStrategyService = null
 
 func set_services(services: ServiceRegistry) -> void:
 	"""Inject ServiceRegistry for access to manager instances"""
 	_services = services
+	if services and services.placement_strategy_service:
+		_placement_service = services.placement_strategy_service
+	else:
+		_placement_service = PlacementStrategyService.new()
+		_placement_service.initialize()
 
 func _ready() -> void:
 	# Initialize button states FIRST before connecting signals (prevents spurious toggle events)
@@ -52,7 +58,7 @@ func _on_placement_mode_pressed() -> void:
 		_update_placement_mode_button()
 	else:
 		# Fallback if reference not set
-		PlacementStrategyManager.cycle_strategy()
+		_get_service().cycle_strategy()
 		_update_placement_mode_button()
 
 func _on_grid_snap_toggled(toggled_on: bool) -> void:
@@ -144,7 +150,7 @@ func _update_placement_mode_button() -> void:
 	if not placement_mode_button:
 		return
 	
-	var strategy_type = PlacementStrategyManager.get_active_strategy_type()
+	var strategy_type = _get_service().get_active_strategy_type()
 	
 	# Update icon based on strategy type
 	if strategy_type == "collision":
@@ -325,3 +331,9 @@ func _initialize_buttons() -> void:
 		transform_mode_button.toggled.connect(_on_transform_mode_toggled)
 	if reset_transforms_button:
 		reset_transforms_button.pressed.connect(_on_reset_transforms_pressed)
+
+func _get_service() -> PlacementStrategyService:
+	if not _placement_service:
+		_placement_service = PlacementStrategyService.new()
+		_placement_service.initialize()
+	return _placement_service

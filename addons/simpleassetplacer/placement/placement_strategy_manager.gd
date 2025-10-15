@@ -32,40 +32,32 @@ const PlacementStrategy = preload("res://addons/simpleassetplacer/placement/plac
 const CollisionPlacementStrategy = preload("res://addons/simpleassetplacer/placement/collision_placement_strategy.gd")
 const PlanePlacementStrategy = preload("res://addons/simpleassetplacer/placement/plane_placement_strategy.gd")
 
-# Strategy instances
-static var collision_strategy: CollisionPlacementStrategy = null
-static var plane_strategy: PlanePlacementStrategy = null
+const PlacementStrategyService = preload("res://addons/simpleassetplacer/placement/placement_strategy_service.gd")
 
-# Active strategy
-static var active_strategy: PlacementStrategy = null
-static var active_strategy_type: String = "collision"
+static var _service: PlacementStrategyService = null
 
-# Configuration
-static var config: Dictionary = {}
+static func set_service(service: PlacementStrategyService) -> void:
+	"""Assign the shared placement strategy service (for DI)"""
+	_service = service
+
+static func _ensure_service() -> PlacementStrategyService:
+	if not _service:
+		_service = PlacementStrategyService.new()
+		_service.initialize()
+	return _service
 
 ## Initialization
 
 static func initialize():
 	"""Initialize all placement strategies"""
-	if not collision_strategy:
-		collision_strategy = CollisionPlacementStrategy.new()
-	
-	if not plane_strategy:
-		plane_strategy = PlanePlacementStrategy.new()
-	
-	# Default to collision strategy
-	if not active_strategy:
-		active_strategy = collision_strategy
-		active_strategy_type = "collision"
-	
-	PluginLogger.info(PluginConstants.COMPONENT_POSITION, "PlacementStrategyManager initialized")
+	_ensure_service().initialize()
+	PluginLogger.info(PluginConstants.COMPONENT_POSITION, "PlacementStrategyManager initialized (service-backed)")
 
 static func cleanup():
 	"""Clean up strategy instances"""
-	collision_strategy = null
-	plane_strategy = null
-	active_strategy = null
-	config.clear()
+	if _service:
+		_service.cleanup()
+	_service = null
 
 ## Strategy Selection
 
@@ -78,40 +70,15 @@ static func set_strategy(strategy_type: String) -> bool:
 	Returns:
 		true if strategy was changed, false if invalid type or already active
 	"""
-	# Ensure strategies are initialized
-	if not collision_strategy or not plane_strategy:
-		initialize()
-	
-	var normalized_type = strategy_type.to_lower()
-	
-	# Check if already using this strategy (avoid spam)
-	if active_strategy_type == normalized_type:
-		return false  # No change needed
-	
-	match normalized_type:
-		"collision":
-			active_strategy = collision_strategy
-			active_strategy_type = "collision"
-			PluginLogger.info(PluginConstants.COMPONENT_POSITION, "Switched to collision placement strategy")
-			return true
-		"plane":
-			active_strategy = plane_strategy
-			active_strategy_type = "plane"
-			PluginLogger.info(PluginConstants.COMPONENT_POSITION, "Switched to plane placement strategy")
-			return true
-		_:
-			PluginLogger.warning(PluginConstants.COMPONENT_POSITION, "Invalid strategy type: " + strategy_type)
-			return false
+	return _ensure_service().set_strategy(strategy_type)
 
 static func get_active_strategy_type() -> String:
 	"""Get the type identifier of the active strategy"""
-	return active_strategy_type
+	return _ensure_service().get_active_strategy_type()
 
 static func get_active_strategy_name() -> String:
 	"""Get the human-readable name of the active strategy"""
-	if active_strategy:
-		return active_strategy.get_strategy_name()
-	return "None"
+	return _ensure_service().get_active_strategy_name()
 
 static func cycle_strategy() -> String:
 	"""Cycle to the next placement strategy
@@ -119,24 +86,7 @@ static func cycle_strategy() -> String:
 	Returns:
 		The new active strategy type
 	"""
-	# Ensure strategies are initialized
-	if not collision_strategy or not plane_strategy:
-		initialize()
-	
-	# Cycle: collision -> plane -> collision
-	var new_strategy = ""
-	match active_strategy_type:
-		"collision":
-			new_strategy = "plane"
-		"plane":
-			new_strategy = "collision"
-		_:
-			# Default to collision if unknown
-			new_strategy = "collision"
-	
-	set_strategy(new_strategy)
-	
-	return new_strategy
+	return _ensure_service().cycle_strategy()
 
 ## Configuration
 
@@ -151,22 +101,7 @@ static func configure(settings: Dictionary):
 			- snap_to_ground: Legacy setting (maps to collision strategy)
 			- And other strategy-specific settings
 	"""
-	config = settings
-	
-	# Ensure strategies are initialized
-	if not collision_strategy or not plane_strategy:
-		initialize()
-	
-	# Determine which strategy to use (defaults to collision)
-	var strategy_type = settings.get("placement_strategy", "collision")
-	
-	# Only set strategy if it actually changed (avoids redundant logging)
-	if strategy_type != active_strategy_type:
-		set_strategy(strategy_type)
-	
-	# Configure both strategies (so switching is seamless)
-	collision_strategy.configure(settings)
-	plane_strategy.configure(settings)
+	_ensure_service().configure(settings)
 
 ## Position Calculation
 
@@ -181,21 +116,7 @@ static func calculate_position(from: Vector3, to: Vector3, additional_config: Di
 	Returns:
 		PlacementResult with position, normal, and metadata
 	"""
-	# Ensure we have an active strategy
-	if not active_strategy:
-		initialize()
-	
-	# Merge additional config with base config
-	var merged_config = config.duplicate()
-	for key in additional_config:
-		merged_config[key] = additional_config[key]
-	
-	# Debug: Log which strategy is being used and if exclusions are present
-	var strategy_name = "Collision" if active_strategy == collision_strategy else "Plane"
-	var exclude_count = merged_config.get("exclude_nodes", []).size()
-	
-	# Delegate to active strategy with merged config
-	return active_strategy.calculate_position(from, to, merged_config)
+	return _ensure_service().calculate_position(from, to, additional_config)
 
 static func calculate_position_with_strategy(from: Vector3, to: Vector3, strategy_type: String) -> PlacementStrategy.PlacementResult:
 	"""Calculate position using a specific strategy (without changing active strategy)
@@ -208,64 +129,31 @@ static func calculate_position_with_strategy(from: Vector3, to: Vector3, strateg
 	Returns:
 		PlacementResult from specified strategy
 	"""
-	# Ensure strategies are initialized
-	if not collision_strategy or not plane_strategy:
-		initialize()
-	
-	match strategy_type.to_lower():
-		"collision":
-			return collision_strategy.calculate_position(from, to, config)
-		"plane":
-			return plane_strategy.calculate_position(from, to, config)
-		_:
-			PluginLogger.warning(PluginConstants.COMPONENT_POSITION, "Invalid strategy type for calculation: " + strategy_type)
-			return PlacementStrategy.PlacementResult.new()
+	return _ensure_service().calculate_position_with_strategy(from, to, strategy_type)
 
 ## Strategy Access
 
+
 static func get_collision_strategy() -> CollisionPlacementStrategy:
-	"""Get collision strategy instance"""
-	if not collision_strategy:
-		initialize()
-	return collision_strategy
+	return _ensure_service().get_collision_strategy()
 
 static func get_plane_strategy() -> PlanePlacementStrategy:
 	"""Get plane strategy instance"""
-	if not plane_strategy:
-		initialize()
-	return plane_strategy
+	return _ensure_service().get_plane_strategy()
 
 ## Utility
 
 static func reset_all_strategies():
 	"""Reset all strategies to default state"""
-	if collision_strategy:
-		collision_strategy.reset()
-	if plane_strategy:
-		plane_strategy.reset()
+	_ensure_service().reset_all_strategies()
 
 static func get_available_strategies() -> Array:
 	"""Get list of available strategy types"""
-	return ["collision", "plane"]
+	return _ensure_service().get_available_strategies()
 
 static func get_strategy_info() -> Dictionary:
 	"""Get information about all available strategies"""
-	if not collision_strategy or not plane_strategy:
-		initialize()
-	
-	return {
-		"active": active_strategy_type,
-		"strategies": {
-			"collision": {
-				"name": collision_strategy.get_strategy_name(),
-				"type": collision_strategy.get_strategy_type()
-			},
-			"plane": {
-				"name": plane_strategy.get_strategy_name(),
-				"type": plane_strategy.get_strategy_type()
-			}
-		}
-	}
+	return _ensure_service().get_strategy_info()
 
 
 

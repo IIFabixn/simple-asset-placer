@@ -84,6 +84,12 @@ func get_rotation_offset_degrees(state: TransformState) -> Vector3:
 		rad_to_deg(state.manual_rotation_offset.z)
 	)
 
+func get_current_rotation(state: TransformState) -> Vector3:
+	"""Return combined surface alignment and manual rotation."""
+	if not state:
+		return Vector3.ZERO
+	return state.surface_alignment_rotation + state.manual_rotation_offset
+
 func reset_rotation(state: TransformState):
 	"""Reset manual rotation offset to zero (keeps surface alignment)"""
 	state.manual_rotation_offset = Vector3.ZERO

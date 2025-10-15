@@ -10,6 +10,7 @@ const SettingsDefinition = preload("res://addons/simpleassetplacer/settings/sett
 const SettingsUIBuilder = preload("res://addons/simpleassetplacer/settings/settings_ui_builder.gd")
 const SettingsPersistence = preload("res://addons/simpleassetplacer/settings/settings_persistence.gd")
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
+const PlacementStrategyService = preload("res://addons/simpleassetplacer/placement/placement_strategy_service.gd")
 
 signal settings_changed()
 signal cache_cleared()
@@ -102,6 +103,15 @@ var cycle_placement_mode_key: String = "P"
 # Asset Cycling Settings
 var cycle_next_asset_key: String = "BRACKETRIGHT"
 var cycle_previous_asset_key: String = "BRACKETLEFT"
+
+var _placement_service: PlacementStrategyService = null
+
+func set_placement_strategy_service(service: PlacementStrategyService) -> void:
+	"""Inject placement strategy service for instance-based operations"""
+	_placement_service = service
+	if not _placement_service:
+		_placement_service = PlacementStrategyService.new()
+		_placement_service.initialize()
 
 func _ready():
 	# Ensure this control expands to fill available space
@@ -359,7 +369,7 @@ func toggle_random_rotation(enabled: bool) -> void:
 func cycle_placement_strategy() -> String:
 	"""Cycle through placement strategies (collision/plane)"""
 	# Cycle the strategy
-	var new_strategy = PlacementStrategyManager.cycle_strategy()
+	var new_strategy = _get_service().cycle_strategy()
 	
 	# Update our property to match
 	placement_strategy = new_strategy
@@ -379,6 +389,12 @@ func cycle_placement_strategy() -> String:
 	settings_changed.emit()
 	
 	return new_strategy
+
+func _get_service() -> PlacementStrategyService:
+	if not _placement_service:
+		_placement_service = PlacementStrategyService.new()
+		_placement_service.initialize()
+	return _placement_service
 
 
 

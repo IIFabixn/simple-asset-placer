@@ -8,8 +8,8 @@ class_name SettingsManager
 # Import utilities
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
 const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
-const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
-const SmoothTransformManager = preload("res://addons/simpleassetplacer/managers/smooth_transform_manager.gd")
+const SettingsStorage = preload("res://addons/simpleassetplacer/settings/settings_storage.gd")
+const SettingsValidator = preload("res://addons/simpleassetplacer/settings/settings_validator.gd")
 
 ## Settings Storage
 
@@ -27,110 +27,29 @@ static var _cache_dirty: bool = true
 
 static func get_default_settings() -> Dictionary:
 	"""Get default plugin settings"""
-	return {
-		# Key bindings
-		"cancel_key": "ESCAPE",
-		"transform_mode_key": "TAB",
-		"height_up_key": "Q", 
-		"height_down_key": "E",
-		"reset_height_key": "R",
-		"position_left_key": "A",
-		"position_right_key": "D",
-		"position_forward_key": "W",
-		"position_backward_key": "S",
-		"reset_position_key": "C",
-		"rotate_x_key": "X",
-		"rotate_y_key": "Y", 
-		"rotate_z_key": "Z",
-		"reset_rotation_key": "T",
-		"scale_up_key": "PAGE_UP",
-		"scale_down_key": "PAGE_DOWN",
-		"scale_reset_key": "HOME",
-		"reverse_modifier_key": "SHIFT",
-		"large_increment_modifier_key": "CTRL",
-		
-		# Asset cycling keys
-		"cycle_next_asset_key": "BRACKETRIGHT",  # ] key
-		"cycle_previous_asset_key": "BRACKETLEFT",  # [ key
-		
-		# Placement behavior
-		"placement_strategy": "collision",  # 'collision' or 'plane'
-		"snap_to_grid": false,
-		"randomize_rotation": false,
-		"randomize_scale": false,
-		
-		# Visual settings
-		"preview_opacity": PluginConstants.DEFAULT_PREVIEW_OPACITY,
-		"show_grid": true,
-		"show_overlay": true,
-		
-		# Increment sizes
-		"height_step_size": PluginConstants.DEFAULT_HEIGHT_STEP,
-		"rotation_increment": PluginConstants.DEFAULT_ROTATION_INCREMENT,
-		"scale_increment": PluginConstants.DEFAULT_SCALE_INCREMENT,
-		"position_increment": PluginConstants.DEFAULT_POSITION_INCREMENT,
-		"grid_size": PluginConstants.DEFAULT_GRID_SIZE,
-		
-		# Advanced
-		"use_surface_normal": true,
-		"auto_select_placed": true,
-		
-		# Reset behavior on exit
-		"reset_height_on_exit": false,
-		"reset_position_on_exit": false,
-		"reset_scale_on_exit": false,
-		"reset_rotation_on_exit": false,
-		
-		# Last used selections (for restoring state)
-		"last_meshlib_path": "",
-		"last_model_category": "",
-		"last_meshlib_category": "",
-
-		# --- New unified snapping keys (legacy compatibility preserved) ---
-		# Position snapping (legacy keys snap_to_grid + grid_size still honored elsewhere)
-		"snap_enabled": false,
-		"snap_step": 1.0,
-		# Rotation snapping
-		"snap_rotation_enabled": false,
-		"snap_rotation_step": 15.0,
-		# Scale snapping
-		"snap_scale_enabled": false,
-		"snap_scale_step": 0.1,
-	}
+	return SettingsStorage.get_default_settings().duplicate(true)
 
 ## Initialization
 
 static func initialize() -> void:
 	"""Initialize settings manager with defaults"""
-	_plugin_settings = get_default_settings()
+	_plugin_settings = SettingsStorage.load_from_editor_settings().duplicate(true)
 	_dock_settings = {}
-	_load_from_editor_settings()  # Load from EditorSettings to sync with UI
+	_combined_cache = {}
 	_cache_dirty = true
-	
-	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "SettingsManager initialized")
+
+	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "SettingsManager initialized via SettingsStorage")
 
 static func _load_from_editor_settings():
 	"""Load plugin settings from Godot's EditorSettings (same source as UI)"""
-	var editor_settings = EditorInterface.get_editor_settings()
-	
-	# Import from settings definitions to ensure we get all UI-configurable settings
-	const SettingsDefinition = preload("res://addons/simpleassetplacer/settings/settings_definition.gd")
-	var all_settings = SettingsDefinition.get_all_settings()
-	
-	for setting_meta in all_settings:
-		if editor_settings.has_setting(setting_meta.editor_key):
-			var value = editor_settings.get_setting(setting_meta.editor_key)
-			_plugin_settings[setting_meta.id] = value
-		# If not found in EditorSettings, keep the default value
-	
-	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Settings loaded from EditorSettings")
+	_plugin_settings = SettingsStorage.load_from_editor_settings().duplicate(true)
+	_cache_dirty = true
+	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "SettingsManager: Plugin settings refreshed from EditorSettings via SettingsStorage")
 
 static func reload_from_editor_settings():
 	"""Reload settings from EditorSettings and invalidate cache (for real-time updates)"""
 	_load_from_editor_settings()
-	_cache_dirty = true
-	
-	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Settings reloaded from EditorSettings")
+	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "SettingsManager reloaded from EditorSettings")
 
 static func load_from_editor_settings(facade: Object) -> Dictionary:
 	"""Load settings from EditorSettings via EditorFacade
@@ -154,42 +73,27 @@ static func load_from_editor_settings(facade: Object) -> Dictionary:
 
 static func load_from_file(config_path: String = "user://simpleassetplacer_settings.cfg") -> bool:
 	"""Load settings from ConfigFile"""
-	var config = ConfigFile.new()
-	var err = config.load(config_path)
-	
-	if err != OK:
-		PluginLogger.warning(PluginConstants.COMPONENT_MAIN, 
-			"Could not load settings from: " + config_path + " (using defaults)")
-		_plugin_settings = get_default_settings()
-		return false
-	
-	# Load settings from config file
-	_plugin_settings = get_default_settings()  # Start with defaults
-	
-	for key in _plugin_settings.keys():
-		if config.has_section_key("settings", key):
-			_plugin_settings[key] = config.get_value("settings", key)
-	
+	var result := SettingsStorage.load_from_file(config_path)
+	var loaded_settings: Dictionary = result.get("settings", get_default_settings())
+	_plugin_settings = loaded_settings.duplicate(true)
 	_cache_dirty = true
-	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Settings loaded from: " + config_path)
-	return true
+
+	var success: bool = result.get("success", false)
+	if success:
+		PluginLogger.info(PluginConstants.COMPONENT_MAIN, "SettingsManager loaded plugin settings from file: %s" % config_path)
+	else:
+		PluginLogger.warning(PluginConstants.COMPONENT_MAIN, "SettingsManager fallback to defaults; failed to load %s" % config_path)
+
+	return success
 
 static func save_to_file(config_path: String = "user://simpleassetplacer_settings.cfg") -> bool:
 	"""Save settings to ConfigFile"""
-	var config = ConfigFile.new()
-	
-	# Save all plugin settings
-	for key in _plugin_settings.keys():
-		config.set_value("settings", key, _plugin_settings[key])
-	
-	var err = config.save(config_path)
-	if err != OK:
-		PluginLogger.error(PluginConstants.COMPONENT_MAIN, 
-			"Failed to save settings to: " + config_path)
-		return false
-	
-	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Settings saved to: " + config_path)
-	return true
+	var success := SettingsStorage.save_to_file(_plugin_settings, config_path)
+	if success:
+		PluginLogger.info(PluginConstants.COMPONENT_MAIN, "SettingsManager saved plugin settings to file: %s" % config_path)
+	else:
+		PluginLogger.error(PluginConstants.COMPONENT_MAIN, "SettingsManager failed to persist settings to file: %s" % config_path)
+	return success
 
 ## Settings Access
 
@@ -326,180 +230,63 @@ static func set_key_binding(action_name: String, key: String) -> void:
 
 ## Validation
 
-static func validate_setting(key: String, value: Variant) -> Dictionary:
+static func validate_setting(key: String, value: Variant, auto_clamp: bool = true) -> Dictionary:
 	"""
-	Validate a single setting value.
-	
-	Returns: {valid: bool, error: String, clamped_value: Variant}
-	- valid: Whether the value is acceptable
-	- error: Human-readable error message (empty if valid)
-	- clamped_value: Value clamped to valid range (if applicable)
+	Validate a single setting using SettingsValidator.
+
+	Returns: {valid: bool, error: String, clamped_value: Variant, issues: Array}
 	"""
-	var result = {"valid": true, "error": "", "clamped_value": value}
-	
-	# Numeric range validation
-	match key:
-		"height_step_size", "position_increment":
-			if value is float or value is int:
-				if value <= 0.0:
-					result["valid"] = false
-					result["error"] = "%s must be greater than 0 (got %s)" % [key, str(value)]
-					result["clamped_value"] = 0.1  # Safe minimum
-		
-		"rotation_increment":
-			if value is float or value is int:
-				if value <= 0.0:
-					result["valid"] = false
-					result["error"] = "rotation_increment must be greater than 0 (got %s)" % str(value)
-					result["clamped_value"] = 1.0  # Safe minimum
-		
-		"scale_increment":
-			if value is float or value is int:
-				if value <= 0.0:
-					result["valid"] = false
-					result["error"] = "scale_increment must be greater than 0 (got %s)" % str(value)
-					result["clamped_value"] = 0.1  # Safe minimum
-		
-		"grid_size", "snap_step":
-			if value is float or value is int:
-				if value <= 0.0:
-					result["valid"] = false
-					result["error"] = "%s must be greater than 0 (got %s)" % [key, str(value)]
-					result["clamped_value"] = 1.0  # Safe default
-		
-		"preview_opacity":
-			if value is float or value is int:
-				if value < 0.0 or value > 1.0:
-					result["valid"] = false
-					result["error"] = "preview_opacity must be between 0.0 and 1.0 (got %s)" % str(value)
-					result["clamped_value"] = clampf(value, 0.0, 1.0)
-		
-		"smooth_transform_speed":
-			if value is float or value is int:
-				if value <= 0.0:
-					result["valid"] = false
-					result["error"] = "smooth_transform_speed must be greater than 0 (got %s)" % str(value)
-					result["clamped_value"] = 1.0  # Safe minimum
-				elif value > 100.0:
-					result["valid"] = false
-					result["error"] = "smooth_transform_speed must be 100 or less (got %s)" % str(value)
-					result["clamped_value"] = 100.0  # Safe maximum
-	
-	return result
+	var report := SettingsValidator.validate_single(key, value, auto_clamp)
+	if report.has("issues") and report["issues"].size() > 0:
+		for issue in report["issues"]:
+			var message: String = issue.get("message", "")
+			var severity: String = issue.get("severity", SettingsValidator.ISSUE_ERROR)
+			if severity == SettingsValidator.ISSUE_ERROR:
+				PluginLogger.warning(PluginConstants.COMPONENT_MAIN, "Settings validation: %s" % message)
+			else:
+				PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "Settings validation warning: %s" % message)
+
+	return {
+		"valid": report.get("valid", true),
+		"error": report.get("error", ""),
+		"clamped_value": report.get("clamped_value", value),
+		"issues": report.get("issues", [])
+	}
 
 static func validate_and_set_plugin_setting(key: String, value: Variant, auto_clamp: bool = true) -> bool:
 	"""
-	Validate and set a plugin setting.
+	Validate and set a plugin setting via SettingsValidator.
 	
-	Args:
-		key: Setting key
-		value: Setting value
-		auto_clamp: If true, automatically clamp invalid values to valid range
-	
-	Returns: True if value was valid or successfully clamped, False otherwise
+	Returns: True if value was accepted (possibly after clamping), false otherwise.
 	"""
-	var validation = validate_setting(key, value)
-	
+	var validation = validate_setting(key, value, auto_clamp)
 	if validation["valid"]:
-		# Value is valid, set it directly
-		set_plugin_setting(key, value)
+		set_plugin_setting(key, validation["clamped_value"])
+		PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "SettingsManager applied setting %s via validator" % key)
 		return true
-	else:
-		# Value is invalid
-		PluginLogger.warning(PluginConstants.COMPONENT_MAIN, "Settings validation: " + validation["error"])
-		
-		if auto_clamp:
-			# Use clamped value
-			PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Auto-clamping %s to %s" % [key, str(validation["clamped_value"])])
-			set_plugin_setting(key, validation["clamped_value"])
-			return true
-		else:
-			# Reject invalid value
-			return false
+
+	if auto_clamp and validation["clamped_value"] != null and validation["clamped_value"] != value:
+		PluginLogger.info(PluginConstants.COMPONENT_MAIN, "SettingsManager auto-adjusted %s to %s" % [key, str(validation["clamped_value"])])
+		set_plugin_setting(key, validation["clamped_value"])
+		return true
+
+	return false
 
 static func validate_settings() -> bool:
-	"""Validate current settings (check for conflicts, invalid values, etc.)"""
-	var errors: Array[String] = []
-	
-	# Check for duplicate key bindings
-	var key_bindings: Dictionary = {}
-	var key_actions = [
-		"cancel_key",
-		"transform_mode_key",
-		"height_up_key",
-		"height_down_key",
-		"reset_height_key",
-		"position_left_key",
-		"position_right_key",
-		"position_forward_key",
-		"position_backward_key",
-		"reset_position_key",
-		"rotate_x_key",
-		"rotate_y_key",
-		"rotate_z_key",
-		"reset_rotation_key",
-		"scale_up_key",
-		"scale_down_key",
-		"scale_reset_key"
-	]
-	
-	var settings = get_combined_settings()
-	for action in key_actions:
-		var key = settings.get(action, "")
-		if key != "":
-			if key_bindings.has(key):
-				errors.append("Duplicate key binding: " + key + " (" + action + " and " + key_bindings[key] + ")")
+	"""Validate current settings via SettingsValidator"""
+	var combined := get_combined_settings().duplicate(true)
+	var result := SettingsValidator.validate(combined, false)
+
+	if result.has("issues") and result["issues"].size() > 0:
+		for issue in result["issues"]:
+			var message: String = issue.get("message", "")
+			var severity: String = issue.get("severity", SettingsValidator.ISSUE_ERROR)
+			if severity == SettingsValidator.ISSUE_ERROR:
+				PluginLogger.warning(PluginConstants.COMPONENT_MAIN, "Settings validation: %s" % message)
 			else:
-				key_bindings[key] = action
-	
-	# Validate numeric ranges using new validation helpers
-	var numeric_settings = [
-		"height_step_size",
-		"rotation_increment",
-		"scale_increment",
-		"position_increment",
-		"grid_size",
-		"snap_step",
-		"snap_rotation_step",
-		"snap_scale_step",
-		"preview_opacity",
-		"smooth_transform_speed"
-	]
-	
-	for setting_key in numeric_settings:
-		if settings.has(setting_key):
-			var validation = validate_setting(setting_key, settings[setting_key])
-			if not validation["valid"]:
-				errors.append(validation["error"])
-	
-	# Validate boolean settings exist and are boolean type
-	var boolean_settings = [
-		"snap_enabled",
-		"snap_to_grid",
-		"snap_rotation_enabled",
-		"snap_scale_enabled",
-		"randomize_rotation",
-		"randomize_scale",
-		"show_grid",
-		"show_overlay",
-		"use_surface_normal",
-		"auto_select_placed",
-		"smooth_transforms"
-	]
-	
-	for setting_key in boolean_settings:
-		if settings.has(setting_key):
-			var value = settings[setting_key]
-			if not (value is bool):
-				errors.append("%s must be a boolean (got %s)" % [setting_key, type_string(typeof(value))])
-	
-	# Log errors
-	if errors.size() > 0:
-		for error in errors:
-			PluginLogger.warning(PluginConstants.COMPONENT_MAIN, "Settings validation: " + error)
-		return false
-	
-	return true
+				PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "Settings validation warning: %s" % message)
+
+	return result.get("is_valid", true)
 
 ## Debug
 

@@ -5,7 +5,6 @@ class_name OverlayManager
 
 const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
 const ModeStateMachine = preload("res://addons/simpleassetplacer/core/mode_state_machine.gd")
-const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placement/placement_strategy_manager.gd")
 const SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
 const NodeUtils = preload("res://addons/simpleassetplacer/utils/node_utils.gd")
 
@@ -46,7 +45,7 @@ func _init(services: ServiceRegistry):
 
 # Overlay references
 var _main_overlay: Control = null
-var _status_overlay: CanvasLayer = null
+var _status_overlay = null  # StatusOverlayControl instance (no type hint to avoid caching issues)
 var _toolbar_buttons: Control = null
 var _grid_overlay: Node3D = null
 var _half_step_grid_overlay: Node3D = null
@@ -104,6 +103,8 @@ func _load_status_overlay_scene():
 	
 	# Instance the status overlay scene (CanvasLayer)
 	_status_overlay = StatusOverlayScene.instantiate()
+	if _services and _services.placement_strategy_service and _status_overlay.has_method("set_placement_strategy_service"):
+		_status_overlay.set_placement_strategy_service(_services.placement_strategy_service)
 	
 	# Add to the 3D viewport specifically so it's positioned relative to viewport, not entire editor
 	var viewport_3d = _services.editor_facade.get_editor_viewport_3d(0)

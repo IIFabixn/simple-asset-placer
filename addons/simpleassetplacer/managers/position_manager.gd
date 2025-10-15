@@ -22,18 +22,18 @@ ARCHITECTURE POSITION: Pure calculation service with NO state storage
 - Does NOT store position state (uses TransformState)
 - Does NOT handle input detection
 - Does NOT handle UI or overlays
-- Delegates actual raycasting to PlacementStrategyManager
+- Delegates actual raycasting to PlacementStrategyService
 - Focused solely on position math
 
 FULLY INSTANCE-BASED with ServiceRegistry injection
 
 USED BY: TransformationCoordinator for positioning calculations
-DEPENDS ON: TransformState, PlacementStrategyManager, IncrementCalculator
+DEPENDS ON: TransformState, PlacementStrategyService, IncrementCalculator
 """
 
 # Import dependencies
 const TransformState = preload("res://addons/simpleassetplacer/core/transform_state.gd")
-const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placement/placement_strategy_manager.gd")
+const PlacementStrategyService = preload("res://addons/simpleassetplacer/placement/placement_strategy_service.gd")
 const PlacementStrategy = preload("res://addons/simpleassetplacer/placement/placement_strategy.gd")
 const IncrementCalculator = preload("res://addons/simpleassetplacer/utils/increment_calculator.gd")
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
@@ -41,9 +41,15 @@ const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger
 # === SERVICE REGISTRY ===
 
 var _services: ServiceRegistry
+var _placement_service: PlacementStrategyService
 
 func _init(services: ServiceRegistry):
 	_services = services
+	if services and services.placement_strategy_service:
+		_placement_service = services.placement_strategy_service
+	else:
+		_placement_service = PlacementStrategyService.new()
+		_placement_service.initialize()
 
 # === INSTANCE VARIABLES ===
 
@@ -86,7 +92,7 @@ func update_position_from_mouse(state: TransformState, camera: Camera3D, mouse_p
 	var exclude_config = {"exclude_nodes": exclude_nodes} if exclude_nodes.size() > 0 else {}
 	
 	# Use strategy manager to calculate position with exclusions
-	var result: PlacementStrategy.PlacementResult = PlacementStrategyManager.calculate_position(from, to, exclude_config)
+	var result: PlacementStrategy.PlacementResult = _calculate_position(from, to, exclude_config)
 	
 	# Check if we got a valid result (null check added)
 	if not result or result.position == Vector3.INF:
@@ -387,6 +393,10 @@ func reset_for_new_placement(state: TransformState, reset_height_offset: bool = 
 	if reset_position_offset:
 		state.manual_position_offset = Vector3.ZERO  # Reset WASD offset for new placement
 
+func _calculate_position(from: Vector3, to: Vector3, additional_config: Dictionary) -> PlacementStrategy.PlacementResult:
+	"""Calculate placement position using the injected service"""
+	return _get_service().calculate_position(from, to, additional_config)
+
 ## Position Getters and Setters
 
 func get_current_position(state: TransformState) -> Vector3:
@@ -485,8 +495,8 @@ func configure(state: TransformState, config: Dictionary) -> void:
 	state.snap_center_y = config.get("snap_center_y", false)
 	state.snap_center_z = config.get("snap_center_z", false)
 	
-	# Configure placement strategy manager
-	PlacementStrategyManager.configure(config)
+	# Configure placement strategy service
+	_get_service().configure(config)
 
 func get_configuration(state: TransformState) -> Dictionary:
 	"""Get current configuration"""
@@ -498,8 +508,14 @@ func get_configuration(state: TransformState) -> Dictionary:
 		"snap_step": state.snap_step,
 		"interpolation_speed": _interpolation_speed,
 		"align_with_normal": _align_with_normal,
-		"placement_strategy": PlacementStrategyManager.get_active_strategy_type()
+		"placement_strategy": _get_service().get_active_strategy_type()
 	}
+
+func _get_service() -> PlacementStrategyService:
+	if not _placement_service:
+		_placement_service = PlacementStrategyService.new()
+		_placement_service.initialize()
+	return _placement_service
 
 ## Transform Node Positioning (for Transform Mode)
 

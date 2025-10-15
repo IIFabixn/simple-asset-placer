@@ -28,8 +28,8 @@ var models_tab: Control
 var meshlib_tab: Control
 var scroll_container: ScrollContainer
 var grid_container: GridContainer
-var meshlib_browser: MeshLibraryBrowser
-var modellib_browser: ModelLibraryBrowser
+var meshlib_browser  # MeshLibraryBrowser (no type hint to avoid initialization issues)
+var modellib_browser  # ModelLibraryBrowser (no type hint to avoid initialization issues)
 var placement_settings: PlacementSettings
 var settings_tab: Control
 var thumbnail_size: int = LayoutCalculator.THUMBNAIL_SIZE_DEFAULT  # Use optimized default size
@@ -155,6 +155,8 @@ func setup_ui():
 	settings_tab.add_child(settings_margin)
 	
 	placement_settings = PlacementSettings.new()
+	if _services and _services.placement_strategy_service:
+		placement_settings.set_placement_strategy_service(_services.placement_strategy_service)
 	placement_settings.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	settings_margin.add_child(placement_settings)
 	

@@ -24,8 +24,17 @@ class_name StatusOverlayControl
 
 # Forward reference to ModeStateMachine for Mode enum
 const ModeStateMachine = preload("res://addons/simpleassetplacer/core/mode_state_machine.gd")
-const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placement/placement_strategy_manager.gd")
 const SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
+const PlacementStrategyService = preload("res://addons/simpleassetplacer/placement/placement_strategy_service.gd")
+
+var _placement_service: PlacementStrategyService = null
+
+func set_placement_strategy_service(service: PlacementStrategyService) -> void:
+	"""Inject placement strategy service so overlay mirrors live state"""
+	_placement_service = service
+	if not _placement_service:
+		_placement_service = PlacementStrategyService.new()
+		_placement_service.initialize()
 
 func _ready() -> void:
 	# Ensure proper setup
@@ -55,8 +64,10 @@ func show_transform_info(mode: int, node_name: String = "", position: Vector3 = 
 		return
 	
 	# Get current placement strategy for display
-	var strategy_name = PlacementStrategyManager.get_active_strategy_name()
-	var strategy_icon = "🎯" if PlacementStrategyManager.get_active_strategy_type() == "collision" else "📐"
+	var strategy_service = _get_service()
+	var strategy_type = strategy_service.get_active_strategy_type()
+	var strategy_name = strategy_service.get_active_strategy_name()
+	var strategy_icon = "🎯" if strategy_type == "collision" else "📐"
 	
 	# Get control mode info if available - ONLY show when modal is actually active
 	var control_mode_text = ""
@@ -129,6 +140,12 @@ func show_transform_info(mode: int, node_name: String = "", position: Vector3 = 
 				keybinds_label.text = "%s (Position)  %s (Rotation)  %s (Scale)  %s/%s (Quick Height)  X/Y/Z (Axis)  Mouse Wheel (Adjust)  ENTER (Confirm)  CTRL/ALT (Fine/Large)" % [g_key, r_key, l_key, height_up, height_down]
 	
 	visible = true
+
+func _get_service() -> PlacementStrategyService:
+	if not _placement_service:
+		_placement_service = PlacementStrategyService.new()
+		_placement_service.initialize()
+	return _placement_service
 
 func show_status_message(message: String, color: Color = Color.GREEN) -> void:
 	"""Show a simple status message"""

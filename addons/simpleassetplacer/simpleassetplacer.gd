@@ -23,10 +23,13 @@ const SmoothTransformManager = preload("res://addons/simpleassetplacer/managers/
 const GridManager = preload("res://addons/simpleassetplacer/managers/grid_manager.gd")
 const ModeStateMachine = preload("res://addons/simpleassetplacer/core/mode_state_machine.gd")
 const TransformApplicator = preload("res://addons/simpleassetplacer/core/transform_applicator.gd")
+const TransformActionRouter = preload("res://addons/simpleassetplacer/core/transform_action_router.gd")
 const PlacementStrategyManager = preload("res://addons/simpleassetplacer/placement/placement_strategy_manager.gd")
+const PlacementStrategyService = preload("res://addons/simpleassetplacer/placement/placement_strategy_service.gd")
 const UtilityManager = preload("res://addons/simpleassetplacer/managers/utility_manager.gd")
 const CategoryManager = preload("res://addons/simpleassetplacer/managers/category_manager.gd")
 const NumericInputManager = preload("res://addons/simpleassetplacer/managers/numeric_input_manager.gd")
+const NumericInputController = preload("res://addons/simpleassetplacer/managers/numeric_input_controller.gd")
 const ThumbnailGenerator = preload("res://addons/simpleassetplacer/thumbnails/thumbnail_generator.gd")
 const ThumbnailQueueManager = preload("res://addons/simpleassetplacer/thumbnails/thumbnail_queue_manager.gd")
 
@@ -101,12 +104,14 @@ func _initialize_systems():
 	
 	# Initialize error handler with editor interface instance
 	ErrorHandler.initialize(get_editor_interface())
-	
-	# Initialize placement strategy system (still static)
-	PlacementStrategyManager.initialize()
-	
+
 	# Create ServiceRegistry
 	service_registry = ServiceRegistry.new()
+
+	# Initialize placement strategy system via service instance
+	service_registry.placement_strategy_service = PlacementStrategyService.new()
+	service_registry.placement_strategy_service.initialize()
+	PlacementStrategyManager.set_service(service_registry.placement_strategy_service)  # Compatibility for legacy static calls
 	
 	# Create EditorFacade and register it
 	var editor_facade = EditorFacade.new(get_editor_interface())
@@ -119,6 +124,9 @@ func _initialize_systems():
 	
 	# Numeric input manager (instance-based with ServiceRegistry)
 	service_registry.numeric_input_manager = NumericInputManager.new(service_registry)
+
+	# Numeric input controller orchestrates NumericInputManager usage
+	service_registry.numeric_input_controller = NumericInputController.new(service_registry)
 	
 	# Position manager (instance-based with ServiceRegistry)
 	service_registry.position_manager = PositionManager.new(service_registry)
@@ -147,6 +155,9 @@ func _initialize_systems():
 	# Control mode state (instance-based, no ServiceRegistry needed - pure state)
 	const ControlModeState = preload("res://addons/simpleassetplacer/core/control_mode_state.gd")
 	service_registry.control_mode_state = ControlModeState.new()
+
+	# Transform action router for shared modal routing
+	service_registry.transform_action_router = TransformActionRouter.new(service_registry)
 	
 	# Utility manager (instance-based with ServiceRegistry)
 	service_registry.utility_manager = UtilityManager.new(service_registry)
@@ -201,7 +212,9 @@ func _cleanup_systems():
 	_safe_cleanup("ThumbnailGenerator.cleanup", func(): ThumbnailGenerator.cleanup())
 	_safe_cleanup("ThumbnailQueueManager.cleanup", func(): ThumbnailQueueManager.cleanup())
 	
-	# Clean up placement system (still static)
+	# Clean up placement system
+	if service_registry.placement_strategy_service:
+		_safe_cleanup("PlacementStrategyService.cleanup", func(): service_registry.placement_strategy_service.cleanup())
 	_safe_cleanup("PlacementStrategyManager.cleanup", func(): PlacementStrategyManager.cleanup())
 	
 	# Clean up service registry

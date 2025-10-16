@@ -52,10 +52,10 @@ Deliver a placement and transform experience that is:
    - *Acceptance criteria:* Merge precedence (modal > numeric > direct) verified by automated tests; script lint passes; team walkthrough held.  
    - *Notes:* Match naming with `TransformState` properties to avoid confusion.  
    - *Blocked by:* None  
-    - *Status:*  
-     - [ ] Not started  
-     - [ ] In progress  
-      - [x] Done  
+    - *Status:*\
+       - [ ] Not started\
+       - [ ] In progress\
+       - [x] Done\
    - *Progress note:* 2025-10-16 – Schema implemented with merge helpers + GUT tests (CLI not available locally).
 2. **CORE-002: Refactor TransformActionRouter**  
    - *Affected components:* `core/transform_action_router.gd`, `core/service_registry.gd`, settings schema.  
@@ -288,9 +288,9 @@ Deliver a placement and transform experience that is:
     - *Blocked by:* CORE-005, SET-101  
     - *Status:*  
        - [ ] Not started  
-       - [ ] In progress  
+       - [x] In progress  
        - [ ] Done  
-    - *Progress note:* _(record updates here)_
+   - *Progress note:* 2025-10-16 – Centralised cursor warp handling in placement/transform modes with safe margins to prevent cross-screen jumps; toggle respects live setting updates.
 5. **WF-205: Mouse wheel granularity**  
    - *Affected components:* `managers/input_handler.gd`, `core/transformation_coordinator.gd`, `ui/status_overlay_control.gd`.  
    - *Deliverables:* Modifier-driven step scaling, axis-aware deltas, updated overlay text.  
@@ -315,6 +315,18 @@ Deliver a placement and transform experience that is:
        - [ ] In progress  
        - [ ] Done  
     - *Progress note:* _(record updates here)_
+7. **WF-207: Non-modal keyboard nudge controls**  
+   - *Affected components:* `managers/input_handler.gd`, `managers/position_manager.gd`, `managers/rotation_manager.gd`, `ui/placement_settings.gd`, `settings/settings_definition.gd`.  
+   - *Deliverables:* Optional WASD/X-Y-Z shortcut handling when modal is inactive, reusable nudge helpers, setting toggle with overlay indication, documentation around viewport navigation conflicts.  
+   - *Expected result:* Users make small positional or rotational adjustments without entering modal state while existing Godot navigation remains available when the toggle is off.  
+   - *Acceptance criteria:* Toggle defaults off, persists across sessions, and clearly communicates focus requirements; viewport fly controls continue working when feature is disabled; undo/redo logs capture the nudges; manual smoke entry added.  
+   - *Notes:* Validate with usability session (tie-in with QA-102) to confirm ergonomics and modifier choices before shipping broadly.  
+   - *Blocked by:* CORE-005, WF-204  
+   - *Status:*  
+      - [ ] Not started  
+      - [ ] In progress  
+      - [ ] Done  
+   - *Progress note:* _(record updates here)_
 
 ---
 

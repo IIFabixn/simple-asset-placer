@@ -43,6 +43,7 @@ Mark each task with `[x]` when completed. Capture short clips (5–10s) where no
 | CP-08 | Modal exit pathways | With modal active, right-click once, then press `ESC` on a second attempt. | First action drops modal, second exits mode; overlay updates accordingly. | recommended |
 | CP-09 | Overlay accuracy | Toggle `auto_modal_activation` in settings, enter both modes, observe overlay. | Overlay reflects modal status only when active; setting persists after restart. | screenshot |
 | CP-10 | Placement loop options | Disable continuous placement, place an asset, then re-enable and repeat. | Single-placement mode exits immediately and auto-selects when enabled; continuous mode keeps preview active until ESC. | recommended |
+| CP-11 | Cursor warp toggle | In transform mode, ensure cursor warp is enabled, push the cursor toward each viewport edge, then disable the setting and repeat. | With the toggle on, the pointer recenters inside the same viewport instead of jumping across monitors; with it off, the cursor never warps. | optional |
 
 > **Tip:** Use the built-in `Editor > Viewport > Capture to GIF` shortcut or an external tool (ScreenToGif, ShareX) for recordings.
 

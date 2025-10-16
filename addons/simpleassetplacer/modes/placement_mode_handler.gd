@@ -377,29 +377,7 @@ func _process_mouse_rotation(
 	var prev_mouse_pos = transform_state.get_meta("_prev_mouse_pos")
 	var mouse_delta = mouse_pos - prev_mouse_pos
 	
-	var cursor_warp_enabled: bool = settings.get("cursor_warp_enabled", true)
-	var warp_handled := false
-	if cursor_warp_enabled and viewport:
-		var viewport_rect = viewport.get_visible_rect()
-		var viewport_size = viewport_rect.size
-		var warp_margin = 50
-		var should_warp = false
-		var warp_target_local = mouse_pos
-
-		if mouse_pos.x < warp_margin or mouse_pos.x > viewport_size.x - warp_margin:
-			warp_target_local.x = viewport_size.x / 2
-			should_warp = true
-		if mouse_pos.y < warp_margin or mouse_pos.y > viewport_size.y - warp_margin:
-			warp_target_local.y = viewport_size.y / 2
-			should_warp = true
-
-		if should_warp:
-			var viewport_screen_transform = viewport.get_screen_transform()
-			var warp_target_global = viewport_screen_transform * warp_target_local
-			Input.warp_mouse(warp_target_global)
-			transform_state.set_meta("_prev_mouse_pos", warp_target_local)
-			warp_handled = true
-
+	var warp_handled: bool = _maybe_warp_cursor(transform_state, "_prev_mouse_pos", mouse_pos, settings, viewport)
 	if not warp_handled:
 		transform_state.set_meta("_prev_mouse_pos", mouse_pos)
 	
@@ -511,29 +489,7 @@ func _process_mouse_scale(
 	var prev_mouse_pos = transform_state.get_meta("_prev_mouse_pos_scale")
 	var mouse_delta = mouse_pos - prev_mouse_pos
 	
-	var cursor_warp_enabled: bool = settings.get("cursor_warp_enabled", true)
-	var warp_handled := false
-	if cursor_warp_enabled and viewport:
-		var viewport_rect = viewport.get_visible_rect()
-		var viewport_size = viewport_rect.size
-		var warp_margin = 50
-		var should_warp = false
-		var warp_target_local = mouse_pos
-
-		if mouse_pos.x < warp_margin or mouse_pos.x > viewport_size.x - warp_margin:
-			warp_target_local.x = viewport_size.x / 2
-			should_warp = true
-		if mouse_pos.y < warp_margin or mouse_pos.y > viewport_size.y - warp_margin:
-			warp_target_local.y = viewport_size.y / 2
-			should_warp = true
-
-		if should_warp:
-			var viewport_screen_transform = viewport.get_screen_transform()
-			var warp_target_global = viewport_screen_transform * warp_target_local
-			Input.warp_mouse(warp_target_global)
-			transform_state.set_meta("_prev_mouse_pos_scale", warp_target_local)
-			warp_handled = true
-
+	var warp_handled: bool = _maybe_warp_cursor(transform_state, "_prev_mouse_pos_scale", mouse_pos, settings, viewport)
 	if not warp_handled:
 		transform_state.set_meta("_prev_mouse_pos_scale", mouse_pos)
 	
@@ -609,6 +565,35 @@ func _process_mouse_scale(
 		new_scale = clamp(new_scale, 0.01, 100.0)
 		
 		_services.scale_manager.set_scale_multiplier(transform_state, new_scale)
+
+func _maybe_warp_cursor(transform_state: TransformState, storage_key: String, mouse_pos: Vector2, settings: Dictionary, viewport: SubViewport) -> bool:
+	if not viewport:
+		return false
+	if not settings.get("cursor_warp_enabled", true):
+		return false
+
+	var viewport_rect := viewport.get_visible_rect()
+	var local_rect := Rect2(Vector2.ZERO, viewport_rect.size)
+	if local_rect.size.x <= 1.0 or local_rect.size.y <= 1.0:
+		return false
+
+	var warp_margin := 50.0
+	var max_margin: float = min(local_rect.size.x, local_rect.size.y) * 0.45
+	if max_margin > 0.0:
+		warp_margin = min(warp_margin, max_margin)
+
+	var safe_rect := local_rect.grow(-warp_margin)
+	if safe_rect.size.x <= 0.0 or safe_rect.size.y <= 0.0:
+		safe_rect = local_rect
+
+	if safe_rect.has_point(mouse_pos):
+		return false
+
+	var local_center := local_rect.size * 0.5
+	var warp_target_global: Vector2 = viewport.get_screen_transform() * local_center
+	Input.warp_mouse(warp_target_global)
+	transform_state.set_meta(storage_key, local_center)
+	return true
 
 ## ASSET CYCLING
 

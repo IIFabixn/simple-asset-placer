@@ -176,80 +176,68 @@ func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 
 	if _snapshot.is_key_held_for_wheel("height_up") or _snapshot.is_key_held_for_wheel("height_down"):
 		_snapshot.mark_pending_taps(["height_up", "height_down"])
-		return {
+		return _with_wheel_modifiers({
 			"action": "height",
-			"direction": wheel_direction,
-			"reverse_modifier": _snapshot.is_reverse_modifier_held()
-		}
+			"direction": wheel_direction
+		})
 
 	if _snapshot.is_key_held_for_wheel("scale_up") or _snapshot.is_key_held_for_wheel("scale_down"):
 		_snapshot.mark_pending_taps(["scale_up", "scale_down"])
-		return {
+		return _with_wheel_modifiers({
 			"action": "scale",
-			"direction": wheel_direction,
-			"large_increment": _snapshot.is_large_increment_modifier_held()
-		}
+			"direction": wheel_direction
+		})
 
 	if _snapshot.is_key_held_for_wheel("rotate_x"):
 		_snapshot.mark_pending_taps(["rotate_x"])
-		return {
+		return _with_wheel_modifiers({
 			"action": "rotation",
 			"axis": "X",
-			"direction": wheel_direction,
-			"large_increment": _snapshot.is_large_increment_modifier_held(),
-			"reverse_modifier": _snapshot.is_reverse_modifier_held()
-		}
+			"direction": wheel_direction
+		})
 	elif _snapshot.is_key_held_for_wheel("rotate_y"):
 		_snapshot.mark_pending_taps(["rotate_y"])
-		return {
+		return _with_wheel_modifiers({
 			"action": "rotation",
 			"axis": "Y",
-			"direction": wheel_direction,
-			"large_increment": _snapshot.is_large_increment_modifier_held(),
-			"reverse_modifier": _snapshot.is_reverse_modifier_held()
-		}
+			"direction": wheel_direction
+		})
 	elif _snapshot.is_key_held_for_wheel("rotate_z"):
 		_snapshot.mark_pending_taps(["rotate_z"])
-		return {
+		return _with_wheel_modifiers({
 			"action": "rotation",
 			"axis": "Z",
-			"direction": wheel_direction,
-			"large_increment": _snapshot.is_large_increment_modifier_held(),
-			"reverse_modifier": _snapshot.is_reverse_modifier_held()
-		}
+			"direction": wheel_direction
+		})
 
 	if _snapshot.is_key_held_for_wheel("position_forward"):
 		_snapshot.mark_pending_taps(["position_forward"])
-		return {
+		return _with_wheel_modifiers({
 			"action": "position",
 			"axis": "forward",
-			"direction": wheel_direction,
-			"reverse_modifier": _snapshot.is_reverse_modifier_held()
-		}
+			"direction": wheel_direction
+		})
 	elif _snapshot.is_key_held_for_wheel("position_backward"):
 		_snapshot.mark_pending_taps(["position_backward"])
-		return {
+		return _with_wheel_modifiers({
 			"action": "position",
 			"axis": "backward",
-			"direction": wheel_direction,
-			"reverse_modifier": _snapshot.is_reverse_modifier_held()
-		}
+			"direction": wheel_direction
+		})
 	elif _snapshot.is_key_held_for_wheel("position_left"):
 		_snapshot.mark_pending_taps(["position_left"])
-		return {
+		return _with_wheel_modifiers({
 			"action": "position",
 			"axis": "left",
-			"direction": wheel_direction,
-			"reverse_modifier": _snapshot.is_reverse_modifier_held()
-		}
+			"direction": wheel_direction
+		})
 	elif _snapshot.is_key_held_for_wheel("position_right"):
 		_snapshot.mark_pending_taps(["position_right"])
-		return {
+		return _with_wheel_modifiers({
 			"action": "position",
 			"axis": "right",
-			"direction": wheel_direction,
-			"reverse_modifier": _snapshot.is_reverse_modifier_held()
-		}
+			"direction": wheel_direction
+		})
 
 	if _services and _services.control_mode_state:
 		var control_state = _services.control_mode_state
@@ -257,46 +245,46 @@ func get_mouse_wheel_input(event: InputEventMouseButton) -> Dictionary:
 		match control_mode:
 			ControlModeState.ControlMode.POSITION:
 				if control_state.has_axis_constraint():
-					return {
+					return _with_wheel_modifiers({
 						"action": "position_axis",
 						"axes": control_state.get_constrained_axes(),
-						"direction": wheel_direction,
-						"fine_increment": _snapshot.is_fine_increment_modifier_held(),
-						"large_increment": _snapshot.is_large_increment_modifier_held(),
-						"reverse_modifier": _snapshot.is_reverse_modifier_held()
-					}
-				return {
+						"direction": wheel_direction
+					})
+				return _with_wheel_modifiers({
 					"action": "height",
-					"direction": wheel_direction,
-					"reverse_modifier": _snapshot.is_reverse_modifier_held()
-				}
+					"direction": wheel_direction
+				})
 			ControlModeState.ControlMode.ROTATION:
 				var axis := "Y"
 				if control_state.has_axis_constraint():
 					axis = control_state.get_axis_constraint_string()
-				return {
+				return _with_wheel_modifiers({
 					"action": "rotation",
 					"axis": axis,
-					"direction": wheel_direction,
-					"large_increment": _snapshot.is_large_increment_modifier_held(),
-					"reverse_modifier": _snapshot.is_reverse_modifier_held()
-				}
+					"direction": wheel_direction
+				})
 			ControlModeState.ControlMode.SCALE:
 				if control_state.has_axis_constraint():
-					return {
+					return _with_wheel_modifiers({
 						"action": "scale_axis",
 						"axes": control_state.get_constrained_axes(),
-						"direction": wheel_direction,
-						"fine_increment": _snapshot.is_fine_increment_modifier_held(),
-						"large_increment": _snapshot.is_large_increment_modifier_held()
-					}
-				return {
+						"direction": wheel_direction
+					})
+				return _with_wheel_modifiers({
 					"action": "scale",
-					"direction": wheel_direction,
-					"large_increment": _snapshot.is_large_increment_modifier_held()
-				}
+					"direction": wheel_direction
+				})
 
 	return {}
+
+func _with_wheel_modifiers(payload: Dictionary) -> Dictionary:
+	if not payload.has("reverse_modifier"):
+		payload["reverse_modifier"] = _snapshot.is_reverse_modifier_held()
+	if not payload.has("large_increment"):
+		payload["large_increment"] = _snapshot.is_large_increment_modifier_held()
+	if not payload.has("fine_increment"):
+		payload["fine_increment"] = _snapshot.is_fine_increment_modifier_held()
+	return payload
 
 func string_to_keycode(key_string: String) -> Key:
 	return _snapshot.string_to_keycode(key_string)

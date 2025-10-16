@@ -190,12 +190,16 @@ func show_transform_info(mode: int, node_name: String = "", position: Vector3 = 
 			var l_key = settings.get("scale_control_key", "L")
 			var height_up = settings.get("height_up_key", "Q")
 			var height_down = settings.get("height_down_key", "E")
+			var reverse_key = settings.get("reverse_modifier_key", "SHIFT")
+			var fine_key = settings.get("fine_increment_modifier_key", "CTRL")
+			var large_key = settings.get("large_increment_modifier_key", "ALT")
+			var wheel_hint = "Mouse Wheel (Adjust; %s reverse, %s fine, %s large)" % [reverse_key, fine_key, large_key]
 			
 			# Show modal control keybinds
 			if mode == ModeStateMachine.Mode.PLACEMENT:
-				keybinds_label.text = "%s (Position)  %s (Rotation)  %s (Scale)\n%s/%s (Quick Height)  X/Y/Z (Axis)  Mouse Wheel (Adjust)  ENTER (Place)" % [g_key, r_key, l_key, height_up, height_down]
+				keybinds_label.text = "%s (Position)  %s (Rotation)  %s (Scale)\n%s/%s (Quick Height)  X/Y/Z (Axis)  %s  ENTER (Place)" % [g_key, r_key, l_key, height_up, height_down, wheel_hint]
 			else:  # transform mode
-				keybinds_label.text = "%s (Position)  %s (Rotation)  %s (Scale)\n%s/%s (Quick Height)  X/Y/Z (Axis)  Mouse Wheel (Adjust)  ENTER (Confirm)  CTRL/ALT (Fine/Large)" % [g_key, r_key, l_key, height_up, height_down]
+				keybinds_label.text = "%s (Position)  %s (Rotation)  %s (Scale)\n%s/%s (Quick Height)  X/Y/Z (Axis)  %s  ENTER (Confirm)" % [g_key, r_key, l_key, height_up, height_down, wheel_hint]
 
 	_update_snap_badges(extra_state.get("snap_state", {}), extra_state.get("smooth_enabled", false))
 	_update_modifier_badges(extra_state.get("modifier_state", {}))

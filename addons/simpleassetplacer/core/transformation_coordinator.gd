@@ -393,35 +393,74 @@ func _get_service() -> PlacementStrategyService:
 		_placement_service.initialize()
 	return _placement_service
 
+func get_current_focus_owner() -> Control:
+	var editor_interface = _services.editor_facade.get_editor_interface()
+	if not editor_interface:
+		return null
+	var base_control = editor_interface.get_base_control()
+	if not base_control:
+		return null
+	var viewport = base_control.get_viewport()
+	if not viewport:
+		return null
+	return viewport.gui_get_focus_owner()
+
+func should_lock_input_to_ui(focus_owner: Control) -> bool:
+	if not focus_owner:
+		return false
+	if _is_spatial_editor_control(focus_owner):
+		return false
+	if _is_text_input_control(focus_owner):
+		return true
+	return false
+
+func _wheel_modifiers(wheel_input: Dictionary) -> Dictionary:
+	return {
+		"reverse": wheel_input.get("reverse_modifier", false),
+		"large": wheel_input.get("large_increment", false),
+		"fine": wheel_input.get("fine_increment", false)
+	}
+
+func _resolve_increment(settings: Dictionary, base_key: String, fine_key: String, large_key: String, default_value: float, modifiers: Dictionary) -> float:
+	var step := settings.get(base_key, default_value)
+	if modifiers.get("large", false) and large_key != "":
+		step = settings.get(large_key, step)
+	elif modifiers.get("fine", false) and fine_key != "":
+		step = settings.get(fine_key, step)
+	return abs(step)
+
+func _direction_with_modifiers(direction: int, modifiers: Dictionary) -> int:
+	if direction == 0:
+		return 0
+	return -direction if modifiers.get("reverse", false) else direction
+
 func _apply_height_adjustment(wheel_input: Dictionary) -> void:
-	var direction = wheel_input.get("direction", 0)
-	var reverse = wheel_input.get("reverse_modifier", false)
-	if reverse:
-		direction = -direction
+	var modifiers := _wheel_modifiers(wheel_input)
+	var direction := _direction_with_modifiers(wheel_input.get("direction", 0), modifiers)
+	if direction == 0:
+		return
 	var settings := _current_settings()
-	var step = settings.get("fine_height_increment", 0.01)
+	var step := _resolve_increment(settings, "height_adjustment_step", "fine_height_increment", "large_height_increment", 0.1, modifiers)
+	var delta := step * direction
 	var mode = _services.mode_state_machine.get_current_mode()
 	if mode == ModeStateMachine.Mode.PLACEMENT:
 		var state := _state()
 		if not state:
 			return
-		if direction > 0:
-			_services.position_manager.adjust_height(state, step)
-		else:
-			_services.position_manager.adjust_height(state, -step)
+		_services.position_manager.adjust_height(state, delta)
 	elif mode == ModeStateMachine.Mode.TRANSFORM:
 		var transform_payload = _session().transform_data
 		var accumulated_y_delta = transform_payload.get("accumulated_y_delta", 0.0)
-		accumulated_y_delta += step * direction
+		accumulated_y_delta += delta
 		transform_payload["accumulated_y_delta"] = accumulated_y_delta
 
 func _apply_scale_adjustment(wheel_input: Dictionary) -> void:
-	var direction = wheel_input.get("direction", 0)
-	var large_increment = wheel_input.get("large_increment", false)
-	var settings := _session().settings
-	var step = settings.get("fine_scale_increment", 0.01)
-	if large_increment:
-		step = settings.get("large_scale_increment", 0.5)
+	var modifiers := _wheel_modifiers(wheel_input)
+	var direction := _direction_with_modifiers(wheel_input.get("direction", 0), modifiers)
+	if direction == 0:
+		return
+	var settings := _current_settings()
+	var step := _resolve_increment(settings, "scale_increment", "fine_scale_increment", "large_scale_increment", 0.1, modifiers)
 	var mode = _services.mode_state_machine.get_current_mode()
 	if mode == ModeStateMachine.Mode.PLACEMENT:
 		var state := _state()
@@ -453,38 +492,45 @@ func _apply_scale_adjustment(wheel_input: Dictionary) -> void:
 
 func _apply_scale_axis_adjustment(wheel_input: Dictionary) -> void:
 	"""Apply mouse wheel scale adjustments along constrained axes in L mode"""
-	var direction = wheel_input.get("direction", 0)
+	var modifiers := _wheel_modifiers(wheel_input)
+	var direction := _direction_with_modifiers(wheel_input.get("direction", 0), modifiers)
+	if direction == 0:
+		return
 	var axes = wheel_input.get("axes", {})  # Dictionary with X/Y/Z: bool
-	var fine = wheel_input.get("fine_increment", false)
-	var large = wheel_input.get("large_increment", false)
 	var settings := _current_settings()
-	
-	# Determine step size based on modifiers using configured increment settings
-	var step: float
-	if fine:
-		step = settings.get("fine_scale_increment", 0.01)
-	elif large:
-		step = settings.get("large_scale_increment", 0.5)
-	else:
-		step = settings.get("fine_scale_increment", 0.01)  # Default to fine for wheel
-	
-	# Apply direction to step
-	step *= direction
-	
-	# Get current scale vector
 	var state := _state()
 	if not state:
 		return
+
+	var step := _resolve_increment(settings, "scale_increment", "fine_scale_increment", "large_scale_increment", 0.1, modifiers)
+	if not modifiers.get("fine", false) and not modifiers.get("large", false) and state.snap_scale_enabled:
+		step = settings.get("snap_scale_step", step)
+
 	var current_scale = _services.scale_manager.get_scale_vector(state)
-	var new_scale = current_scale
-	
-	# Apply scale change only to constrained axes
+	var movement := Vector3.ZERO
+	var axis_count := 0
+
 	if axes.get("X", false):
-		new_scale.x = clamp(current_scale.x + step, 0.01, 100.0)
+		movement.x = direction
+		axis_count += 1
 	if axes.get("Y", false):
-		new_scale.y = clamp(current_scale.y + step, 0.01, 100.0)
+		movement.y = direction
+		axis_count += 1
 	if axes.get("Z", false):
-		new_scale.z = clamp(current_scale.z + step, 0.01, 100.0)
+		movement.z = direction
+		axis_count += 1
+
+	if axis_count == 0:
+		return
+
+	if axis_count > 1:
+		movement = movement.normalized()
+
+	movement *= step
+	var new_scale = current_scale + movement
+	new_scale.x = clamp(new_scale.x, 0.01, 100.0)
+	new_scale.y = clamp(new_scale.y, 0.01, 100.0)
+	new_scale.z = clamp(new_scale.z, 0.01, 100.0)
 	
 	# Update scale in transform state
 	_services.scale_manager.set_non_uniform_multiplier(state, new_scale)
@@ -506,19 +552,13 @@ func _apply_scale_axis_adjustment(wheel_input: Dictionary) -> void:
 				TransformApplicator.apply_scale_only(node, state, node_original_scale)
 
 func _apply_rotation_adjustment(wheel_input: Dictionary) -> void:
-	var direction = wheel_input.get("direction", 0)
+	var modifiers := _wheel_modifiers(wheel_input)
+	var direction := _direction_with_modifiers(wheel_input.get("direction", 0), modifiers)
+	if direction == 0:
+		return
 	var axis = wheel_input.get("axis", "Y")
-	var large_increment = wheel_input.get("large_increment", false)
-	var reverse = wheel_input.get("reverse_modifier", false)
 	var settings := _current_settings()
-	var rotation_step: float
-	if large_increment:
-		rotation_step = settings.get("large_rotation_increment", 90.0)
-	else:
-		rotation_step = settings.get("fine_rotation_increment", 5.0)
-	if reverse:
-		rotation_step = -rotation_step
-	var step = rotation_step * direction
+	var step := _resolve_increment(settings, "rotation_increment", "fine_rotation_increment", "large_rotation_increment", 15.0, modifiers) * direction
 	var mode = _services.mode_state_machine.get_current_mode()
 	if mode == ModeStateMachine.Mode.PLACEMENT:
 		var state := _state()
@@ -536,19 +576,13 @@ func _apply_rotation_adjustment(wheel_input: Dictionary) -> void:
 		_services.transform_mode_handler.rotate_group_by_step(axis, step, _session().transform_data, state)
 
 func _apply_position_adjustment(wheel_input: Dictionary) -> void:
-	var direction = wheel_input.get("direction", 0)
+	var modifiers := _wheel_modifiers(wheel_input)
+	var direction := _direction_with_modifiers(wheel_input.get("direction", 0), modifiers)
+	if direction == 0:
+		return
 	var axis = wheel_input.get("axis", "forward")  # forward, backward, left, right
-	var reverse = wheel_input.get("reverse_modifier", false)
 	var settings := _current_settings()
-	
-	# Get fine position increment from settings (mouse wheel provides fine adjustment)
-	var step = settings.get("fine_position_increment", 0.01)
-	
-	# Apply reverse modifier if held
-	var actual_direction = direction
-	if reverse:
-		actual_direction = -direction
-	
+	var step := _resolve_increment(settings, "position_increment", "fine_position_increment", "large_position_increment", 0.1, modifiers)
 	var mode = _services.mode_state_machine.get_current_mode()
 	var camera = _services.editor_facade.get_editor_viewport_3d(0).get_camera_3d() if _services.editor_facade.get_editor_viewport_3d(0) else null
 	if not camera:
@@ -584,13 +618,13 @@ func _apply_position_adjustment(wheel_input: Dictionary) -> void:
 	var movement = Vector3.ZERO
 	match axis:
 		"forward":
-			movement = camera_forward * actual_direction
+			movement = camera_forward * direction
 		"backward":
-			movement = -camera_forward * actual_direction
+			movement = -camera_forward * direction
 		"left":
-			movement = -camera_right * actual_direction
+			movement = -camera_right * direction
 		"right":
-			movement = camera_right * actual_direction
+			movement = camera_right * direction
 	
 	movement *= step
 	
@@ -610,65 +644,46 @@ func _apply_position_adjustment(wheel_input: Dictionary) -> void:
 
 func _apply_position_axis_adjustment(wheel_input: Dictionary) -> void:
 	"""Apply mouse wheel position adjustments along constrained axes in G mode"""
-	var direction = wheel_input.get("direction", 0)
+	var modifiers := _wheel_modifiers(wheel_input)
+	var direction := _direction_with_modifiers(wheel_input.get("direction", 0), modifiers)
+	if direction == 0:
+		return
 	var axes = wheel_input.get("axes", {})  # Dictionary with X/Y/Z: bool
-	var fine = wheel_input.get("fine_increment", false)
-	var large = wheel_input.get("large_increment", false)
-	var reverse = wheel_input.get("reverse_modifier", false)
+	var state := _state()
+	if not state:
+		return
 	var settings := _current_settings()
-	
-	# Determine step size based on modifiers using configured increment settings
-	var step: float
-	if fine:
-		step = settings.get("fine_position_increment", 0.01)
-	elif large:
-		step = settings.get("large_position_increment", 1.0)
-	else:
-		# Default: Use snap_step if snapping enabled, otherwise position_increment
-		if settings.get("snap_enabled", false):
-			step = settings.get("snap_step", 1.0)
-		else:
-			step = settings.get("position_increment", 0.1)
-	
-	# Apply reverse modifier
-	var actual_direction = direction
-	if reverse:
-		actual_direction = -direction
-	
-	# Calculate movement along constrained axes
+
+	var step := _resolve_increment(settings, "position_increment", "fine_position_increment", "large_position_increment", 0.1, modifiers)
+	if not modifiers.get("fine", false) and not modifiers.get("large", false) and state.snap_enabled:
+		step = state.snap_step
+
 	var movement = Vector3.ZERO
 	var axis_count = 0
-	
+
 	if axes.get("X", false):
-		movement.x = actual_direction
+		movement.x = direction
 		axis_count += 1
 	if axes.get("Y", false):
-		movement.y = actual_direction
+		movement.y = direction
 		axis_count += 1
 	if axes.get("Z", false):
-		movement.z = actual_direction
+		movement.z = direction
 		axis_count += 1
-	
-	# Normalize if multiple axes (diagonal movement)
+
+	if axis_count == 0:
+		return
+
 	if axis_count > 1:
 		movement = movement.normalized()
-	
+
 	movement *= step
-	
-	# Apply movement based on mode
+
 	var mode = _services.mode_state_machine.get_current_mode()
 	if mode == ModeStateMachine.Mode.PLACEMENT:
-		var state := _state()
-		if not state:
-			return
-		# In placement mode, directly adjust position
 		state.position += movement
 		state.target_position += movement
 	elif mode == ModeStateMachine.Mode.TRANSFORM:
-		var state := _state()
-		if not state:
-			return
-		# In transform mode, adjust center position
 		var transform_payload = _session().transform_data
 		var center_pos = transform_payload.get("center_position", state.position)
 		center_pos += movement
@@ -676,6 +691,9 @@ func _apply_position_axis_adjustment(wheel_input: Dictionary) -> void:
 		state.position = center_pos
 
 func _grab_3d_viewport_focus() -> void:
+	var focus_owner = get_current_focus_owner()
+	if should_lock_input_to_ui(focus_owner):
+		return
 	var viewport_3d = _services.editor_facade.get_editor_viewport_3d(0)
 	if not viewport_3d:
 		return
@@ -700,6 +718,32 @@ func _find_spatial_editor(node: Node) -> Control:
 				return result
 	return null
 
+func _is_spatial_editor_control(control: Control) -> bool:
+	var current: Node = control
+	var depth := 0
+	while current and depth < 8:
+		if current.get_class() == "Node3DEditor":
+			return true
+		current = current.get_parent()
+		depth += 1
+	return false
+
+func _is_text_input_control(control: Control) -> bool:
+	if control is LineEdit or control is TextEdit:
+		return true
+	if control.get_class() == "SpinBox":
+		return true
+	var current: Node = control.get_parent()
+	var depth := 0
+	while current and depth < 5:
+		if current is LineEdit or current is TextEdit:
+			return true
+		if current.get_class() == "SpinBox":
+			return true
+		current = current.get_parent()
+		depth += 1
+	return false
+
 func _is_3d_context_focused() -> bool:
 	var edited_scene = _services.editor_facade.get_edited_scene_root()
 	if not edited_scene:
@@ -714,6 +758,8 @@ func _is_3d_context_focused() -> bool:
 	if base_control:
 		var focused_control = base_control.get_viewport().gui_get_focus_owner()
 		if focused_control:
+			if should_lock_input_to_ui(focused_control):
+				return false
 			var current = focused_control
 			var depth = 0
 			while current and depth < 20:

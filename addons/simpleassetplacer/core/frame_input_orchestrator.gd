@@ -31,7 +31,16 @@ func process(session, camera: Camera3D, input_settings: Dictionary, delta: float
 		return
 
 	_services.input_handler.update_input_state(input_settings, viewport_3d)
-	_owner._process_navigation_input()
+	var focus_owner: Control = null
+	if _owner and _owner.has_method("get_current_focus_owner"):
+		focus_owner = _owner.get_current_focus_owner()
+	var ui_focus_locked := false
+	if _owner and _owner.has_method("should_lock_input_to_ui"):
+		ui_focus_locked = _owner.should_lock_input_to_ui(focus_owner)
+	session.ui_focus_locked = ui_focus_locked
+
+	if not ui_focus_locked:
+		_owner._process_navigation_input()
 
 	var combined_source = SettingsManager.get_combined_settings()
 	var combined_settings = combined_source.duplicate(true)
@@ -53,13 +62,15 @@ func process(session, camera: Camera3D, input_settings: Dictionary, delta: float
 	var mode = _services.mode_state_machine.get_current_mode()
 	match mode:
 		ModeStateMachine.Mode.PLACEMENT:
-			_services.placement_mode_handler.process_input(camera, session.placement_data, state, combined_settings, delta)
+			if not ui_focus_locked:
+				_services.placement_mode_handler.process_input(camera, session.placement_data, state, combined_settings, delta)
 			if session.placement_data.get("_confirm_exit", false):
 				session.placement_data.erase("_confirm_exit")
 				_owner.exit_placement_mode()
 				return
 		ModeStateMachine.Mode.TRANSFORM:
-			_services.transform_mode_handler.process_input(camera, session.transform_data, state, combined_settings, delta)
+			if not ui_focus_locked:
+				_services.transform_mode_handler.process_input(camera, session.transform_data, state, combined_settings, delta)
 			if session.transform_data.get("_confirm_exit", false):
 				session.transform_data.erase("_confirm_exit")
 				_owner.exit_transform_mode(true)

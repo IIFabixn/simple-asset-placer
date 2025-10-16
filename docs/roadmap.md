@@ -175,10 +175,10 @@ Deliver a placement and transform experience that is:
    - *Acceptance criteria:* Info button visible in settings; dialog opens/closes reliably via keyboard and mouse; dismissal state persists and reset is available.  
    - *Notes:* Capture screenshots for README Quickstart and leave hooks for richer tooltip flows later.  
    - *Blocked by:* UI-101, UI-102, SET-101  
-   - *Status:*  
-     - [ ] Not started  
-     - [ ] In progress  
-     - [ ] Done  
+     - *Status:*  
+        - [ ] Not started  
+        - [x] In progress  
+        - [ ] Done  
    - *Progress note:* _(record updates here)_
 4. **UI-103: Quick Controls panel in dock**  
     - *Affected components:* _Scope retired_ – existing overlay and settings surfaces already expose live keybinds.  
@@ -302,7 +302,7 @@ Deliver a placement and transform experience that is:
        - [ ] Not started  
        - [ ] In progress  
        - [ ] Done  
-    - *Progress note:* _(record updates here)_
+    - *Progress note:* 2025-10-17 – Wheel increments now honour fine/large modifiers with overlay copy refreshed; validating axis cases and smoke checklist updates.  
 6. **WF-206: Focus management**  
    - *Affected components:* `core/transformation_coordinator.gd`, `ui/asset_placer_dock.gd`, `ui/placement_settings.gd`, automated focus tests.  
    - *Deliverables:* Revised focus grabbing logic, automated tests, behaviour docs.  
@@ -312,9 +312,9 @@ Deliver a placement and transform experience that is:
     - *Blocked by:* CORE-005, DOC-101  
     - *Status:*  
        - [ ] Not started  
-       - [ ] In progress  
+       - [x] In progress  
        - [ ] Done  
-    - *Progress note:* _(record updates here)_
+    - *Progress note:* 2025-10-17 – Added UI focus lock plumbing (session flag + frame orchestrator guard) so dock inputs keep focus; viewport grab skips protected controls and smoke checklist covers the regression.
 7. **WF-207: Non-modal keyboard nudge controls**  
    - *Affected components:* `managers/input_handler.gd`, `managers/position_manager.gd`, `managers/rotation_manager.gd`, `ui/placement_settings.gd`, `settings/settings_definition.gd`.  
    - *Deliverables:* Optional WASD/X-Y-Z shortcut handling when modal is inactive, reusable nudge helpers, setting toggle with overlay indication, documentation around viewport navigation conflicts.  

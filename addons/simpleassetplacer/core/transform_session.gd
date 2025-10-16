@@ -29,6 +29,10 @@ var mesh_placed_callback: Callable = Callable()
 # Remaining frames we should force focus on the 3D viewport.
 var focus_grab_frames: int = 0
 
+# True when an editor UI control currently owns focus and should suppress
+# viewport shortcut processing.
+var ui_focus_locked: bool = false
+
 
 func is_active() -> bool:
 	return mode != ModeStateMachine.Mode.NONE
@@ -42,6 +46,7 @@ func reset() -> void:
 	settings.clear()
 	dock_reference = null
 	focus_grab_frames = 0
+	ui_focus_locked = false
 
 
 func begin(mode_type: int, initial_settings: Dictionary = {}) -> void:
@@ -58,6 +63,7 @@ func begin(mode_type: int, initial_settings: Dictionary = {}) -> void:
 	transform_data.clear()
 	dock_reference = null
 	focus_grab_frames = 0
+	ui_focus_locked = false
 
 
 func ensure_state(initial_settings: Dictionary = {}) -> TransformState:

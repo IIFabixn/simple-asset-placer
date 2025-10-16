@@ -74,7 +74,9 @@ func enter_transform_mode(target_nodes: Variant, settings: Dictionary, transform
 	return transform_data
 
 func exit_transform_mode(transform_data: Dictionary, transform_state: TransformState, confirm_changes: bool, settings: Dictionary) -> void:
-	if not confirm_changes:
+	if confirm_changes:
+		_register_transform_undo(transform_data)
+	else:
 		restore_original_state(transform_data)
 	_reset_transforms_on_exit(transform_state, settings)
 	_services.overlay_manager.hide_transform_overlay()
@@ -733,6 +735,64 @@ func restore_original_state(transform_data: Dictionary) -> void:
 			var original_transform = original_transforms.get(node)
 			if original_transform:
 				node.transform = original_transform
+
+func _register_transform_undo(transform_data: Dictionary) -> void:
+	var undo_helper = _services.undo_redo_helper if _services else null
+	if not undo_helper:
+		return
+
+	var undo_redo: EditorUndoRedoManager = transform_data.get("undo_redo")
+	if undo_redo == null:
+		return
+
+	var target_nodes: Array = transform_data.get("target_nodes", [])
+	if target_nodes.is_empty():
+		return
+
+	var original_transforms: Dictionary = transform_data.get("original_transforms", {})
+	if original_transforms.is_empty():
+		return
+
+	var changed_nodes: Array = []
+	var filtered_originals := {}
+	for node in target_nodes:
+		if not node or not is_instance_valid(node) or not node.is_inside_tree():
+			continue
+		if not original_transforms.has(node):
+			continue
+		var original_transform: Transform3D = original_transforms.get(node)
+		if original_transform == null:
+			continue
+		var current_transform: Transform3D = node.transform
+		if _transforms_different(original_transform, current_transform):
+			changed_nodes.append(node)
+			filtered_originals[node] = original_transform
+
+	if changed_nodes.is_empty():
+		return
+
+	var primary_name = ""
+	if changed_nodes.size() == 1:
+		primary_name = changed_nodes[0].name
+	var action_name: String = undo_helper.get_action_description("Transform", primary_name, changed_nodes.size())
+	var created: bool = undo_helper.create_multi_transform_undo(undo_redo, changed_nodes, filtered_originals, action_name)
+	if created:
+		PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, "Registered transform undo action: %s" % action_name)
+	else:
+		PluginLogger.warning(PluginConstants.COMPONENT_TRANSFORM, "Failed to record transform undo action")
+
+func _transforms_different(original: Transform3D, current: Transform3D) -> bool:
+	if not original.origin.is_equal_approx(current.origin):
+		return true
+	var original_basis := original.basis
+	var current_basis := current.basis
+	if not original_basis.x.is_equal_approx(current_basis.x):
+		return true
+	if not original_basis.y.is_equal_approx(current_basis.y):
+		return true
+	if not original_basis.z.is_equal_approx(current_basis.z):
+		return true
+	return false
 
 func _calculate_node_offsets(nodes: Array, center: Vector3) -> Dictionary:
 	var offsets = {}

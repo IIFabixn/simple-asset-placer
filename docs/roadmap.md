@@ -77,8 +77,8 @@ Deliver a placement and transform experience that is:
     - *Notes:* Document new data flow for future contributors.  
     - *Blocked by:* CORE-001, CORE-002  
     - *Status:*  
-          - [ ] Not started  
-          - [ ] In progress  
+         - [ ] Not started  
+         - [ ] In progress  
        - [x] Done  
       - *Progress note:* 2025-10-16 – PlacementModeHandler now processes TransformCommand end-to-end (position/rotation/scale/numeric), axis taps feed numeric offsets; manual smoke tests pass.
 4. **CORE-004: Update TransformModeHandler**  
@@ -168,12 +168,12 @@ Deliver a placement and transform experience that is:
        - [ ] In progress  
        - [x] Done  
     - *Progress note:* 2025-10-16 – Toolbar toggles wired to settings (snap/alignment/smooth/strategy), overlay badges update instantly, state persists.
-3. **DOC-101: In-editor onboarding tooltips**  
-   - *Affected components:* New `ui/onboarding_manager.gd`, `SettingsManager`, dock/toolbar scripts.  
-   - *Deliverables:* First-run detection, guided tooltip sequence with dismissal option, reset command.  
-   - *Expected result:* New users receive contextual guidance without documentation.  
-   - *Acceptance criteria:* Tooltips appear only when intended; keyboard navigation supported; dismissal state stored in settings.  
-   - *Notes:* Capture screenshots for README Quickstart.  
+3. **DOC-101: In-editor onboarding entry point**  
+   - *Affected components:* `ui/placement_settings.gd`, new intro dialog scene/script, `SettingsManager`.  
+   - *Deliverables:* Info button within settings panel that opens an introductory dialog covering core controls; optional reset action so users can revisit the content; light-weight copy for future expansion.  
+   - *Expected result:* New users launch the intro from settings and understand primary placement/transform shortcuts without leaving the editor.  
+   - *Acceptance criteria:* Info button visible in settings; dialog opens/closes reliably via keyboard and mouse; dismissal state persists and reset is available.  
+   - *Notes:* Capture screenshots for README Quickstart and leave hooks for richer tooltip flows later.  
    - *Blocked by:* UI-101, UI-102, SET-101  
    - *Status:*  
      - [ ] Not started  
@@ -181,17 +181,17 @@ Deliver a placement and transform experience that is:
      - [ ] Done  
    - *Progress note:* _(record updates here)_
 4. **UI-103: Quick Controls panel in dock**  
-   - *Affected components:* `ui/asset_placer_dock.gd`, new panel scene, keybinding display helpers.  
-   - *Deliverables:* Collapsible controls panel pulling live keybind data, cached layout nodes.  
-   - *Expected result:* Users see current shortcuts at a glance, respecting remaps.  
-   - *Acceptance criteria:* Panel toggles without layout jitter; updates within one frame after keybinding change; negligible frame impact (<0.1ms).  
-   - *Notes:* Add preference to default panel state (collapsed/expanded).  
-   - *Blocked by:* UI-102, DOC-101  
-   - *Status:*  
-     - [ ] Not started  
-     - [ ] In progress  
-     - [ ] Done  
-   - *Progress note:* _(record updates here)_
+    - *Affected components:* _Scope retired_ – existing overlay and settings surfaces already expose live keybinds.  
+    - *Deliverables:* None; document decision and ensure overlay/settings stay accurate.  
+    - *Expected result:* Users continue relying on overlay + settings for shortcut discovery without redundant UI.  
+    - *Acceptance criteria:* Overlay and settings reflect latest bindings; decision captured in docs/changelog when relevant.  
+    - *Notes:* Revisit only if future usability feedback highlights a dock-specific gap.  
+    - *Blocked by:* —  
+    - *Status:*  
+       - [ ] Not started  
+       - [ ] In progress  
+       - [x] Done  
+    - *Progress note:* 2025-10-16 – Closed as unnecessary; overlay badges and settings tab already serve quick reference needs.
 5. **SET-101: Settings exposure**  
    - *Affected components:* `ui/placement_settings.gd`, `settings/settings_definition.gd`, README.  
    - *Deliverables:* Toggles for auto-modal, cursor warp, sensitivity curves; tooltips; persisted values.  
@@ -210,7 +210,7 @@ Deliver a placement and transform experience that is:
    - *Expected result:* Actionable feedback informs Phase 3 scope.  
    - *Acceptance criteria:* Findings documented; new issues/tickets created; roadmap updated if priorities shift.  
    - *Notes:* Include mix of new and experienced users.  
-   - *Blocked by:* UI-101, UI-102, UI-103, DOC-101, SET-101  
+   - *Blocked by:* UI-101, UI-102, DOC-101, SET-101  
    - *Status:*  
      - [ ] Not started  
      - [ ] In progress  
@@ -224,11 +224,12 @@ Deliver a placement and transform experience that is:
 ### Goals
 - Reduce friction during asset placement and transformation loops.
 - Expose more contextual information without leaving the viewport.
+- Confirm undo/redo stays reliable across the command-driven workflows.
 
 ### Key Tasks
 1. **Placement Loop Options**  
    - Allow users to toggle between "single placement" and "continuous placement"; optionally auto-select the placed node.
-   - Provide commands to repeat last asset or open a history palette overlay.
+   - Provide commands to repeat last asset or surface recent choices via existing Godot panels when possible.
 
 2. **Asset Context**  
    - Show material variants, LOD info, or alternative meshes within the viewport overlay while cycling.
@@ -254,18 +255,18 @@ Deliver a placement and transform experience that is:
        - [ ] In progress  
        - [x] Done  
     - *Progress note:* 2025-10-16 – Added continuous placement toggle, auto-select option, and single-drop exit flow with documentation and smoke test updates.
-2. **WF-202: Placement history overlay**  
-   - *Affected components:* `core/service_registry.gd`, `ui/status_overlay_control.gd`, `ui/asset_placer_dock.gd`, `managers/overlay_manager.gd`.  
-   - *Deliverables:* History data store (last N assets), overlay palette with shortcuts, dock accessors.  
-   - *Expected result:* Users quickly re-place recent assets without opening dock.  
-   - *Acceptance criteria:* History updates reliably; overlay selection re-enters placement; session-level persistence confirmed.  
-    - *Notes:* Evaluate persisting history per project in later iterations.  
-    - *Blocked by:* WF-201, CORE-003  
+2. **WF-202: Undo/redo completeness audit**  
+   - *Affected components:* `core/transformation_coordinator.gd`, `modes/placement_mode_handler.gd`, `modes/transform_mode_handler.gd`, `docs/testing/undo_checklist.md`, `scripts/run_gut_tests.ps1`, regression fixtures.  
+   - *Deliverables:* Deep analysis of undo/redo behaviour across placement and transform flows (single + multi-selection, modal/non-modal, numeric overrides); documented root causes for observed anomalies (e.g., multi-node transform undo deleting nodes); checklist + test coverage updates; fixes or follow-up tickets for every discrepancy.  
+   - *Expected result:* Command pipeline integrates cleanly with Godot's history, undo reverses actions without deleting nodes, redo restores prior state, and known scenarios are codified in tests.  
+   - *Acceptance criteria:* Comprehensive scenario matrix in `docs/testing/undo_checklist.md`; reproducible steps and owners logged for each issue; at least one automated or scripted regression check outlined; confirmation that the tab → G → move → LMB → Ctrl+Z flow restores positions instead of removing nodes.  
+    - *Notes:* Leverage Godot's history panel for observation, capture before/after command logs, and record video/GIF evidence for complex cases.  
+    - *Blocked by:* WF-201, CORE-003, CORE-004  
     - *Status:*  
        - [ ] Not started  
        - [ ] In progress  
        - [ ] Done  
-    - *Progress note:* _(record updates here)_
+    - *Progress note:* 2025-10-16 – Audit scope expanded after discovering multi-node transform undo removes instances instead of reverting transform.
 3. **WF-203: Variant and LOD display**  
    - *Affected components:* `managers/category_manager.gd`, `ui/meshlib_browser.gd`, `ui/modellib_browser.gd`, `ui/status_overlay_control.gd`, thumbnail cache helpers.  
    - *Deliverables:* Metadata extraction for variants/LODs, UI selector, thumbnail cache.  
@@ -357,25 +358,25 @@ Deliver a placement and transform experience that is:
    - *Deliverables:* JSON logging behind `debug_commands`, history viewer UI, auto-trim policy.  
    - *Expected result:* Developers inspect recent commands during debugging without cluttering normal runs.  
    - *Acceptance criteria:* Logs only emit when enabled; viewer lists latest N commands with timestamps; memory usage bounded.  
-   - *Notes:* Consider integrating with placement history overlay for reuse; depends on `debug_commands` setting introduced in CORE-002.  
+   - *Notes:* Use WF-202 findings to prioritise logging views; depends on `debug_commands` setting introduced in CORE-002.  
    - *Blocked by:* CORE-002, WF-202  
    - *Status:*  
      - [ ] Not started  
      - [ ] In progress  
      - [ ] Done  
    - *Progress note:* _(record updates here)_
-3. **DEV-302: Input provider abstraction**  
-   - *Affected components:* `core/transform_action_router.gd`, `core/frame_input_orchestrator.gd`, `core/service_registry.gd`, developer docs.  
-   - *Deliverables:* Interface for external input providers, gamepad stub example, dev guide.  
-   - *Expected result:* Future inputs integrate without modifying router core.  
-   - *Acceptance criteria:* Stub registers via ServiceRegistry and emits commands; documentation explains lifecycle; unit tests validate provider hook.  
-   - *Notes:* Leave actual gamepad keymap implementation for future ticket.  
-   - *Blocked by:* CORE-002, DEV-301  
-   - *Status:*  
-     - [ ] Not started  
-     - [ ] In progress  
-     - [ ] Done  
-   - *Progress note:* _(record updates here)_
+3. **DEV-302: External input guidance**  
+    - *Affected components:* Developer docs (`docs/architecture/`, `README`), optional samples.  
+    - *Deliverables:* Confirmation that Godot’s built-in input map already handles external/gamepad devices; documentation describing how the command pipeline consumes mapped actions; guidance for contributors on adding new bindings without code changes.  
+    - *Expected result:* Team understands that no additional abstraction layer is required, and future input work focuses on configuration + UX instead of plumbing.  
+    - *Acceptance criteria:* Short explainer committed to docs; checklist ensuring new actions flow through `TransformActionRouter` when mapped; open questions about edge cases captured if any remain.  
+    - *Notes:* Revisit only if a future device requires per-frame data that Godot’s Input API cannot expose.  
+    - *Blocked by:* CORE-002, DEV-301  
+    - *Status:*  
+       - [ ] Not started  
+       - [ ] In progress  
+       - [ ] Done  
+    - *Progress note:* _(record updates here)_
 4. **DOC-301: Architecture diagrams refresh**  
    - *Affected components:* `docs/architecture/*.mmd`, exported assets, README references.  
    - *Deliverables:* Updated flow/class diagrams, new TransformCommand sequence diagram, optimized PNG exports.  
@@ -429,7 +430,7 @@ Deliver a placement and transform experience that is:
    - *Expected result:* Users access key docs without leaving Godot.  
    - *Acceptance criteria:* Panel loads instantly; content sourced from markdown/resources; version badge reflects `plugin.cfg`.  
    - *Notes:* Explore markdown-to-rich-text pipeline for maintainability.  
-   - *Blocked by:* DOC-101, UI-103, WF-202  
+   - *Blocked by:* DOC-101  
    - *Status:*  
      - [ ] Not started  
      - [ ] In progress  
@@ -453,7 +454,7 @@ Deliver a placement and transform experience that is:
    - *Expected result:* Users can explore new workflows immediately.  
    - *Acceptance criteria:* Sample scenes open without warnings; media showcases latest UI; README links functional.  
    - *Notes:* Note minimum Godot version compatibility if scene features require it.  
-   - *Blocked by:* WF-201, WF-202, WF-203, WF-204, WF-205  
+   - *Blocked by:* WF-201, WF-203, WF-204, WF-205  
    - *Status:*  
      - [ ] Not started  
      - [ ] In progress  

@@ -163,11 +163,11 @@ Deliver a placement and transform experience that is:
    - *Acceptance criteria:* Toggle state persists across sessions; tooltips display remapped shortcuts; icon assets optimized (<10KB).  
    - *Notes:* Ensure toolbar width handles localization.  
    - *Blocked by:* CORE-005, SET-101  
-   - *Status:*  
-     - [ ] Not started  
-     - [ ] In progress  
-     - [ ] Done  
-   - *Progress note:* _(record updates here)_
+    - *Status:*  
+       - [ ] Not started  
+       - [ ] In progress  
+       - [x] Done  
+    - *Progress note:* 2025-10-16 – Toolbar toggles wired to settings (snap/alignment/smooth/strategy), overlay badges update instantly, state persists.
 3. **DOC-101: In-editor onboarding tooltips**  
    - *Affected components:* New `ui/onboarding_manager.gd`, `SettingsManager`, dock/toolbar scripts.  
    - *Deliverables:* First-run detection, guided tooltip sequence with dismissal option, reset command.  

@@ -85,6 +85,11 @@ static func get_all_settings() -> Array:
 	random_rotation.ui_tooltip = "Apply random Y-axis rotation on placement"
 	settings.append(random_rotation)
 	
+	var smooth_transforms_setting = SettingMeta.new("smooth_transforms", "simple_asset_placer/smooth_transforms", true, SettingType.BOOL, "Smooth Transforms")
+	smooth_transforms_setting.section = "basic"
+	smooth_transforms_setting.ui_tooltip = "Smoothly interpolate preview and transform updates"
+	settings.append(smooth_transforms_setting)
+
 	var scale_multiplier = SettingMeta.new("scale_multiplier", "simple_asset_placer/scale_multiplier", 1.0, SettingType.FLOAT, "Scale Multiplier")
 	scale_multiplier.section = "basic"
 	scale_multiplier.min_value = 0.01

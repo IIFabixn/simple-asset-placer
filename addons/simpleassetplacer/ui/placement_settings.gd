@@ -367,6 +367,22 @@ func toggle_random_rotation(enabled: bool) -> void:
 	save_settings()
 	settings_changed.emit()
 
+func toggle_surface_alignment(enabled: bool) -> void:
+	"""Toggle surface alignment (align to surface normal)"""
+	align_with_normal = enabled
+	if ui_controls.has("align_with_normal"):
+		ui_controls["align_with_normal"].set_pressed_no_signal(enabled)
+	save_settings()
+	settings_changed.emit()
+
+func toggle_smooth_transforms(enabled: bool) -> void:
+	"""Toggle smooth transform interpolation"""
+	smooth_transforms = enabled
+	if ui_controls.has("smooth_transforms"):
+		ui_controls["smooth_transforms"].set_pressed_no_signal(enabled)
+	save_settings()
+	settings_changed.emit()
+
 func cycle_placement_strategy() -> String:
 	"""Cycle through placement strategies (collision/plane)"""
 	# Cycle the strategy

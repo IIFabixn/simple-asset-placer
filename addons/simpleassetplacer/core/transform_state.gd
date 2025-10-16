@@ -208,7 +208,10 @@ func configure_from_settings(settings: Dictionary):
 	if snap_rotation_enabled or snap_scale_enabled or snap_enabled:
 		PluginLogger.debug("TransformState", "Snap settings | Pos:%s step:%s Rot:%s step:%s Scale:%s step:%s half_step:%s" % [snap_enabled, snap_step, snap_rotation_enabled, snap_rotation_step, snap_scale_enabled, snap_scale_step, use_half_step])
 	
-	align_with_normal = settings.get("use_surface_normal", false)
+	var align_normal_setting = settings.get("align_with_normal")
+	if align_normal_setting == null:
+		align_normal_setting = settings.get("use_surface_normal", false)
+	align_with_normal = bool(align_normal_setting)
 	collision_mask = settings.get("collision_mask", 1)
 	height_step_size = settings.get("height_step_size", 0.1)
 

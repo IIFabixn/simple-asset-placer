@@ -19,6 +19,10 @@ func process(session, camera: Camera3D, input_settings: Dictionary, delta: float
 	if not camera or not is_instance_valid(camera):
 		return
 
+	var previous_settings: Dictionary = {}
+	if session.settings is Dictionary:
+		previous_settings = session.settings.duplicate(true)
+
 	if not input_settings.is_empty():
 		session.settings = input_settings.duplicate(true)
 
@@ -31,9 +35,13 @@ func process(session, camera: Camera3D, input_settings: Dictionary, delta: float
 
 	var combined_source = SettingsManager.get_combined_settings()
 	var combined_settings = combined_source.duplicate(true)
+	var settings_changed = previous_settings != combined_settings
 	session.settings = combined_settings
 
-	var state = session.transform_state
+	var state_was_null := session.transform_state == null
+	var state = session.ensure_state(combined_settings)
+	if state and (settings_changed or state_was_null):
+		state.configure_from_settings(combined_settings)
 	if state:
 		_services.position_manager.configure(state, combined_settings)
 	_owner._configure_smooth_transforms(combined_settings)

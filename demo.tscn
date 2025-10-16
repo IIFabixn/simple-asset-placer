@@ -1,4 +1,4 @@
-[gd_scene load_steps=33 format=4 uid="uid://repnqsnpqatg"]
+[gd_scene load_steps=29 format=4 uid="uid://repnqsnpqatg"]
 
 [ext_resource type="PackedScene" uid="uid://bi526m4rgyylo" path="res://sample/building_a.tscn" id="1_m0rpm"]
 [ext_resource type="PackedScene" uid="uid://bs7orqq2mvo0n" path="res://sample/building_b.tscn" id="2_c6xj6"]
@@ -254,72 +254,6 @@ _surfaces = [{
 blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_nlcn0")
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_svejp"]
-resource_name = "stones"
-shading_mode = 0
-albedo_texture = ExtResource("16_y4qkf")
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_36gju"]
-resource_name = "bricks"
-shading_mode = 0
-albedo_texture = ExtResource("17_oncxo")
-
-[sub_resource type="ArrayMesh" id="ArrayMesh_tql22"]
-_surfaces = [{
-"aabb": AABB(-0.1, 0, -0.1, 0.2, 1, 0.2),
-"format": 34896613377,
-"index_count": 48,
-"index_data": PackedByteArray("AAABAAIAAQAAAAIAAQADAAAAAwABAAAAAgAEAAAABAACAAAAAAAFAAMABQAAAAMABAAGAAIABgAEAAIABQADAAYAAwAFAAYAAgAHAAYABwACAAYABgAHAAMABwAGAAMA"),
-"name": "stones",
-"primitive": 3,
-"uv_scale": Vector4(0, 0, 0, 0),
-"vertex_count": 8,
-"vertex_data": PackedByteArray("////////AAD//wAA//8AAAAAAAD//wAA//8AAAAAAAAAAP////8AAP////8AAAAAAAD//wAAAAAAAAAAAAAAAA==")
-}, {
-"aabb": AABB(-0.1, 0, -0.1, 0.2, 1, 0.2),
-"format": 34896613377,
-"index_count": 24,
-"index_data": PackedByteArray("BAAFAAYABQAEAAYABwAGAAQABgAHAAQAAAABAAIAAQAAAAIAAwACAAAAAgADAAAA"),
-"lods": [0.081649825, PackedByteArray("AAABAAIAAQAAAAIAAwACAAAAAgADAAAA")],
-"name": "bricks",
-"primitive": 3,
-"uv_scale": Vector4(0, 0, 0, 0),
-"vertex_count": 8,
-"vertex_data": PackedByteArray("AAAAAP//AAD//wAA//8AAP//AAAAAAAAAAAAAAAAAAAAAP//AAAAAP////8AAAAA////////AAAAAP////8AAA==")
-}]
-blend_shape_mode = 0
-
-[sub_resource type="ArrayMesh" id="ArrayMesh_jbdfk"]
-resource_name = "column_column"
-_surfaces = [{
-"aabb": AABB(-0.1, 0, -0.1, 0.2, 1, 0.2),
-"attribute_data": PackedByteArray("qjr/f6o6////L////y//f6o6//+qOv9//y////8v/38AAP9/qgr/f6oK//8AAP//qgr/fwAA/3+qCv//AAD///8v//9VJf//VSX/f/8v/39VJf///y///1Ul/3//L/9/VRX/f1UV//+qCv//qgr/f1UV//9VFf9/qgr//6oK/38="),
-"format": 34896613399,
-"index_count": 48,
-"index_data": PackedByteArray("AAABAAIAAgADAAAABAAFAAYABwAGAAUACAAJAAoACgALAAgADAANAA4ADwAOAA0AEAARABIAEgATABAAFAAVABYAFwAWABUAGAAZABoAGgAbABgAHAAdAB4AHwAeAB0A"),
-"material": SubResource("StandardMaterial3D_svejp"),
-"name": "stones",
-"primitive": 3,
-"uv_scale": Vector4(4.8, 2, 0, 0),
-"vertex_count": 32,
-"vertex_data": PackedByteArray("////////AID//wAA//8AgAAAAAD//wCAAAD/////AID//wAA//8AAP///////wAAAAAAAP//AAAAAP////8AAP////////+//////wAA/7///wAAAAD/v///AAD///+//////wAAAAD///////8AAP//AAAAAAAA//8AAP//AAAAAAAA////vwAAAAAAAP+/AAD//wAA/78AAP//////vwAAAAAAAAAAAAAAAP//AAAAAP//AAAAAAAA/////wAAAAD//wAA//8AAAAAAAD/////AAAAAP///////wAA//8AAAAAAAAAAAAA//8AAAAA//8AAAAAAAD/////AAAAAP9/////f////3////9///////9/////f////3////9//38AAP9/AAD/fwAA/38AAP8//3//P/9//z//f/8//3//f////3////9/////f////7//f/+//3//v/9//7//f/9/////f////3////9/////f/9//3//f/9//3//f/9/")
-}, {
-"aabb": AABB(-0.1, 0, -0.1, 0.2, 1, 0.2),
-"attribute_data": PackedByteArray("AACp6pkZqeqZGf//AAD//5kZqeoAAKnqmRn//wAA////////Zeb//2Xmqer//6nqZeb///////9l5qnq//+p6g=="),
-"format": 34896613399,
-"index_count": 24,
-"index_data": PackedByteArray("CAAJAAoACgALAAgADAANAA4ADwAOAA0AAAABAAIAAgADAAAABAAFAAYABwAGAAUA"),
-"lods": [0.081649825, PackedByteArray("AAABAAIAAgADAAAABAAFAAYABwAGAAUA")],
-"material": SubResource("StandardMaterial3D_36gju"),
-"name": "bricks",
-"primitive": 3,
-"uv_scale": Vector4(2, 2.4, 0, 0),
-"vertex_count": 16,
-"vertex_data": PackedByteArray("AAAAAP///7///wAA////v///AAAAAP+/AAAAAAAA/7///wAA////PwAAAAD///8///8AAAAA/z8AAAAAAAD/PwAA//8AAP///////wAA/////////////wAA/////////////wAAAAAAAP//AAAAAP///////wAAAAD/////AAAAAP9/AAD/fwAA/38AAP9/////f////3////9/////f/9//7//f/+//3//v/9//7//f/8//3//P/9//z//f/8/")
-}]
-blend_shape_mode = 0
-shadow_mesh = SubResource("ArrayMesh_tql22")
-
 [node name="Node3D" type="Node3D"]
 
 [node name="CSGCombiner3D" type="CSGCombiner3D" parent="."]
@@ -428,22 +362,8 @@ mesh = SubResource("ArrayMesh_vybca")
 [node name="column_3" type="MeshInstance3D" parent="."]
 mesh = SubResource("ArrayMesh_vybca")
 
-[node name="column_4" type="MeshInstance3D" parent="."]
-transform = Transform3D(6, 0, 0, 0, 6, 0, 0, 0, 6, 1, 0, -12)
-mesh = SubResource("ArrayMesh_jbdfk")
-
-[node name="column_5" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, -10)
-mesh = SubResource("ArrayMesh_jbdfk")
-
 [node name="building_a_3" parent="." instance=ExtResource("1_m0rpm")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0, -10)
 
 [node name="barrels_3" parent="." instance=ExtResource("7_gxmxl")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, -10)
-
-[node name="barrels_4" parent="." instance=ExtResource("7_gxmxl")]
-transform = Transform3D(-0.35021156, 0, 0.9366706, 0, 1, 0, -0.9366706, 0, -0.35021156, 2.5, 0.5, -10.5)
-
-[node name="barrels_5" parent="." instance=ExtResource("7_gxmxl")]
-transform = Transform3D(0.25037593, 0, 0.9681487, 0, 1, 0, -0.9681487, 0, 0.25037593, 1.5, 0.5, -9)

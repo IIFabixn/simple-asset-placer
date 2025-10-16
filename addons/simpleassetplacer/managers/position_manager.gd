@@ -494,6 +494,7 @@ func configure(state: TransformState, config: Dictionary) -> void:
 	state.snap_center_x = config.get("snap_center_x", false)
 	state.snap_center_y = config.get("snap_center_y", false)
 	state.snap_center_z = config.get("snap_center_z", false)
+	state.align_with_normal = _align_with_normal
 	
 	# Configure placement strategy service
 	_get_service().configure(config)

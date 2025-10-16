@@ -32,6 +32,24 @@ toggle_mode = true
 flat = true
 text = "🔲"
 
+[node name="SurfaceAlignButton" type="Button" parent="."]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+tooltip_text = "Toggle Surface Alignment
+Align placement rotation to surface normals"
+toggle_mode = true
+flat = true
+text = "SA"
+
+[node name="SmoothTransformsButton" type="Button" parent="."]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+tooltip_text = "Toggle Smooth Transforms
+Lerp preview and transform updates"
+toggle_mode = true
+flat = true
+text = "SM"
+
 [node name="RandomRotationButton" type="Button" parent="."]
 custom_minimum_size = Vector2(32, 28)
 layout_mode = 2

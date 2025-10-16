@@ -10,6 +10,8 @@ class_name ToolbarButtons
 @onready var placement_mode_button: Button = $PlacementModeButton
 @onready var grid_snap_button: Button = $GridSnapButton
 @onready var grid_overlay_button: Button = $GridOverlayButton
+var surface_align_button: Button
+var smooth_transforms_button: Button
 @onready var random_rotation_button: Button = $RandomRotationButton
 @onready var transform_mode_button: Button = $TransformModeButton
 @onready var reset_transforms_button: Button = $ResetTransformsButton
@@ -45,7 +47,12 @@ func set_services(services: ServiceRegistry) -> void:
 
 func _ready() -> void:
 	# Initialize button states FIRST before connecting signals (prevents spurious toggle events)
+	_assign_optional_buttons()
 	call_deferred("_initialize_buttons")
+
+func _assign_optional_buttons() -> void:
+	surface_align_button = get_node_or_null("SurfaceAlignButton") as Button
+	smooth_transforms_button = get_node_or_null("SmoothTransformsButton") as Button
 
 ## Button Handlers
 
@@ -140,10 +147,48 @@ func _update_button_states() -> void:
 	_update_placement_mode_button()
 	_update_grid_snap_button()
 	_update_grid_overlay_button()
+	_update_surface_align_button()
+	_update_smooth_transforms_button()
 	_update_random_rotation_button()
 	_update_transform_mode_button()
 	_update_button_tooltips()
 	# Note: Reset button doesn't have state (it's a momentary action)
+
+func _update_surface_align_button() -> void:
+	"""Sync surface alignment toggle"""
+	if not surface_align_button:
+		return
+	var enabled := false
+	if placement_settings_ref:
+		enabled = placement_settings_ref.align_with_normal
+	else:
+		var settings = SettingsManager.get_combined_settings()
+		enabled = settings.get("align_with_normal", false)
+	if surface_align_button.button_pressed != enabled:
+		var was_connected = surface_align_button.toggled.is_connected(_on_surface_align_toggled)
+		if was_connected:
+			surface_align_button.toggled.disconnect(_on_surface_align_toggled)
+		surface_align_button.button_pressed = enabled
+		if was_connected:
+			surface_align_button.toggled.connect(_on_surface_align_toggled)
+
+func _update_smooth_transforms_button() -> void:
+	"""Sync smooth transforms toggle"""
+	if not smooth_transforms_button:
+		return
+	var enabled := true
+	if placement_settings_ref:
+		enabled = placement_settings_ref.smooth_transforms
+	else:
+		var settings = SettingsManager.get_combined_settings()
+		enabled = settings.get("smooth_transforms", true)
+	if smooth_transforms_button.button_pressed != enabled:
+		var was_connected = smooth_transforms_button.toggled.is_connected(_on_smooth_transforms_toggled)
+		if was_connected:
+			smooth_transforms_button.toggled.disconnect(_on_smooth_transforms_toggled)
+		smooth_transforms_button.button_pressed = enabled
+		if was_connected:
+			smooth_transforms_button.toggled.connect(_on_smooth_transforms_toggled)
 
 func _update_placement_mode_button() -> void:
 	"""Update placement mode button icon"""
@@ -268,6 +313,12 @@ func _update_button_tooltips() -> void:
 	if transform_mode_button:
 		transform_mode_button.tooltip_text = "Transform Mode (%s)\nEdit placed objects\nPosition, Rotation, Scale" % transform_key
 
+	if surface_align_button:
+		surface_align_button.tooltip_text = "Toggle Surface Alignment\nAlign placement rotation to surface normals\nCurrent: %s" % ("On" if surface_align_button.button_pressed else "Off")
+
+	if smooth_transforms_button:
+		smooth_transforms_button.tooltip_text = "Toggle Smooth Transforms\nLerp preview and transform updates\nCurrent: %s" % ("On" if smooth_transforms_button.button_pressed else "Off")
+
 func refresh_button_states() -> void:
 	"""Public method to refresh button states (called from overlay_manager)"""
 	_update_button_states()
@@ -325,12 +376,32 @@ func _initialize_buttons() -> void:
 		grid_snap_button.toggled.connect(_on_grid_snap_toggled)
 	if grid_overlay_button:
 		grid_overlay_button.toggled.connect(_on_grid_overlay_toggled)
+	if surface_align_button:
+		surface_align_button.toggled.connect(_on_surface_align_toggled)
+	if smooth_transforms_button:
+		smooth_transforms_button.toggled.connect(_on_smooth_transforms_toggled)
 	if random_rotation_button:
 		random_rotation_button.toggled.connect(_on_random_rotation_toggled)
 	if transform_mode_button:
 		transform_mode_button.toggled.connect(_on_transform_mode_toggled)
 	if reset_transforms_button:
 		reset_transforms_button.pressed.connect(_on_reset_transforms_pressed)
+
+func _on_surface_align_toggled(toggled_on: bool) -> void:
+	"""Toggle surface alignment preference"""
+	if placement_settings_ref:
+		placement_settings_ref.toggle_surface_alignment(toggled_on)
+	else:
+		SettingsManager.set_dock_setting("align_with_normal", toggled_on)
+		SettingsManager.set_plugin_setting("align_with_normal", toggled_on)
+
+func _on_smooth_transforms_toggled(toggled_on: bool) -> void:
+	"""Toggle smooth transform interpolation"""
+	if placement_settings_ref:
+		placement_settings_ref.toggle_smooth_transforms(toggled_on)
+	else:
+		SettingsManager.set_dock_setting("smooth_transforms", toggled_on)
+		SettingsManager.set_plugin_setting("smooth_transforms", toggled_on)
 
 func _get_service() -> PlacementStrategyService:
 	if not _placement_service:

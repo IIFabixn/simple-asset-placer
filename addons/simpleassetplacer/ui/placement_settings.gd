@@ -37,6 +37,8 @@ var scale_multiplier: float = 1.0
 var smooth_transforms: bool = true
 var smooth_transform_speed: float = 8.0
 var auto_modal_activation: bool = false
+var continuous_placement_enabled: bool = true
+var auto_select_placed: bool = true
 var cursor_warp_enabled: bool = true
 var mouse_sensitivity_curve: String = "linear"
 

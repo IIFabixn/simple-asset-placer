@@ -104,6 +104,16 @@ static func get_all_settings() -> Array:
 	modal_control_exclusive.ui_tooltip = "When enabled, modal controls (G/R/L) disable other automatic transformations like surface alignment. Recommended for precise control."
 	settings.append(modal_control_exclusive)
 
+	var continuous_placement_enabled = SettingMeta.new("continuous_placement_enabled", "simple_asset_placer/continuous_placement_enabled", true, SettingType.BOOL, "Continuous Placement")
+	continuous_placement_enabled.section = "basic"
+	continuous_placement_enabled.ui_tooltip = "Keep placement mode active after each placement. Disable to exit automatically for single-drop workflows."
+	settings.append(continuous_placement_enabled)
+
+	var auto_select_placed = SettingMeta.new("auto_select_placed", "simple_asset_placer/auto_select_placed", true, SettingType.BOOL, "Auto-select Placed Node")
+	auto_select_placed.section = "basic"
+	auto_select_placed.ui_tooltip = "Automatically select newly placed nodes in the scene tree and focus them in the inspector."
+	settings.append(auto_select_placed)
+
 	var auto_modal_activation = SettingMeta.new("auto_modal_activation", "simple_asset_placer/auto_modal_activation", false, SettingType.BOOL, "Auto-activate Modal Controls")
 	auto_modal_activation.section = "basic"
 	auto_modal_activation.ui_tooltip = "When enabled, entering placement or transform will immediately activate Grab (G) like the legacy workflow."

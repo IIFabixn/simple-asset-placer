@@ -37,6 +37,7 @@ const EXTRA_BOOLEAN_KEYS := [
 	"randomize_scale",
 	"show_overlay",
 	"use_surface_normal",
+	"continuous_placement_enabled",
 	"auto_select_placed",
 	"smooth_transforms",
 	"snap_enabled",

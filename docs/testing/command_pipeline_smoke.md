@@ -42,6 +42,7 @@ Mark each task with `[x]` when completed. Capture short clips (5–10s) where no
 | CP-07 | Undo/Redo | After CP-04 or CP-06, issue `CTRL+Z` then `CTRL+SHIFT+Z`. | Transform reverts and reapplies without desync. | optional |
 | CP-08 | Modal exit pathways | With modal active, right-click once, then press `ESC` on a second attempt. | First action drops modal, second exits mode; overlay updates accordingly. | recommended |
 | CP-09 | Overlay accuracy | Toggle `auto_modal_activation` in settings, enter both modes, observe overlay. | Overlay reflects modal status only when active; setting persists after restart. | screenshot |
+| CP-10 | Placement loop options | Disable continuous placement, place an asset, then re-enable and repeat. | Single-placement mode exits immediately and auto-selects when enabled; continuous mode keeps preview active until ESC. | recommended |
 
 > **Tip:** Use the built-in `Editor > Viewport > Capture to GIF` shortcut or an external tool (ScreenToGif, ShareX) for recordings.
 
@@ -58,6 +59,17 @@ Append one block per run.
 - Media: [list filenames placed in docs/testing/assets/]
 - Findings: [new issues or regressions]
 - Follow-up Tasks: [links to issues/PRs]
+```
+
+### Recorded Sessions
+
+```
+## 2025-10-16 – Internal QA Dry Run
+- Automated: scripts/run_gut_tests.ps1 (not run – Godot headless CLI unavailable in current workspace)
+- Manual Summary: Checklist pending first capture session.
+- Media: none yet (prepare baseline GIFs before closing QA-001).
+- Findings: n/a
+- Follow-up Tasks: Schedule full smoke pass once editor access is available; capture CP-04, CP-08 recordings.
 ```
 
 ---

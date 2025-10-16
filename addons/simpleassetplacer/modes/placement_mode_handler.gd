@@ -139,6 +139,9 @@ func process_input(
 	if not camera:
 		return
 
+	if placement_data != null and settings and not settings.is_empty():
+		placement_data["settings"] = settings.duplicate(true)
+
 	var router = _services.transform_action_router
 	if not router:
 		return
@@ -193,7 +196,7 @@ func process_input(
 		if numeric_controller != null and numeric_controller.is_active():
 			numeric_controller.confirm_action()
 		else:
-			place_at_current_position(placement_data, transform_state)
+			place_at_current_position(placement_data, transform_state, settings)
 			if _services.control_mode_state:
 				_services.control_mode_state.deactivate_modal()
 
@@ -633,6 +636,7 @@ func process_asset_cycling_input(placement_data: Dictionary) -> void:
 func place_at_current_position(
 	placement_data: Dictionary,
 	transform_state: TransformState,
+	settings: Dictionary = {},
 	placed_callback: Callable = Callable()
 ) -> Node3D:
 	"""Place object at current preview position
@@ -647,6 +651,9 @@ func place_at_current_position(
 	"""
 	var position = _services.position_manager.get_current_position(transform_state)
 	var placed_node = null
+	var current_settings: Dictionary = settings if settings and not settings.is_empty() else placement_data.get("settings", {})
+	if placement_data != null and not current_settings.is_empty():
+		placement_data["settings"] = current_settings.duplicate(true)
 	
 	# Debug: Log transform state scale
 	if transform_state:
@@ -657,28 +664,28 @@ func place_at_current_position(
 	var meshlib = placement_data.get("meshlib")
 	var item_id = placement_data.get("item_id", -1)
 	var asset_path = placement_data.get("asset_path", "")
-	var settings = placement_data.get("settings", {})
+	var effective_settings = current_settings
 	
 	if meshlib and item_id >= 0:
 		placed_node = _services.utility_manager.place_meshlib_item_in_scene(
 			meshlib,
 			item_id,
 			position,
-			settings,
+			effective_settings,
 			transform_state
 		)
 	elif asset_path != "":
 		placed_node = _services.utility_manager.place_asset_in_scene(
 			asset_path,
 			position,
-			settings,
+			effective_settings,
 			transform_state
 		)
 	elif mesh:
 		placed_node = _services.utility_manager.place_mesh_in_scene(
 			mesh,
 			position,
-			settings,
+			effective_settings,
 			transform_state
 		)
 	
@@ -706,8 +713,26 @@ func place_at_current_position(
 	# Show feedback
 	if placed_node:
 		_services.overlay_manager.show_status_message("Placed: " + placed_node.name, Color.GREEN, 1.0)
+		if effective_settings.get("auto_select_placed", true):
+			_select_placed_node(placed_node)
+		if not effective_settings.get("continuous_placement_enabled", true):
+			placement_data["_confirm_exit"] = true
 	
 	return placed_node
+
+func _select_placed_node(node: Node) -> void:
+	if node == null:
+		return
+	var facade = _services.editor_facade if _services else null
+	if not facade or not facade.is_valid():
+		return
+	var selection = facade.get_selection()
+	if selection:
+		if selection.has_method("clear"):
+			selection.clear()
+		if selection.has_method("add_node"):
+			selection.add_node(node)
+	facade.inspect_object(node)
 
 ## NODE3D PLACEMENT
 

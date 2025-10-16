@@ -116,7 +116,7 @@ Deliver a placement and transform experience that is:
        - [ ] Not started   
        - [x] In progress   
        - [ ] Done   
-    - *Progress note:* 2025-10-16 – Added `/docs/testing/command_pipeline_smoke.md` checklist + assets staging folder; awaiting baseline captures and first recorded run log.
+    - *Progress note:* 2025-10-16 – Checklist and assets staging folder in place; initial session log stub added, awaiting full smoke pass and baseline captures once Godot CLI access is available.
 
 ---
 
@@ -252,8 +252,8 @@ Deliver a placement and transform experience that is:
     - *Status:*  
        - [ ] Not started  
        - [ ] In progress  
-       - [ ] Done  
-    - *Progress note:* _(record updates here)_
+       - [x] Done  
+    - *Progress note:* 2025-10-16 – Added continuous placement toggle, auto-select option, and single-drop exit flow with documentation and smoke test updates.
 2. **WF-202: Placement history overlay**  
    - *Affected components:* `core/service_registry.gd`, `ui/status_overlay_control.gd`, `ui/asset_placer_dock.gd`, `managers/overlay_manager.gd`.  
    - *Deliverables:* History data store (last N assets), overlay palette with shortcuts, dock accessors.  

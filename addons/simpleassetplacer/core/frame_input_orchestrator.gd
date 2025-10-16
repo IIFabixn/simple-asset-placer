@@ -54,6 +54,10 @@ func process(session, camera: Camera3D, input_settings: Dictionary, delta: float
 	match mode:
 		ModeStateMachine.Mode.PLACEMENT:
 			_services.placement_mode_handler.process_input(camera, session.placement_data, state, combined_settings, delta)
+			if session.placement_data.get("_confirm_exit", false):
+				session.placement_data.erase("_confirm_exit")
+				_owner.exit_placement_mode()
+				return
 		ModeStateMachine.Mode.TRANSFORM:
 			_services.transform_mode_handler.process_input(camera, session.transform_data, state, combined_settings, delta)
 			if session.transform_data.get("_confirm_exit", false):

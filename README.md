@@ -20,6 +20,7 @@ Simple Asset Placer brings professional-grade asset placement capabilities to Go
 - 🏷️ **Advanced Category System**: Intelligent asset organization with automatic folder-based categories, custom tags, favorites, and recent assets tracking.
 - 🎮 **Professional Input Handling**: Advanced conflict prevention system ensures plugin shortcuts never interfere with Godot's built-in commands. Full modifier key support (CTRL, ALT, SHIFT, META) for every keybind.
 - 🔧 **Complete Customization**: Every aspect is configurable - from key bindings and reset behaviors to placement settings and visual feedback.
+- 🔁 **Placement Loop Control**: Switch between continuous placement and single-drop workflows, and auto-select placed nodes directly from the settings dock.
 - ⚡ **Performance Optimized**: Frame-based settings caching, double-buffered AABB calculations, fast thumbnail generation with isolated rendering, and smooth real-time placement with instant visual feedback.
 - 🎨 **Clean Architecture**: Modern instance-based design with service registry pattern, dedicated mode handlers, and specialized utility classes for maintainability and extensibility.
 
@@ -42,6 +43,8 @@ Simple Asset Placer brings professional-grade asset placement capabilities to Go
 7. Left-click to place the asset in your scene.
 8. ESC to exit placement mode.
 ```
+
+> **Tip:** Tweak the **Continuous Placement** and **Auto-select Placed Node** toggles in the Settings dock to swap between single-drop bursts and hands-free placement runs.
 
 <div align="center">
   <img src="branding/gifs/placement_mode.gif" alt="Placement Mode Demo" width="80%"/>

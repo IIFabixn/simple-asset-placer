@@ -43,6 +43,7 @@ static func get_default_settings() -> Dictionary:
 		"position_increment": PluginConstants.DEFAULT_POSITION_INCREMENT,
 		"grid_size": PluginConstants.DEFAULT_GRID_SIZE,
 		"use_surface_normal": true,
+		"continuous_placement_enabled": true,
 		"auto_select_placed": true,
 		"auto_modal_activation": false,
 		"reset_height_on_exit": false,

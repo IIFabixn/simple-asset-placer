@@ -98,6 +98,11 @@ static func get_all_settings() -> Array:
 	modal_control_exclusive.section = "basic"
 	modal_control_exclusive.ui_tooltip = "When enabled, modal controls (G/R/L) disable other automatic transformations like surface alignment. Recommended for precise control."
 	settings.append(modal_control_exclusive)
+
+	var auto_modal_activation = SettingMeta.new("auto_modal_activation", "simple_asset_placer/auto_modal_activation", false, SettingType.BOOL, "Auto-activate Modal Controls")
+	auto_modal_activation.section = "basic"
+	auto_modal_activation.ui_tooltip = "When enabled, entering placement or transform will immediately activate Grab (G) like the legacy workflow."
+	settings.append(auto_modal_activation)
 	
 	# Mouse control sensitivity
 	var mouse_rotation_sensitivity = SettingMeta.new("mouse_rotation_sensitivity", "simple_asset_placer/mouse_rotation_sensitivity", 0.5, SettingType.FLOAT, "Mouse Rotation Sensitivity")
@@ -253,6 +258,11 @@ static func get_all_settings() -> Array:
 	_add_increment(settings, "position_increment", 0.1, "Default Position (Numeric)", "numeric_input", 0.01, 10.0, 0.01)
 	_add_increment(settings, "fine_position_increment", 0.01, "Fine Position (Numeric)", "numeric_input", 0.001, 1.0, 0.001)
 	_add_increment(settings, "large_position_increment", 1.0, "Large Position (Numeric)", "numeric_input", 0.5, 10.0, 0.1)
+
+	var debug_commands = SettingMeta.new("debug_commands", "simple_asset_placer/debug_commands", false, SettingType.BOOL, "Debug Command Logging")
+	debug_commands.section = "debug"
+	debug_commands.ui_tooltip = "Emit TransformCommand diagnostics to the console when enabled."
+	settings.append(debug_commands)
 	
 	return settings
 

@@ -44,6 +44,7 @@ static func get_default_settings() -> Dictionary:
 		"grid_size": PluginConstants.DEFAULT_GRID_SIZE,
 		"use_surface_normal": true,
 		"auto_select_placed": true,
+		"auto_modal_activation": false,
 		"reset_height_on_exit": false,
 		"reset_position_on_exit": false,
 		"reset_scale_on_exit": false,
@@ -68,7 +69,8 @@ static func get_default_settings() -> Dictionary:
 		"large_position_increment": 1.0,
 		"large_height_increment": 1.0,
 		"fine_sensitivity_multiplier": PluginConstants.FINE_SENSITIVITY_MULTIPLIER,
-		"large_sensitivity_multiplier": PluginConstants.LARGE_SENSITIVITY_MULTIPLIER
+		"large_sensitivity_multiplier": PluginConstants.LARGE_SENSITIVITY_MULTIPLIER,
+		"debug_commands": false
 	}
 
 	for setting_meta in SettingsDefinition.get_all_settings():

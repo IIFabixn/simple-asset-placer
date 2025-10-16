@@ -347,13 +347,27 @@ func _configure_smooth_transforms(settings_dict: Dictionary) -> void:
 	_services.scale_manager.configure(config_state, smooth_config)
 
 func _process_navigation_input() -> void:
-	var nav_input = _services.input_handler.get_navigation_input()
+	var input_handler = _services.input_handler if _services else null
+	if not input_handler:
+		return
+	var control_state = _services.control_mode_state if _services else null
+	if control_state and control_state.is_modal_active() and input_handler.is_mouse_button_just_pressed("right"):
+		control_state.deactivate_modal()
+		PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, "Modal control deactivated via right-click")
+		return
+
+	var nav_input = input_handler.get_navigation_input()
 	if nav_input.tab_just_pressed:
 		handle_tab_key_activation(_session().dock_reference)
 	if nav_input.cancel_pressed:
-		exit_any_mode()
+		if control_state and control_state.is_modal_active():
+			control_state.deactivate_modal()
+			PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, "Modal control deactivated via cancel key")
+		else:
+			exit_any_mode()
+		return
 	# Allow cycling placement strategy in both PLACEMENT and TRANSFORM modes
-	if _services.input_handler.should_cycle_placement_mode():
+	if input_handler.should_cycle_placement_mode():
 		if _services.mode_state_machine.is_any_mode_active():
 			_cycle_placement_strategy()
 

@@ -154,26 +154,43 @@ func set_control_mode(mode: ControlMode, activate_modal: bool = true) -> void:
 		mode: New control mode to activate
 		activate_modal: Whether this is an explicit modal activation (user pressed G/R/L)
 	"""
+	var previous_mode = _current_control_mode
+	var previous_modal = _modal_active
 	if _current_control_mode != mode:
 		_current_control_mode = mode
 		# Clear axis constraints when changing modes
 		clear_all_axis_constraints()
 		PluginLogger.debug("ControlModeState", "Control mode changed to: %s" % get_control_mode_string())
-	
-	if activate_modal:
-		_modal_active = true
 
-func switch_to_position_mode() -> void:
-	"""Switch to position control mode (G) - explicitly activated by user"""
-	set_control_mode(ControlMode.POSITION, true)
+	_modal_active = activate_modal
+	if activate_modal and not previous_modal:
+		PluginLogger.debug("ControlModeState", "Modal control activated: %s" % get_control_mode_string())
+	elif not activate_modal and previous_modal:
+		PluginLogger.debug("ControlModeState", "Modal control deactivated (explicit) for: %s" % get_control_mode_string())
 
-func switch_to_rotation_mode() -> void:
-	"""Switch to rotation control mode (R) - explicitly activated by user"""
-	set_control_mode(ControlMode.ROTATION, true)
+func switch_to_position_mode(activate_modal: bool = true) -> void:
+	"""Switch to position control mode (G)
 
-func switch_to_scale_mode() -> void:
-	"""Switch to scale control mode (L) - explicitly activated by user"""
-	set_control_mode(ControlMode.SCALE, true)
+	Args:
+		activate_modal: Whether to mark modal as active after switching
+	"""
+	set_control_mode(ControlMode.POSITION, activate_modal)
+
+func switch_to_rotation_mode(activate_modal: bool = true) -> void:
+	"""Switch to rotation control mode (R)
+
+	Args:
+		activate_modal: Whether to mark modal as active after switching
+	"""
+	set_control_mode(ControlMode.ROTATION, activate_modal)
+
+func switch_to_scale_mode(activate_modal: bool = true) -> void:
+	"""Switch to scale control mode (L)
+
+	Args:
+		activate_modal: Whether to mark modal as active after switching
+	"""
+	set_control_mode(ControlMode.SCALE, activate_modal)
 
 func deactivate_modal() -> void:
 	"""Deactivate modal control (return to normal mode)"""

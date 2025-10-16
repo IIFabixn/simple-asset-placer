@@ -82,16 +82,27 @@ func track_action_context(rotation_input: RotationInputState, scale_input: Scale
 	var is_position_mode = control_mode.is_position_mode() if control_mode else false
 	var action_types = action_types()
 
-	if not is_position_mode:
-		if rotation_input and rotation_input.x_tapped:
+	if rotation_input and rotation_input.x_tapped:
+		var axis_meta = _merge_metadata(metadata, {"axis": "X"})
+		if is_position_mode:
+			_set_action_context(action_types.POSITION_RIGHT, axis_meta)
+		else:
 			PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "NumericInput: ROTATE_X context")
-			_set_action_context(action_types.ROTATE_X, _merge_metadata(metadata, {"axis": "X"}))
-		elif rotation_input and rotation_input.y_tapped:
+			_set_action_context(action_types.ROTATE_X, axis_meta)
+	elif rotation_input and rotation_input.y_tapped:
+		var axis_meta_y = _merge_metadata(metadata, {"axis": "Y"})
+		if is_position_mode:
+			_set_action_context(action_types.HEIGHT, axis_meta_y)
+		else:
 			PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "NumericInput: ROTATE_Y context")
-			_set_action_context(action_types.ROTATE_Y, _merge_metadata(metadata, {"axis": "Y"}))
-		elif rotation_input and rotation_input.z_tapped:
+			_set_action_context(action_types.ROTATE_Y, axis_meta_y)
+	elif rotation_input and rotation_input.z_tapped:
+		var axis_meta_z = _merge_metadata(metadata, {"axis": "Z"})
+		if is_position_mode:
+			_set_action_context(action_types.POSITION_FORWARD, axis_meta_z)
+		else:
 			PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "NumericInput: ROTATE_Z context")
-			_set_action_context(action_types.ROTATE_Z, _merge_metadata(metadata, {"axis": "Z"}))
+			_set_action_context(action_types.ROTATE_Z, axis_meta_z)
 	elif scale_input and (scale_input.up_tapped or scale_input.down_tapped):
 		_set_action_context(action_types.SCALE, metadata)
 	elif position_input and (position_input.height_up_tapped or position_input.height_down_tapped):

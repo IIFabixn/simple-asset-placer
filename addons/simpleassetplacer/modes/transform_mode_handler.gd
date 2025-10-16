@@ -12,6 +12,8 @@ const TransformState = preload("res://addons/simpleassetplacer/core/transform_st
 const ModeStateMachine = preload("res://addons/simpleassetplacer/core/mode_state_machine.gd")
 const ScaleManager = preload("res://addons/simpleassetplacer/managers/scale_manager.gd")
 const TransformApplicator = preload("res://addons/simpleassetplacer/core/transform_applicator.gd")
+const ControlModeState = preload("res://addons/simpleassetplacer/core/control_mode_state.gd")
+const TransformCommand = preload("res://addons/simpleassetplacer/core/transform_command.gd")
 
 var _services: ServiceRegistry
 
@@ -47,8 +49,12 @@ func enter_transform_mode(target_nodes: Variant, settings: Dictionary, transform
 	
 	# Start in Position control mode (G) by default
 	if _services.control_mode_state:
-		_services.control_mode_state.switch_to_position_mode()
-		PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, "Auto-activated Position control (G) on transform mode entry")
+		var auto_modal_enabled: bool = settings.get("auto_modal_activation", false)
+		_services.control_mode_state.switch_to_position_mode(auto_modal_enabled)
+		if auto_modal_enabled:
+			PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, "Auto-activated Position control (G) on transform mode entry")
+		else:
+			PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, "Transform mode primed in Position control without modal activation")
 	
 	var transform_data = {
 		"target_nodes": valid_nodes,
@@ -90,15 +96,15 @@ func process_input(camera: Camera3D, transform_data: Dictionary, transform_state
 		"mode": _services.mode_state_machine.get_current_mode() if _services.mode_state_machine else null,
 		"transform_state": transform_state,
 		"axis_origin": transform_data.get("center_position", transform_state.position),
-		"numeric_metadata": {"mode": "transform"},
-		"position_modal_callback": Callable(self, "_handle_position_modal").bind(transform_data, camera, transform_state, settings),
-		"rotation_modal_callback": Callable(self, "_handle_rotation_modal").bind(transform_data, camera, transform_state, settings),
-		"scale_modal_callback": Callable(self, "_handle_scale_modal").bind(transform_data, transform_state, settings)
+		"numeric_metadata": {"mode": "transform"}
 	})
 
+	var command: TransformCommand = router_result.get("command")
 	var position_input: PositionInputState = router_result.get("position_input")
-	if not position_input:
+	if not command or not position_input:
 		return
+
+	_reset_rotation_accumulators_if_axis_changed(command, transform_data)
 
 	var numeric_controller = _services.numeric_input_controller
 	var numeric_was_confirmed: bool = router_result.get("numeric_was_confirmed", false)
@@ -113,10 +119,24 @@ func process_input(camera: Camera3D, transform_data: Dictionary, transform_state
 	_services.position_manager.set_use_half_step(fine_modifier_held)
 	transform_state.use_half_step = fine_modifier_held
 
-	if not skip_normal_input:
-		_process_height_input(position_input, transform_data, transform_state, settings)
+	var control_mode = _services.control_mode_state
+	var modal_active = control_mode and control_mode.is_modal_active()
 
-	if position_input.confirm_action:
+	if not skip_normal_input and modal_active:
+		match control_mode.get_control_mode():
+			ControlModeState.ControlMode.POSITION:
+				_process_position_modal(command, position_input, camera, transform_data, transform_state, settings)
+			ControlModeState.ControlMode.ROTATION:
+				_process_rotation_modal(command, position_input, camera, transform_data, transform_state, settings)
+			ControlModeState.ControlMode.SCALE:
+				_process_scale_modal(command, position_input, transform_data, transform_state, settings)
+			_:
+				pass
+
+	if not skip_normal_input:
+		_process_height_input(command, position_input, transform_data, transform_state, settings)
+
+	if command.confirm:
 		if (numeric_controller != null and numeric_controller.is_active()) or numeric_was_confirmed:
 			if numeric_controller != null and numeric_controller.is_active():
 				numeric_controller.confirm_action()
@@ -130,16 +150,17 @@ func process_input(camera: Camera3D, transform_data: Dictionary, transform_state
 	_apply_group_transformation(transform_data, transform_state)
 	update_overlays(transform_data)
 
-## ROUTER CALLBACKS
+## COMMAND PROCESSING HELPERS
 
-func _handle_position_modal(
+func _process_position_modal(
+	command: TransformCommand,
 	position_input: PositionInputState,
-	transform_data: Dictionary,
 	camera: Camera3D,
+	transform_data: Dictionary,
 	transform_state: TransformState,
 	settings: Dictionary
 ) -> void:
-	if not camera:
+	if not camera or not position_input:
 		return
 	var control_mode = _services.control_mode_state
 	if not control_mode:
@@ -147,7 +168,7 @@ func _handle_position_modal(
 
 	var prev_center = transform_data.get("center_position", transform_state.position)
 	var target_nodes = transform_data.get("target_nodes", [])
-	var new_center = Vector3.ZERO
+	var new_center = prev_center
 	if control_mode.has_axis_constraint():
 		new_center = _calculate_constrained_position(camera, position_input.mouse_position, prev_center, control_mode)
 	else:
@@ -165,40 +186,93 @@ func _handle_position_modal(
 			var offset = node_offsets.get(node, Vector3.ZERO)
 			node.global_position = new_center + offset
 
-func _handle_rotation_modal(
+	var delta = new_center - prev_center
+	if delta != Vector3.ZERO:
+		command.set_position_delta(delta, TransformCommand.SOURCE_MOUSE_MODAL)
+		command.merge_metadata({
+			"center_position": new_center,
+			"position_modal": true
+		})
+
+func _process_rotation_modal(
+	command: TransformCommand,
 	position_input: PositionInputState,
-	_rotation_input: RotationInputState,
-	transform_data: Dictionary,
 	camera: Camera3D,
-	transform_state: TransformState,
-	settings: Dictionary
-) -> void:
-	if not camera:
-		return
-	_process_mouse_rotation(camera, position_input.mouse_position, transform_data, transform_state, settings)
-
-func _handle_scale_modal(
-	position_input: PositionInputState,
-	_scale_input: ScaleInputState,
 	transform_data: Dictionary,
 	transform_state: TransformState,
 	settings: Dictionary
 ) -> void:
-	_process_mouse_scale(position_input.mouse_position, transform_data, transform_state, settings)
+	if not camera or not position_input:
+		return
+	var rotation_result = _process_mouse_rotation(camera, position_input.mouse_position, transform_data, transform_state, settings)
+	var axis: String = rotation_result.get("axis", "")
+	var degrees_step: float = rotation_result.get("degrees", 0.0)
+	if axis == "" or absf(degrees_step) < 0.0001:
+		return
 
-func _process_height_input(position_input: PositionInputState, transform_data: Dictionary, transform_state: TransformState, settings: Dictionary) -> void:
+	var delta_vector = Vector3.ZERO
+	var radians_delta = deg_to_rad(degrees_step)
+	match axis:
+		"X":
+			delta_vector.x = radians_delta
+		"Y":
+			delta_vector.y = radians_delta
+		"Z":
+			delta_vector.z = radians_delta
+
+	if delta_vector == Vector3.ZERO:
+		return
+
+	transform_state.set_rotation_radians(transform_state.manual_rotation_offset + delta_vector)
+	command.set_rotation_delta(delta_vector, TransformCommand.SOURCE_MOUSE_MODAL)
+	command.merge_metadata({
+		"rotation_axis": axis,
+		"rotation_step_degrees": degrees_step
+	})
+
+func _process_scale_modal(
+	command: TransformCommand,
+	position_input: PositionInputState,
+	transform_data: Dictionary,
+	transform_state: TransformState,
+	settings: Dictionary
+) -> void:
+	if not position_input:
+		return
+	var scale_result = _process_mouse_scale(position_input.mouse_position, transform_data, transform_state, settings)
+	var delta: Vector3 = scale_result.get("delta", Vector3.ZERO)
+	var new_scale: Vector3 = scale_result.get("new_scale", Vector3.ONE)
+	if delta == Vector3.ZERO:
+		return
+
+	command.set_scale_delta(delta, TransformCommand.SOURCE_MOUSE_MODAL)
+	command.merge_metadata({
+		"scale_multiplier": new_scale,
+		"scale_modal": true
+	})
+
+func _process_height_input(
+	command: TransformCommand,
+	position_input: PositionInputState,
+	transform_data: Dictionary,
+	transform_state: TransformState,
+	settings: Dictionary
+) -> void:
+	var prev_center = transform_data.get("center_position", transform_state.position)
 	var height_up = position_input.height_up_pressed
 	var height_down = position_input.height_down_pressed
 	var reset_height = position_input.reset_height_pressed
 	
+	var height_changed = false
+
 	if reset_height:
 		_services.position_manager.reset_height(transform_state)
 		var center_pos = Vector3(transform_state.position.x, transform_state.base_height + transform_state.height_offset, transform_state.position.z)
 		transform_state.position = center_pos
 		transform_data["center_position"] = center_pos
-		return
+		height_changed = true
 	
-	if not (height_up or height_down):
+	if not height_changed and not (height_up or height_down):
 		return
 	
 	# Determine height step based on modifiers (use proper settings)
@@ -212,17 +286,46 @@ func _process_height_input(position_input: PositionInputState, transform_data: D
 	
 	var reverse_modifier = position_input.reverse_modifier_held
 	
-	if height_up:
+	if height_up and not height_changed:
 		var height_change = height_step if not reverse_modifier else -height_step
 		_services.position_manager.adjust_height(transform_state, height_change)
-	elif height_down:
+		height_changed = true
+	elif height_down and not height_changed:
 		var height_change = -height_step if not reverse_modifier else height_step
 		_services.position_manager.adjust_height(transform_state, height_change)
+		height_changed = true
 	
+	if not height_changed:
+		return
+
 	# CRITICAL: Update actual position.y to base_height + height_offset
 	var center_pos = Vector3(transform_state.position.x, transform_state.base_height + transform_state.height_offset, transform_state.position.z)
 	transform_state.position = center_pos
 	transform_data["center_position"] = center_pos
+
+	var delta = center_pos - prev_center
+	if delta != Vector3.ZERO:
+		command.set_position_delta(delta, TransformCommand.SOURCE_KEY_DIRECT)
+		command.merge_metadata({
+			"height_offset": transform_state.height_offset
+		})
+
+func _reset_rotation_accumulators_if_axis_changed(command: TransformCommand, transform_data: Dictionary) -> void:
+	if not command:
+		return
+	var current_axes: Dictionary = command.axis_constraints if command.axis_constraints else {}
+	var previous_axes = transform_data.get("_last_axis_constraints", null)
+	if previous_axes == null:
+		transform_data["_last_axis_constraints"] = current_axes.duplicate(true)
+		return
+	for axis in ["X", "Y", "Z"]:
+		var prev_val = bool(previous_axes.get(axis, false))
+		var curr_val = bool(current_axes.get(axis, false))
+		if prev_val != curr_val:
+			if transform_data.has("_accumulated_rotation"):
+				transform_data.erase("_accumulated_rotation")
+			break
+	transform_data["_last_axis_constraints"] = current_axes.duplicate(true)
 
 func _process_mouse_rotation(
 	camera: Camera3D,
@@ -230,14 +333,18 @@ func _process_mouse_rotation(
 	transform_data: Dictionary,
 	transform_state: TransformState,
 	settings: Dictionary
-) -> void:
+) -> Dictionary:
 	"""Process mouse movement for rotation control (R mode)
 	
 	Uses horizontal mouse movement to rotate the group around the constrained axis,
 	or around Y-axis if no constraint is active.
 	"""
+	var result := {
+		"axis": "",
+		"degrees": 0.0
+	}
 	if not camera:
-		return
+		return result
 	
 	# Get viewport for cursor warping
 	var viewport = _services.editor_facade.get_editor_viewport_3d(0)
@@ -245,7 +352,7 @@ func _process_mouse_rotation(
 	# Store previous mouse position for delta calculation
 	if not transform_data.has("_prev_mouse_pos"):
 		transform_data["_prev_mouse_pos"] = mouse_pos
-		return
+		return result
 	
 	var prev_mouse_pos = transform_data.get("_prev_mouse_pos")
 	var mouse_delta = mouse_pos - prev_mouse_pos
@@ -286,6 +393,8 @@ func _process_mouse_rotation(
 	# If multiple axes are constrained, use the first one (X > Y > Z priority)
 	# If no constraint, rotate around Y axis (default)
 	var control_mode = _services.control_mode_state
+	if not control_mode:
+		return result
 	var rotation_axis = ""
 	
 	if control_mode.has_axis_constraint():
@@ -299,6 +408,9 @@ func _process_mouse_rotation(
 	else:
 		# No constraint: Rotate around Y axis (default)
 		rotation_axis = "Y"
+
+	if rotation_axis == "":
+		return result
 	
 	# Calculate rotation based on horizontal mouse movement
 	var rotation_sensitivity = settings.get("mouse_rotation_sensitivity", 0.5)
@@ -349,28 +461,40 @@ func _process_mouse_rotation(
 		transform_data["_accumulated_rotation"] = accumulated
 		
 		# Apply the snapped rotation step
-		rotate_group_by_step(rotation_axis, actual_step, transform_data, transform_state)
+		if absf(actual_step) > 0.0001:
+			rotate_group_by_step(rotation_axis, actual_step, transform_data, transform_state)
+			result["axis"] = rotation_axis
+			result["degrees"] = actual_step
 	else:
 		# No snapping - apply rotation directly (rotation_step expects degrees)
-		rotate_group_by_step(rotation_axis, rotation_amount, transform_data, transform_state)
+		if absf(rotation_amount) > 0.0001:
+			rotate_group_by_step(rotation_axis, rotation_amount, transform_data, transform_state)
+			result["axis"] = rotation_axis
+			result["degrees"] = rotation_amount
+
+	return result
 
 func _process_mouse_scale(
 	mouse_pos: Vector2,
 	transform_data: Dictionary,
 	transform_state: TransformState,
 	settings: Dictionary
-) -> void:
+) -> Dictionary:
 	"""Process mouse movement for scale control (L mode)
 	
 	Uses vertical mouse movement to adjust scale for the group.
 	"""
+	var result := {
+		"delta": Vector3.ZERO,
+		"new_scale": _services.scale_manager.get_scale_vector(transform_state)
+	}
 	# Get viewport for cursor warping
 	var viewport = _services.editor_facade.get_editor_viewport_3d(0)
 	
 	# Store previous mouse position for delta calculation
 	if not transform_data.has("_prev_mouse_pos_scale"):
 		transform_data["_prev_mouse_pos_scale"] = mouse_pos
-		return
+		return result
 	
 	var prev_mouse_pos = transform_data.get("_prev_mouse_pos_scale")
 	var mouse_delta = mouse_pos - prev_mouse_pos
@@ -423,19 +547,21 @@ func _process_mouse_scale(
 	
 	# Check for axis constraints (L + X/Y/Z for per-axis scaling)
 	var control_mode = _services.control_mode_state
-	var has_constraint = control_mode.has_axis_constraint()
+	var has_constraint = control_mode and control_mode.has_axis_constraint()
 	
 	var scale_vector: Vector3
+	var previous_scale_vector: Vector3
 	if has_constraint:
 		# Per-axis scaling: Apply delta only to constrained axes
 		var current_scale_vector = _services.scale_manager.get_scale_vector(transform_state)
 		scale_vector = current_scale_vector
+		previous_scale_vector = current_scale_vector
 		
-		if control_mode.is_x_constrained():
+		if control_mode and control_mode.is_x_constrained():
 			scale_vector.x = current_scale_vector.x + scale_delta
-		if control_mode.is_y_constrained():
+		if control_mode and control_mode.is_y_constrained():
 			scale_vector.y = current_scale_vector.y + scale_delta
-		if control_mode.is_z_constrained():
+		if control_mode and control_mode.is_z_constrained():
 			scale_vector.z = current_scale_vector.z + scale_delta
 		
 		# Apply scale snapping if enabled (per-axis)
@@ -444,11 +570,11 @@ func _process_mouse_scale(
 			if transform_state.use_half_step:
 				snap_step = snap_step / 2.0
 			var pre_snap = scale_vector
-			if control_mode.is_x_constrained():
+			if control_mode and control_mode.is_x_constrained():
 				scale_vector.x = round(scale_vector.x / snap_step) * snap_step
-			if control_mode.is_y_constrained():
+			if control_mode and control_mode.is_y_constrained():
 				scale_vector.y = round(scale_vector.y / snap_step) * snap_step
-			if control_mode.is_z_constrained():
+			if control_mode and control_mode.is_z_constrained():
 				scale_vector.z = round(scale_vector.z / snap_step) * snap_step
 			PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, "ScaleSnap axis per pre:%s post:%s step:%.4f half:%s" % [pre_snap, scale_vector, snap_step, transform_state.use_half_step])
 		
@@ -477,6 +603,7 @@ func _process_mouse_scale(
 		new_scale = clamp(new_scale, 0.01, 100.0)
 		_services.scale_manager.set_scale_multiplier(transform_state, new_scale)
 		scale_vector = Vector3(new_scale, new_scale, new_scale)
+		previous_scale_vector = Vector3(current_scale, current_scale, current_scale)
 	
 	# Apply to all nodes in group immediately (bypass smooth transforms during modal control)
 	var target_nodes = transform_data.get("target_nodes", [])
@@ -489,6 +616,13 @@ func _process_mouse_scale(
 				max(0.01, scale_vector.z)
 			)
 			node.scale = safe_scale
+
+	var delta = scale_vector - previous_scale_vector
+	if delta != Vector3.ZERO:
+		result["delta"] = delta
+		result["new_scale"] = scale_vector
+
+	return result
 
 func rotate_group_by_step(axis: String, rotation_step: float, transform_data: Dictionary, transform_state: TransformState) -> void:
 	"""Helper function to rotate group by a specific step amount (used by mouse wheel)"""

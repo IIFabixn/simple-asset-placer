@@ -35,6 +35,8 @@ const NodeUtils = preload("res://addons/simpleassetplacer/utils/node_utils.gd")
 const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
 const TransformState = preload("res://addons/simpleassetplacer/core/transform_state.gd")
 const TransformApplicator = preload("res://addons/simpleassetplacer/core/transform_applicator.gd")
+const ControlModeState = preload("res://addons/simpleassetplacer/core/control_mode_state.gd")
+const TransformCommand = preload("res://addons/simpleassetplacer/core/transform_command.gd")
 
 var _services: ServiceRegistry
 
@@ -95,8 +97,12 @@ func enter_placement_mode(
 		_services.rotation_manager.reset_all_rotation(transform_state)
 
 	if _services.control_mode_state:
-		_services.control_mode_state.switch_to_position_mode()
-		PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, "Auto-activated Position control (G) on placement mode entry")
+		var auto_modal_enabled: bool = settings.get("auto_modal_activation", false)
+		_services.control_mode_state.switch_to_position_mode(auto_modal_enabled)
+		if auto_modal_enabled:
+			PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, "Auto-activated Position control (G) on placement mode entry")
+		else:
+			PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, "Placement mode primed in Position control without modal activation")
 
 	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Started placement mode")
 
@@ -144,14 +150,12 @@ func process_input(
 		"mode": _services.mode_state_machine.get_current_mode() if _services.mode_state_machine else null,
 		"transform_state": transform_state,
 		"axis_origin": transform_state.position,
-		"numeric_metadata": {"mode": "placement"},
-		"position_modal_callback": Callable(self, "_handle_position_modal").bind(camera, transform_state, settings, exclude_nodes, preview_mesh),
-		"rotation_modal_callback": Callable(self, "_handle_rotation_modal").bind(camera, transform_state, settings, preview_mesh),
-		"scale_modal_callback": Callable(self, "_handle_scale_modal").bind(transform_state, settings, preview_mesh)
+		"numeric_metadata": {"mode": "placement"}
 	})
 
+	var command: TransformCommand = router_result.get("command")
 	var position_input: PositionInputState = router_result.get("position_input")
-	if not position_input:
+	if not command or not position_input:
 		return
 
 	var numeric_controller = _services.numeric_input_controller
@@ -167,22 +171,36 @@ func process_input(
 	transform_state.use_half_step = fine_modifier_held
 
 	if not skip_normal_input:
-		_process_height_input(position_input, transform_state, settings)
+		_process_position_pointer_update(command, position_input, camera, transform_state, settings, exclude_nodes, preview_mesh)
+
+	var control_mode = _services.control_mode_state
+	if control_mode and control_mode.is_modal_active() and not skip_normal_input:
+		match control_mode.get_control_mode():
+			ControlModeState.ControlMode.ROTATION:
+				_process_rotation_control(command, position_input, camera, transform_state, settings, preview_mesh)
+			ControlModeState.ControlMode.SCALE:
+				_process_scale_control(command, position_input, transform_state, settings, preview_mesh)
+			_:
+				pass
 
 	if not skip_normal_input:
+		_process_height_input(command, position_input, transform_state, settings)
 		process_asset_cycling_input(placement_data)
 
-	if position_input.confirm_action:
+	if command.confirm:
 		if numeric_controller != null and numeric_controller.is_active():
 			numeric_controller.confirm_action()
 		else:
 			place_at_current_position(placement_data, transform_state)
+			if _services.control_mode_state:
+				_services.control_mode_state.deactivate_modal()
 
 	update_overlays(placement_data, transform_state)
 
-## ROUTER CALLBACKS
+## COMMAND PROCESSING HELPERS
 
-func _handle_position_modal(
+func _process_position_pointer_update(
+	command: TransformCommand,
 	position_input: PositionInputState,
 	camera: Camera3D,
 	transform_state: TransformState,
@@ -190,15 +208,19 @@ func _handle_position_modal(
 	exclude_nodes: Array,
 	preview_mesh: Node3D
 ) -> void:
-	if not camera:
-		return
-	var control_mode = _services.control_mode_state
-	if not control_mode:
+	if not camera or not position_input:
 		return
 
-	var prev_pos = _services.position_manager.get_current_position(transform_state)
-	var new_pos = Vector3.ZERO
-	if control_mode.has_axis_constraint():
+	var control_mode = _services.control_mode_state
+	if control_mode and control_mode.is_modal_active() and not control_mode.is_position_mode():
+		return
+
+	var prev_pos = transform_state.position
+	var modal_position_active = control_mode and control_mode.is_modal_active() and control_mode.is_position_mode()
+	var use_constraints = modal_position_active and control_mode.has_axis_constraint()
+	var new_pos = prev_pos
+
+	if use_constraints:
 		new_pos = _calculate_constrained_position(camera, position_input.mouse_position, prev_pos, control_mode)
 	else:
 		new_pos = _services.position_manager.update_position_from_mouse(transform_state, camera, position_input.mouse_position, 1, false, exclude_nodes)
@@ -212,48 +234,70 @@ func _handle_position_modal(
 		preview_mesh.global_position = new_pos
 
 	var modal_exclusive = settings.get("modal_control_exclusive", true)
-	var should_lock_rotation = modal_exclusive and control_mode.is_position_mode()
-	if should_lock_rotation:
-		return
+	var should_lock_rotation = modal_exclusive and modal_position_active
+	if not should_lock_rotation:
+		if settings.get("align_with_normal", false):
+			var surface_normal = _services.position_manager.get_surface_normal(transform_state)
+			_services.rotation_manager.align_with_surface_normal(transform_state, surface_normal)
+			if preview_mesh:
+				TransformApplicator.apply_rotation_only(preview_mesh, transform_state)
+		else:
+			_services.rotation_manager.reset_surface_alignment(transform_state)
 
-	if settings.get("align_with_normal", false):
-		var surface_normal = _services.position_manager.get_surface_normal(transform_state)
-		_services.rotation_manager.align_with_surface_normal(transform_state, surface_normal)
-		if preview_mesh:
-			TransformApplicator.apply_rotation_only(preview_mesh, transform_state)
-	else:
-		_services.rotation_manager.reset_surface_alignment(transform_state)
+	var delta = new_pos - prev_pos
+	if delta != Vector3.ZERO:
+		var source_flag = TransformCommand.SOURCE_MOUSE_MODAL if modal_position_active else TransformCommand.SOURCE_KEY_DIRECT
+		command.set_position_delta(delta, source_flag)
+		command.merge_metadata({"target_position": new_pos})
 
-func _handle_rotation_modal(
+func _process_rotation_control(
+	command: TransformCommand,
 	position_input: PositionInputState,
-	rotation_input: RotationInputState,
 	camera: Camera3D,
 	transform_state: TransformState,
 	settings: Dictionary,
 	preview_mesh: Node3D
 ) -> void:
-	if not camera:
+	if not camera or not position_input:
 		return
+
+	var previous_rotation = transform_state.manual_rotation_offset
 	_process_mouse_rotation(camera, position_input.mouse_position, transform_state, settings)
 	if preview_mesh:
 		TransformApplicator.apply_rotation_only(preview_mesh, transform_state)
 
-func _handle_scale_modal(
+	var delta = transform_state.manual_rotation_offset - previous_rotation
+	if delta != Vector3.ZERO:
+		command.set_rotation_delta(delta, TransformCommand.SOURCE_MOUSE_MODAL)
+		command.merge_metadata({"rotation_offset": transform_state.manual_rotation_offset})
+
+func _process_scale_control(
+	command: TransformCommand,
 	position_input: PositionInputState,
-	scale_input: ScaleInputState,
 	transform_state: TransformState,
 	settings: Dictionary,
 	preview_mesh: Node3D
 ) -> void:
+	if not position_input:
+		return
+
+	var previous_scale = _services.scale_manager.get_scale_vector(transform_state)
 	_process_mouse_scale(position_input.mouse_position, transform_state, settings)
 	if preview_mesh:
 		var base_scale = transform_state.get_meta("original_scale") if transform_state.has_meta("original_scale") else Vector3.ONE
 		TransformApplicator.apply_scale_only(preview_mesh, transform_state, base_scale)
 
+	var new_scale = _services.scale_manager.get_scale_vector(transform_state)
+	var delta = new_scale - previous_scale
+	if delta != Vector3.ZERO:
+		command.set_scale_delta(delta, TransformCommand.SOURCE_MOUSE_MODAL)
+		command.merge_metadata({"scale_multiplier": new_scale})
+
 ## INPUT HELPERS
 
 
 func _process_height_input(
+	command: TransformCommand,
 	position_input: PositionInputState,
 	transform_state: TransformState,
 	settings: Dictionary
@@ -265,6 +309,7 @@ func _process_height_input(
 		transform_state: Transform state to modify
 		settings: Settings dictionary
 	"""
+	var previous_offset = transform_state.height_offset
 	var reverse_height = position_input.reverse_modifier_held
 	
 	# Determine height step based on modifiers
@@ -288,6 +333,11 @@ func _process_height_input(
 		_services.position_manager.adjust_height(transform_state, height_change)
 	elif position_input.reset_height_pressed:
 		_services.position_manager.reset_height(transform_state)
+
+	var height_delta = transform_state.height_offset - previous_offset
+	if absf(height_delta) > 0.0001:
+		command.set_position_delta(Vector3(0.0, height_delta, 0.0), TransformCommand.SOURCE_KEY_DIRECT)
+		command.merge_metadata({"height_offset": transform_state.height_offset})
 
 func _process_mouse_rotation(
 	camera: Camera3D,

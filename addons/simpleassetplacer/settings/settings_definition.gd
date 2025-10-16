@@ -108,6 +108,11 @@ static func get_all_settings() -> Array:
 	auto_modal_activation.section = "basic"
 	auto_modal_activation.ui_tooltip = "When enabled, entering placement or transform will immediately activate Grab (G) like the legacy workflow."
 	settings.append(auto_modal_activation)
+
+	var cursor_warp_enabled = SettingMeta.new("cursor_warp_enabled", "simple_asset_placer/cursor_warp_enabled", true, SettingType.BOOL, "Enable Cursor Warp")
+	cursor_warp_enabled.section = "basic"
+	cursor_warp_enabled.ui_tooltip = "Warp the mouse back toward the viewport center when it nears the edge during modal transforms. Disable if you prefer no cursor repositioning."
+	settings.append(cursor_warp_enabled)
 	
 	# Mouse control sensitivity
 	var mouse_rotation_sensitivity = SettingMeta.new("mouse_rotation_sensitivity", "simple_asset_placer/mouse_rotation_sensitivity", 0.5, SettingType.FLOAT, "Mouse Rotation Sensitivity")
@@ -125,6 +130,12 @@ static func get_all_settings() -> Array:
 	mouse_scale_sensitivity.step = 0.001
 	mouse_scale_sensitivity.ui_tooltip = "Sensitivity for mouse scaling in L mode (pixels to scale factor)"
 	settings.append(mouse_scale_sensitivity)
+
+	var mouse_sensitivity_curve = SettingMeta.new("mouse_sensitivity_curve", "simple_asset_placer/mouse_sensitivity_curve", "linear", SettingType.OPTION, "Sensitivity Curve")
+	mouse_sensitivity_curve.section = "basic"
+	mouse_sensitivity_curve.options = ["linear", "ease_in", "ease_out", "ease_in_out"]
+	mouse_sensitivity_curve.ui_tooltip = "Shape mouse response when rotating or scaling: Linear = constant, Ease In = slower start, Ease Out = faster start, Ease In-Out = smooth blend."
+	settings.append(mouse_sensitivity_curve)
 	
 	# Mouse sensitivity modifiers
 	var fine_sensitivity_multiplier = SettingMeta.new("fine_sensitivity_multiplier", "simple_asset_placer/fine_sensitivity_multiplier", PluginConstants.FINE_SENSITIVITY_MULTIPLIER, SettingType.FLOAT, "Fine Sensitivity Multiplier")

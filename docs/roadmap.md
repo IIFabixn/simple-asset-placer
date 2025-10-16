@@ -200,10 +200,10 @@ Deliver a placement and transform experience that is:
    - *Notes:* Align default values with Phase 1 outcomes (e.g., auto-modal off).  
    - *Blocked by:* CORE-005  
    - *Status:*  
-     - [ ] Not started  
-     - [ ] In progress  
-     - [ ] Done  
-   - *Progress note:* _(record updates here)_
+       - [ ] Not started  
+       - [ ] In progress  
+       - [x] Done  
+    - *Progress note:* 2025-10-16 – Added placement settings toggles for auto-modal, cursor warp, and sensitivity curve selection; transform handlers respect new settings.
 6. **QA-102: Usability testing round**  
    - *Affected components:* Testing templates, roadmap backlog.  
    - *Deliverables:* At least three recorded sessions, summary report, backlog adjustments.  

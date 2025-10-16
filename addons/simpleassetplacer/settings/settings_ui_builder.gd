@@ -85,7 +85,7 @@ static func _build_basic_section(container: Control, settings: Array, owner_node
 				
 				# Add options to dropdown
 				for option in setting.options:
-					option_button.add_item(option.capitalize())
+					option_button.add_item(_format_option_label(option))
 				
 				# Set current value
 				var current_value = settings_data.get(setting.id, setting.default_value)
@@ -182,6 +182,27 @@ static func _build_grid_section(container: Control, settings: Array, owner_node:
 				grid.add_child(checkbox)
 				ui_controls[setting.id] = checkbox
 			
+			SettingsDefinition.SettingType.OPTION:
+				var option_label = Label.new()
+				option_label.text = setting.ui_label + ":"
+				option_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				grid.add_child(option_label)
+
+				var option_button = OptionButton.new()
+				option_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				option_button.tooltip_text = setting.ui_tooltip
+
+				for option in setting.options:
+					option_button.add_item(_format_option_label(option))
+
+				var option_value = settings_data.get(setting.id, setting.default_value)
+				var option_index = setting.options.find(option_value)
+				if option_index >= 0:
+					option_button.selected = option_index
+
+				grid.add_child(option_button)
+				ui_controls[setting.id] = option_button
+			
 			SettingsDefinition.SettingType.VECTOR3:
 				# Handle Vector3 separately (for snap_offset with X/Z spinboxes)
 				if setting.id == "snap_offset":
@@ -220,6 +241,16 @@ static func _build_grid_section(container: Control, settings: Array, owner_node:
 					spinbox_z.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 					grid.add_child(spinbox_z)
 					ui_controls["grid_offset_z"] = spinbox_z
+
+static func _format_option_label(option: String) -> String:
+	var cleaned := option.replace("_", " ")
+	var parts := cleaned.split(" ")
+	for i in range(parts.size()):
+		var part: String = parts[i]
+		if part.is_empty():
+			continue
+		parts[i] = part.substr(0, 1).to_upper() + part.substr(1).to_lower()
+	return " ".join(parts)
 
 static func _build_utility_section(container: Control, owner_node: Node):
 	# Add separator

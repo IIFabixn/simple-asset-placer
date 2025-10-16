@@ -452,6 +452,10 @@ Control which part of the object is used for snapping:
 #### **Other Options**
 - **Random Rotation**: Apply random Y-axis rotation on placement
 - **Scale Multiplier**: Base scale applied to all placed objects
+- **Smooth Transforms**: Interpolate preview updates for less jittery motion
+- **Auto-Activate Modal Controls**: Enter G/R/L automatically when modes begin (off by default)
+- **Cursor Warp**: Keep the mouse centered during modal drags to avoid screen edge stalls
+- **Sensitivity Curve**: Choose how mouse movement ramps (Linear, Ease In, Ease Out, Ease In-Out)
 
 ### **Reset Behavior**
 Control what gets reset when exiting modes:

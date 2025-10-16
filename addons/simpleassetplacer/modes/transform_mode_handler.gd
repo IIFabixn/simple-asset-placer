@@ -14,6 +14,7 @@ const ScaleManager = preload("res://addons/simpleassetplacer/managers/scale_mana
 const TransformApplicator = preload("res://addons/simpleassetplacer/core/transform_applicator.gd")
 const ControlModeState = preload("res://addons/simpleassetplacer/core/control_mode_state.gd")
 const TransformCommand = preload("res://addons/simpleassetplacer/core/transform_command.gd")
+const SensitivityCurve = preload("res://addons/simpleassetplacer/utils/sensitivity_curve.gd")
 
 var _services: ServiceRegistry
 
@@ -357,35 +358,30 @@ func _process_mouse_rotation(
 	var prev_mouse_pos = transform_data.get("_prev_mouse_pos")
 	var mouse_delta = mouse_pos - prev_mouse_pos
 	
-	# Cursor warping: If mouse is near screen edges, warp to center
-	# This allows infinite rotation without hitting screen boundaries
-	if viewport:
+	var cursor_warp_enabled: bool = settings.get("cursor_warp_enabled", true)
+	var warp_handled := false
+	if cursor_warp_enabled and viewport:
 		var viewport_rect = viewport.get_visible_rect()
 		var viewport_size = viewport_rect.size
-		var warp_margin = 50  # pixels from edge before warping
+		var warp_margin = 50
 		var should_warp = false
 		var warp_target_local = mouse_pos
-		
+
 		if mouse_pos.x < warp_margin or mouse_pos.x > viewport_size.x - warp_margin:
 			warp_target_local.x = viewport_size.x / 2
 			should_warp = true
 		if mouse_pos.y < warp_margin or mouse_pos.y > viewport_size.y - warp_margin:
 			warp_target_local.y = viewport_size.y / 2
 			should_warp = true
-		
+
 		if should_warp:
-			# Convert viewport-local position to global screen position
-			# SubViewport doesn't have get_screen_position(), so we use get_screen_transform()
 			var viewport_screen_transform = viewport.get_screen_transform()
 			var warp_target_global = viewport_screen_transform * warp_target_local
-			
-			# Warp cursor using global screen coordinates
 			Input.warp_mouse(warp_target_global)
-			
 			transform_data["_prev_mouse_pos"] = warp_target_local
-		else:
-			transform_data["_prev_mouse_pos"] = mouse_pos
-	else:
+			warp_handled = true
+
+	if not warp_handled:
 		transform_data["_prev_mouse_pos"] = mouse_pos
 	
 	# Determine which axis to rotate around
@@ -414,7 +410,9 @@ func _process_mouse_rotation(
 	
 	# Calculate rotation based on horizontal mouse movement
 	var rotation_sensitivity = settings.get("mouse_rotation_sensitivity", 0.5)
-	var rotation_amount = -mouse_delta.x * rotation_sensitivity
+	var curve_type: String = settings.get("mouse_sensitivity_curve", SensitivityCurve.CURVE_LINEAR)
+	var curved_delta = SensitivityCurve.apply(mouse_delta.x, curve_type, 400.0)
+	var rotation_amount = -curved_delta * rotation_sensitivity
 	
 	# Apply fine/large increment modifiers
 	var input_handler = _services.input_handler
@@ -499,40 +497,37 @@ func _process_mouse_scale(
 	var prev_mouse_pos = transform_data.get("_prev_mouse_pos_scale")
 	var mouse_delta = mouse_pos - prev_mouse_pos
 	
-	# Cursor warping: If mouse is near screen edges, warp to center
-	# This allows infinite scaling without hitting screen boundaries
-	if viewport:
+	var cursor_warp_enabled: bool = settings.get("cursor_warp_enabled", true)
+	var warp_handled := false
+	if cursor_warp_enabled and viewport:
 		var viewport_rect = viewport.get_visible_rect()
 		var viewport_size = viewport_rect.size
-		var warp_margin = 50  # pixels from edge before warping
+		var warp_margin = 50
 		var should_warp = false
 		var warp_target_local = mouse_pos
-		
+
 		if mouse_pos.x < warp_margin or mouse_pos.x > viewport_size.x - warp_margin:
 			warp_target_local.x = viewport_size.x / 2
 			should_warp = true
 		if mouse_pos.y < warp_margin or mouse_pos.y > viewport_size.y - warp_margin:
 			warp_target_local.y = viewport_size.y / 2
 			should_warp = true
-		
+
 		if should_warp:
-			# Convert viewport-local position to global screen position
-			# SubViewport doesn't have get_screen_position(), so we use get_screen_transform()
 			var viewport_screen_transform = viewport.get_screen_transform()
 			var warp_target_global = viewport_screen_transform * warp_target_local
-			
-			# Warp cursor using global screen coordinates
 			Input.warp_mouse(warp_target_global)
-			
 			transform_data["_prev_mouse_pos_scale"] = warp_target_local
-		else:
-			transform_data["_prev_mouse_pos_scale"] = mouse_pos
-	else:
+			warp_handled = true
+
+	if not warp_handled:
 		transform_data["_prev_mouse_pos_scale"] = mouse_pos
 	
 	# Calculate scale change based on vertical mouse movement
 	var scale_sensitivity = settings.get("mouse_scale_sensitivity", 0.01)
-	var scale_delta = -mouse_delta.y * scale_sensitivity
+	var curve_type: String = settings.get("mouse_sensitivity_curve", SensitivityCurve.CURVE_LINEAR)
+	var curved_delta = SensitivityCurve.apply(mouse_delta.y, curve_type, 400.0)
+	var scale_delta = -curved_delta * scale_sensitivity
 	
 	# Apply fine/large increment modifiers
 	var input_handler = _services.input_handler

@@ -68,6 +68,8 @@ static func get_default_settings() -> Dictionary:
 		"fine_position_increment": 0.01,
 		"large_position_increment": 1.0,
 		"large_height_increment": 1.0,
+		"cursor_warp_enabled": true,
+		"mouse_sensitivity_curve": "linear",
 		"fine_sensitivity_multiplier": PluginConstants.FINE_SENSITIVITY_MULTIPLIER,
 		"large_sensitivity_multiplier": PluginConstants.LARGE_SENSITIVITY_MULTIPLIER,
 		"debug_commands": false

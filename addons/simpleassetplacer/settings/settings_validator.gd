@@ -41,7 +41,8 @@ const EXTRA_BOOLEAN_KEYS := [
 	"smooth_transforms",
 	"snap_enabled",
 	"snap_rotation_enabled",
-	"snap_scale_enabled"
+	"snap_scale_enabled",
+	"cursor_warp_enabled"
 ]
 
 const EXTRA_KEY_BINDINGS := [

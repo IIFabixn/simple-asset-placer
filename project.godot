@@ -20,4 +20,4 @@ project/assembly_name="SimpleAssetPlacer"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/asd/plugin.cfg", "res://addons/simpleassetplacer/plugin.cfg")
+enabled=PackedStringArray("res://addons/gut/plugin.cfg", "res://addons/simpleassetplacer/plugin.cfg")

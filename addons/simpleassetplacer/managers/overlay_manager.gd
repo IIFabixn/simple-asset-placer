@@ -105,6 +105,8 @@ func _load_status_overlay_scene():
 	_status_overlay = StatusOverlayScene.instantiate()
 	if _services and _services.placement_strategy_service and _status_overlay.has_method("set_placement_strategy_service"):
 		_status_overlay.set_placement_strategy_service(_services.placement_strategy_service)
+	if _status_overlay.has_method("set_services"):
+		_status_overlay.set_services(_services)
 	
 	# Add to the 3D viewport specifically so it's positioned relative to viewport, not entire editor
 	var viewport_3d = _services.editor_facade.get_editor_viewport_3d(0)
@@ -123,16 +125,46 @@ func set_toolbar_reference(toolbar: Control):
 	"""Set the toolbar buttons reference"""
 	_toolbar_buttons = toolbar
 
-func show_transform_overlay(mode: int, node_name: String = "", position: Vector3 = Vector3.ZERO, rotation: Vector3 = Vector3.ZERO, scale: float = 1.0, height_offset: float = 0.0):
+func show_transform_overlay(mode: int, node_name: String = "", position: Vector3 = Vector3.ZERO, rotation: Vector3 = Vector3.ZERO, scale: float = 1.0, height_offset: float = 0.0, transform_state = null):
 	"""Show unified transform overlay with all current transformation data"""
 	if not _is_overlay_ready():
 		return
 	
 	# Get control mode state from services
 	var control_mode_state = _services.control_mode_state if _services else null
+
+	var snap_state := {}
+	if transform_state:
+		snap_state = {
+			"position": transform_state.snap_enabled,
+			"snap_y": transform_state.snap_y_enabled,
+			"rotation": transform_state.snap_rotation_enabled,
+			"scale": transform_state.snap_scale_enabled,
+			"half_step": transform_state.use_half_step,
+			"align": transform_state.align_with_normal
+		}
+
+	var modifier_state := {}
+	if _services and _services.input_handler:
+		modifier_state = _services.input_handler.get_modifier_state()
+
+	var numeric_state := {}
+	if _services and _services.numeric_input_controller and _services.numeric_input_controller.is_active():
+		numeric_state = _services.numeric_input_controller.get_display_state()
+
+	var smooth_enabled := false
+	if _services and _services.smooth_transform_manager:
+		smooth_enabled = _services.smooth_transform_manager.is_smooth_transforms_enabled()
+
+	var extra_state := {
+		"snap_state": snap_state,
+		"modifier_state": modifier_state,
+		"numeric_state": numeric_state,
+		"smooth_enabled": smooth_enabled
+	}
 	
 	# Use the scene's controller method
-	_status_overlay.show_transform_info(mode, node_name, position, rotation, scale, height_offset, control_mode_state)
+	_status_overlay.show_transform_info(mode, node_name, position, rotation, scale, height_offset, control_mode_state, extra_state)
 	_current_mode = mode
 
 func refresh_overlay_buttons():
@@ -165,17 +197,21 @@ func show_numeric_input(action_name: String, input_string: String):
 	"""
 	if not _is_overlay_ready():
 		return
-	
-	# Build display message
-	var message = "%s: %s" % [action_name, input_string if input_string.length() > 0 else "_"]
-	
-	# Show with a distinct color
-	_status_overlay.show_status_message(message, Color(0.4, 0.7, 1.0))  # Light blue for numeric input
+
+	if _status_overlay.has_method("update_numeric_state"):
+		_status_overlay.update_numeric_state(action_name, input_string)
+
+func clear_numeric_input():
+	if not _is_overlay_ready():
+		return
+	if _status_overlay.has_method("clear_numeric_state"):
+		_status_overlay.clear_numeric_state()
 
 func hide_transform_overlay():
 	"""Hide the unified transform overlay"""
 	if NodeUtils.is_valid_and_ready(_status_overlay):
 		_status_overlay.hide_overlay()
+	clear_numeric_input()
 	_current_mode = 0  # NONE mode
 
 func hide_status_overlay():

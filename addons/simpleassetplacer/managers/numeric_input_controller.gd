@@ -212,6 +212,7 @@ func _update_overlay() -> void:
 		return
 	var display_state = get_display_state()
 	if display_state.is_empty():
+		overlay.clear_numeric_input()
 		return
 	overlay.show_numeric_input(display_state.get("action_name", ""), display_state.get("input_string", ""))
 

@@ -67,8 +67,8 @@ func enter_transform_mode(target_nodes: Variant, settings: Dictionary, transform
 		"manual_position_offset": Vector3.ZERO
 	}
 	_services.overlay_manager.initialize_overlays()
-	_services.overlay_manager.set_mode(2)
-	update_overlays(transform_data)
+	_services.overlay_manager.set_mode(ModeStateMachine.Mode.TRANSFORM)
+	update_overlays(transform_data, transform_state)
 	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Started transform mode for " + str(valid_nodes.size()) + " node(s)")
 	return transform_data
 
@@ -77,7 +77,7 @@ func exit_transform_mode(transform_data: Dictionary, transform_state: TransformS
 		restore_original_state(transform_data)
 	_reset_transforms_on_exit(transform_state, settings)
 	_services.overlay_manager.hide_transform_overlay()
-	_services.overlay_manager.set_mode(0)
+	_services.overlay_manager.set_mode(ModeStateMachine.Mode.NONE)
 	_services.overlay_manager.remove_grid_overlay()
 	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Exited transform mode")
 
@@ -148,7 +148,7 @@ func process_input(camera: Camera3D, transform_data: Dictionary, transform_state
 		return
 
 	_apply_group_transformation(transform_data, transform_state)
-	update_overlays(transform_data)
+	update_overlays(transform_data, transform_state)
 
 ## COMMAND PROCESSING HELPERS
 
@@ -669,6 +669,17 @@ func rotate_group_by_step(axis: String, rotation_step: float, transform_data: Di
 	# Update the stored offsets for next rotation
 	transform_data["node_offsets"] = rotated_offsets
 
+	if transform_state:
+		var manual_rotation := transform_state.manual_rotation_offset
+		match axis:
+			"X":
+				manual_rotation.x += rotation_radians
+			"Y":
+				manual_rotation.y += rotation_radians
+			"Z":
+				manual_rotation.z += rotation_radians
+		transform_state.set_rotation_radians(manual_rotation)
+
 func _apply_group_transformation(transform_data: Dictionary, transform_state: TransformState) -> void:
 	var target_nodes = transform_data.get("target_nodes", [])
 	var center = transform_data.get("center_position", Vector3.ZERO)
@@ -798,35 +809,19 @@ func _apply_numeric_scale(numeric_controller, transform_data: Dictionary, transf
 	Absolute mode (=): Set to exact scale value
 	Relative mode (+/-): Add to current scale"""
 	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Applying numeric scale")
-	
-	var input_value = numeric_controller.get_numeric_value()
-	var is_absolute = numeric_controller.is_absolute_mode()
-	
-	# Apply to all nodes directly based on absolute/relative mode
+	var current_multiplier = _services.scale_manager.get_scale(transform_state)
+	var new_multiplier = numeric_controller.apply_to_value(current_multiplier)
+	new_multiplier = max(0.01, new_multiplier)
+	_services.scale_manager.set_scale_multiplier(transform_state, new_multiplier)
+	var new_scale_vector = Vector3(new_multiplier, new_multiplier, new_multiplier)
+
+	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Numeric scale: current=%.3f new=%.3f" % [current_multiplier, new_multiplier])
+
 	var target_nodes = transform_data.get("target_nodes", [])
 	for node in target_nodes:
 		if node and node.is_inside_tree():
-			var current_scene_scale = node.scale
-			var new_scene_scale: Vector3
-			
-			if is_absolute:
-				# Absolute: Set to exact value (=1 means scale 1.0 in scene)
-				new_scene_scale = Vector3(input_value, input_value, input_value)
-			else:
-				# Relative: Add to current scale (+0.5 adds 0.5 to each axis)
-				var scale_change = numeric_controller.apply_to_value(0.0)  # Get the delta
-				new_scene_scale = current_scene_scale + Vector3(scale_change, scale_change, scale_change)
-			
-			PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Scale node %s: current=%s, input=%.3f, is_absolute=%s, new=%s" % [
-				node.name, current_scene_scale, input_value, is_absolute, new_scene_scale
-			])
-			
-			# Prevent negative or zero scale
-			new_scene_scale.x = max(0.01, new_scene_scale.x)
-			new_scene_scale.y = max(0.01, new_scene_scale.y)
-			new_scene_scale.z = max(0.01, new_scene_scale.z)
-			
-			_services.smooth_transform_manager.set_target_scale(node, new_scene_scale)
+			# Snap immediately to avoid overlay jitter; also update smooth manager targets
+			_services.smooth_transform_manager.apply_transform_immediately(node, node.global_position, node.rotation, new_scale_vector)
 
 func _apply_numeric_height(numeric_controller, transform_data: Dictionary, transform_state: TransformState) -> void:
 	"""Apply numeric input to height"""
@@ -874,17 +869,17 @@ func _apply_numeric_position(action, numeric_controller, transform_data: Diction
 	
 	transform_data["manual_position_offset"] = manual_offset
 
-func update_overlays(transform_data: Dictionary) -> void:
+func update_overlays(transform_data: Dictionary, transform_state: TransformState) -> void:
 	var target_nodes = transform_data.get("target_nodes", [])
 	if target_nodes.is_empty():
 		return
-	var center = transform_data.get("center_position", Vector3.ZERO)
+	var center = transform_data.get("center_position", transform_state.position if transform_state else Vector3.ZERO)
 	var first_node = target_nodes[0] if target_nodes.size() > 0 else null
 	var node_name = first_node.name if first_node else ""
-	var position = center
-	var rotation = first_node.rotation if first_node else Vector3.ZERO
-	var scale_val = first_node.scale.x if first_node else 1.0
-	_services.overlay_manager.show_transform_overlay(1, node_name, position, rotation, scale_val, 0.0)
+	var rotation = first_node.rotation if first_node else (transform_state.get_final_rotation() if transform_state else Vector3.ZERO)
+	var scale_val = first_node.scale.x if first_node else (_services.scale_manager.get_scale(transform_state) if transform_state else 1.0)
+	var height_offset = transform_state.height_offset if transform_state else 0.0
+	_services.overlay_manager.show_transform_overlay(ModeStateMachine.Mode.TRANSFORM, node_name, center, rotation, scale_val, height_offset, transform_state)
 
 func _reset_transforms_on_exit(transform_state: TransformState, settings: Dictionary) -> void:
 	var reset_rotation = settings.get("reset_rotation_on_exit", false)

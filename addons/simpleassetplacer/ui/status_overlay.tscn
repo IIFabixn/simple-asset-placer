@@ -33,10 +33,10 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -350.0
-offset_top = -100.0
-offset_right = 350.0
-offset_bottom = -20.0
+offset_left = -360.0
+offset_top = -140.0
+offset_right = 360.0
+offset_bottom = -8.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_status")
@@ -56,6 +56,7 @@ theme_override_constants/separation = 6
 
 [node name="TitleHBox" type="HBoxContainer" parent="OverlayControl/StatusPanel/ContentVBox"]
 layout_mode = 2
+size_flags_horizontal = 3
 theme_override_constants/separation = 10
 
 [node name="ModeLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox/TitleHBox"]
@@ -114,8 +115,102 @@ theme_override_colors/font_color = Color(0.8, 0.6, 1, 1)
 theme_override_font_sizes/font_size = 10
 text = "Scale: 100.0%"
 
+[node name="StateBadgeHBox" type="FlowContainer" parent="OverlayControl/StatusPanel/ContentVBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 0
+theme_override_constants/h_separation = 6
+theme_override_constants/v_separation = 2
+
+[node name="GridBadgeLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox/StateBadgeHBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+text = "Grid off"
+size_flags_horizontal = 1
+
+[node name="YSnapBadgeLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox/StateBadgeHBox"]
+layout_mode = 2
+size_flags_horizontal = 1
+theme_override_font_sizes/font_size = 9
+text = "Y Snap off"
+
+[node name="RotationSnapBadgeLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox/StateBadgeHBox"]
+layout_mode = 2
+size_flags_horizontal = 1
+theme_override_font_sizes/font_size = 9
+text = "Rot Snap off"
+
+[node name="ScaleSnapBadgeLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox/StateBadgeHBox"]
+layout_mode = 2
+size_flags_horizontal = 1
+theme_override_font_sizes/font_size = 9
+text = "Scale Snap off"
+
+[node name="HalfStepBadgeLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox/StateBadgeHBox"]
+layout_mode = 2
+size_flags_horizontal = 1
+theme_override_font_sizes/font_size = 9
+text = "Half Step off"
+
+[node name="SurfaceAlignBadgeLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox/StateBadgeHBox"]
+layout_mode = 2
+size_flags_horizontal = 1
+theme_override_font_sizes/font_size = 9
+text = "Surface Align off"
+
+[node name="SmoothBadgeLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox/StateBadgeHBox"]
+layout_mode = 2
+size_flags_horizontal = 1
+theme_override_font_sizes/font_size = 9
+text = "Smooth off"
+
+[node name="ModifierBadgeHBox" type="FlowContainer" parent="OverlayControl/StatusPanel/ContentVBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 0
+theme_override_constants/h_separation = 6
+theme_override_constants/v_separation = 2
+
+[node name="FineModifierLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox/ModifierBadgeHBox"]
+layout_mode = 2
+size_flags_horizontal = 1
+theme_override_font_sizes/font_size = 9
+text = "Fine"
+
+[node name="LargeModifierLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox/ModifierBadgeHBox"]
+layout_mode = 2
+size_flags_horizontal = 1
+theme_override_font_sizes/font_size = 9
+text = "Large"
+
+[node name="ReverseModifierLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox/ModifierBadgeHBox"]
+layout_mode = 2
+size_flags_horizontal = 1
+theme_override_font_sizes/font_size = 9
+text = "Reverse"
+
+[node name="NumericHBox" type="HBoxContainer" parent="OverlayControl/StatusPanel/ContentVBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="NumericGlyphLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox/NumericHBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+text = "#"
+
+[node name="NumericActionLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox/NumericHBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+text = ""
+
+[node name="NumericValueLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox/NumericHBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+text = ""
+
 [node name="KeybindsLabel" type="Label" parent="OverlayControl/StatusPanel/ContentVBox"]
 layout_mode = 2
+size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
 theme_override_font_sizes/font_size = 9
-text = "WASD (Move)  Q/E (Height)  PgUp/PgDn (Scale)  Mouse (Rotate)  P (Mode)"
+text = "G (Position)  R (Rotation)  L (Scale)\nQ/E (Height)  X/Y/Z (Axis)  Mouse Wheel (Adjust)  ENTER (Action)"

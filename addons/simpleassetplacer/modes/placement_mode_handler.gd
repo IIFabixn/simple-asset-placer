@@ -37,6 +37,7 @@ const TransformState = preload("res://addons/simpleassetplacer/core/transform_st
 const TransformApplicator = preload("res://addons/simpleassetplacer/core/transform_applicator.gd")
 const ControlModeState = preload("res://addons/simpleassetplacer/core/control_mode_state.gd")
 const TransformCommand = preload("res://addons/simpleassetplacer/core/transform_command.gd")
+const ModeStateMachine = preload("res://addons/simpleassetplacer/core/mode_state_machine.gd")
 
 var _services: ServiceRegistry
 
@@ -63,7 +64,7 @@ func enter_placement_mode(
 	}
 
 	_services.overlay_manager.initialize_overlays()
-	_services.overlay_manager.set_mode(1)
+	_services.overlay_manager.set_mode(ModeStateMachine.Mode.PLACEMENT)
 
 	if mesh:
 		_services.preview_manager.start_preview_mesh(mesh, settings)
@@ -122,7 +123,7 @@ func exit_placement_mode(
 	_reset_transforms_on_exit(transform_state, settings)
 
 	_services.overlay_manager.hide_transform_overlay()
-	_services.overlay_manager.set_mode(0)
+	_services.overlay_manager.set_mode(ModeStateMachine.Mode.NONE)
 	_services.overlay_manager.remove_grid_overlay()
 
 	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Exited placement mode")
@@ -752,12 +753,13 @@ func update_overlays(placement_data: Dictionary, transform_state: TransformState
 	var current_asset_name = asset_path.get_file().get_basename() if asset_path != "" else "Mesh"
 	
 	_services.overlay_manager.show_transform_overlay(
-		1,  # PLACEMENT mode (compatible with both old and new enum)
+		ModeStateMachine.Mode.PLACEMENT,
 		current_asset_name,
 		_services.position_manager.get_current_position(transform_state),
 		_services.preview_manager.get_preview_rotation(),
 		_services.scale_manager.get_scale(transform_state),
-		_services.position_manager.get_height_offset(transform_state)
+		_services.position_manager.get_height_offset(transform_state),
+		transform_state
 	)
 
 ## RESET MANAGEMENT

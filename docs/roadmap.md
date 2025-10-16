@@ -112,11 +112,11 @@ Deliver a placement and transform experience that is:
    - *Acceptance criteria:* Checklist completed with pass/fail notes; media stored in the new directory; follow-up issues created as needed.  
    - *Notes:* Schedule immediately after CORE-004 before broader rollout; treat directory scaffolding as part of the ticket.  
    - *Blocked by:* CORE-004, CORE-005  
-   - *Status:*  
-     - [ ] Not started  
-     - [ ] In progress  
-     - [ ] Done  
-   - *Progress note:* _(record updates here)_
+    - *Status:*   
+       - [ ] Not started   
+       - [x] In progress   
+       - [ ] Done   
+    - *Progress note:* 2025-10-16 – Added `/docs/testing/command_pipeline_smoke.md` checklist + assets staging folder; awaiting baseline captures and first recorded run log.
 
 ---
 
@@ -151,11 +151,11 @@ Deliver a placement and transform experience that is:
    - *Acceptance criteria:* State changes visible within one frame; layout responsive at various resolutions; color contrast meets accessibility guidelines.  
    - *Notes:* Provide light/dark mockups in design document.  
    - *Blocked by:* CORE-001, CORE-002, CORE-003, CORE-004, CORE-005  
-   - *Status:*  
-     - [ ] Not started  
-     - [ ] In progress  
-     - [ ] Done  
-   - *Progress note:* _(record updates here)_
+    - *Status:*  
+       - [ ] Not started  
+       - [ ] In progress  
+       - [x] Done  
+    - *Progress note:* 2025-10-16 – Overlay layout rebuilt with snap/modifier badges, numeric strip, color-based feedback, and dynamic resizing to contain content across resolutions.
 2. **UI-102: Toolbar quick toggles**  
    - *Affected components:* `ui/toolbar_buttons.tscn/.gd`, `settings/settings_manager.gd`, icon assets.  
    - *Deliverables:* Snap/alignment/smooth/strategy buttons with persistent state, SVG icons, tooltips.  
@@ -488,6 +488,7 @@ Deliver a placement and transform experience that is:
 - Use this roadmap as a living document; annotate completed milestones, blockers, and design decisions.
 - Sync roadmap updates with Git commits (e.g., mention phase progress in commit messages or changelog entries).
 - Revisit the roadmap quarterly or after each major release to confirm priorities.
+- Action item: capture refreshed overlay screenshots/GIFs once UI-101 visual QA completes.
 
 ---
 

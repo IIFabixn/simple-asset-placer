@@ -339,11 +339,22 @@ func _transforms_different(a: Transform3D, b: Transform3D) -> bool:
 	)
 
 func _reset_transforms_on_exit(state: TransformState) -> void:
-	"""Reset transform state when exiting"""
-	state.values.position = Vector3.ZERO
-	state.values.manual_rotation_offset = Vector3.ZERO
-	state.values.scale_multiplier = 1.0
-	state.values.manual_position_offset = Vector3.ZERO
+	"""Reset transformations based on settings when exiting"""
+	var settings = state.settings
+	if settings.is_empty():
+		return
+	
+	if settings.get("reset_height_on_exit", false):
+		_services.position_manager.reset_offset_normal(state)
+	
+	if settings.get("reset_rotation_on_exit", false):
+		_services.rotation_manager.reset_all_rotation(state)
+	
+	if settings.get("reset_scale_on_exit", false):
+		_services.scale_manager.reset_scale(state)
+	
+	if settings.get("reset_position_on_exit", false):
+		state.values.manual_position_offset = Vector3.ZERO
 	
 	if state.session.transform_data:
 		state.session.transform_data.clear()

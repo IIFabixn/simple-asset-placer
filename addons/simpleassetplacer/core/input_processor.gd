@@ -112,6 +112,17 @@ func _handle_placement_mouse_motion(camera: Camera3D, mouse_position: Vector2, s
 func _handle_transform_mouse_motion(camera: Camera3D, mouse_position: Vector2, state: TransformState) -> void:
 	"""Update position from mouse in transform mode"""
 	var target_nodes = state.session.transform_data.get("target_nodes", [])
+	var current_center = state.session.transform_data.get("center_position", Vector3.ZERO)
+	
+	# Get the plane normal direction (perpendicular to the active plane)
+	# - XZ plane (horizontal): normal = Y axis (up/down)
+	# - XY plane (vertical): normal = Z axis (forward/back)
+	# - YZ plane (vertical): normal = X axis (left/right)
+	var plane_normal = _services.position_manager.get_plane_normal_direction(state)
+	
+	# Store the component along the plane normal to preserve height adjustments
+	var preserved_normal_offset = current_center.dot(plane_normal)
+	
 	var old_position = state.values.position
 	
 	# Update with node exclusions to avoid self-collision
@@ -120,9 +131,15 @@ func _handle_transform_mouse_motion(camera: Camera3D, mouse_position: Vector2, s
 	var new_position = state.values.position
 	var position_delta = new_position - old_position
 	
-	# Apply delta to center_position
-	var current_center = state.session.transform_data.get("center_position", Vector3.ZERO)
-	state.session.transform_data["center_position"] = current_center + position_delta
+	# Apply the position delta to center
+	current_center += position_delta
+	
+	# Restore the component along the plane normal (preserve height offset from Q/E keys)
+	# This ensures mouse motion only moves along the plane, not perpendicular to it
+	var new_normal_component = current_center.dot(plane_normal)
+	current_center += plane_normal * (preserved_normal_offset - new_normal_component)
+	
+	state.session.transform_data["center_position"] = current_center
 
 ## Mouse Wheel Handlers
 

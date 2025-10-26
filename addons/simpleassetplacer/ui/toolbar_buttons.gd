@@ -78,6 +78,18 @@ func _on_grid_snap_toggled(toggled_on: bool) -> void:
 	# This is a USER click - always apply it
 	if placement_settings_ref:
 		placement_settings_ref.toggle_grid_snap(toggled_on)
+	
+	# Refresh overlay to show updated state
+	if _coordinator:
+		_coordinator.refresh_overlay()
+	
+	# Show feedback message if not in active mode
+	if _services and _services.overlay_manager:
+		if not _coordinator or not _coordinator.is_any_mode_active():
+			var status := "Grid snap %s" % ("enabled" if toggled_on else "disabled")
+			var color := Color(0.4, 0.85, 0.4) if toggled_on else Color(0.9, 0.45, 0.45)
+			_services.overlay_manager.show_status_message(status, color, 1.5)
+		_services.overlay_manager.refresh_overlay_buttons()
 
 func _on_grid_overlay_toggled(toggled_on: bool) -> void:
 	"""Toggle grid overlay visibility"""
@@ -97,6 +109,18 @@ func _on_random_rotation_toggled(toggled_on: bool) -> void:
 	# This is a USER click - always apply it
 	if placement_settings_ref:
 		placement_settings_ref.toggle_random_rotation(toggled_on)
+	
+	# Refresh overlay to show updated state
+	if _coordinator:
+		_coordinator.refresh_overlay()
+	
+	# Show feedback message if not in active mode
+	if _services and _services.overlay_manager:
+		if not _coordinator or not _coordinator.is_any_mode_active():
+			var status := "Random rotation %s" % ("enabled" if toggled_on else "disabled")
+			var color := Color(0.4, 0.85, 0.4) if toggled_on else Color(0.9, 0.45, 0.45)
+			_services.overlay_manager.show_status_message(status, color, 1.5)
+		_services.overlay_manager.refresh_overlay_buttons()
 
 func _on_transform_mode_toggled(toggled_on: bool) -> void:
 	"""Toggle transform mode"""
@@ -177,6 +201,9 @@ func _update_surface_align_button() -> void:
 		surface_align_button.button_pressed = enabled
 		if was_connected:
 			surface_align_button.toggled.connect(_on_surface_align_toggled)
+	
+	# Apply visual styling
+	_apply_toggle_button_style(surface_align_button, enabled)
 
 func _update_smooth_transforms_button() -> void:
 	"""Sync smooth transforms toggle"""
@@ -195,6 +222,9 @@ func _update_smooth_transforms_button() -> void:
 		smooth_transforms_button.button_pressed = enabled
 		if was_connected:
 			smooth_transforms_button.toggled.connect(_on_smooth_transforms_toggled)
+	
+	# Apply visual styling
+	_apply_toggle_button_style(smooth_transforms_button, enabled)
 
 func _update_cursor_warp_button() -> void:
 	"""Sync cursor warp toggle"""
@@ -213,6 +243,9 @@ func _update_cursor_warp_button() -> void:
 		cursor_warp_button.button_pressed = enabled
 		if was_connected:
 			cursor_warp_button.toggled.connect(_on_cursor_warp_toggled)
+	
+	# Apply visual styling
+	_apply_toggle_button_style(cursor_warp_button, enabled)
 
 func _update_placement_mode_button() -> void:
 	"""Update placement mode button icon"""
@@ -251,6 +284,9 @@ func _update_grid_snap_button() -> void:
 		
 		if was_connected:
 			grid_snap_button.toggled.connect(_on_grid_snap_toggled)
+	
+	# Apply visual styling
+	_apply_toggle_button_style(grid_snap_button, enabled)
 
 func _update_grid_overlay_button() -> void:
 	"""Update grid overlay button state from settings"""
@@ -277,6 +313,9 @@ func _update_grid_overlay_button() -> void:
 		
 		if was_connected:
 			grid_overlay_button.toggled.connect(_on_grid_overlay_toggled)
+	
+	# Apply visual styling
+	_apply_toggle_button_style(grid_overlay_button, enabled)
 
 func _update_random_rotation_button() -> void:
 	"""Update random rotation button state from settings"""
@@ -302,6 +341,9 @@ func _update_random_rotation_button() -> void:
 		
 		if was_connected:
 			random_rotation_button.toggled.connect(_on_random_rotation_toggled)
+	
+	# Apply visual styling
+	_apply_toggle_button_style(random_rotation_button, enabled)
 
 func _update_transform_mode_button() -> void:
 	"""Update transform mode button state"""
@@ -424,6 +466,18 @@ func _on_surface_align_toggled(toggled_on: bool) -> void:
 		if _services and _services.settings_manager:
 			_services.settings_manager.set_dock_setting("align_with_normal", toggled_on)
 			_services.settings_manager.set_plugin_setting("align_with_normal", toggled_on)
+	
+	# Refresh overlay to show updated state
+	if _coordinator:
+		_coordinator.refresh_overlay()
+	
+	# Show feedback message if not in active mode
+	if _services and _services.overlay_manager:
+		if not _coordinator or not _coordinator.is_any_mode_active():
+			var status := "Surface align %s" % ("enabled" if toggled_on else "disabled")
+			var color := Color(0.4, 0.85, 0.4) if toggled_on else Color(0.9, 0.45, 0.45)
+			_services.overlay_manager.show_status_message(status, color, 1.5)
+		_services.overlay_manager.refresh_overlay_buttons()
 
 func _on_smooth_transforms_toggled(toggled_on: bool) -> void:
 	"""Toggle smooth transform interpolation"""
@@ -433,6 +487,18 @@ func _on_smooth_transforms_toggled(toggled_on: bool) -> void:
 		if _services and _services.settings_manager:
 			_services.settings_manager.set_dock_setting("smooth_transforms", toggled_on)
 			_services.settings_manager.set_plugin_setting("smooth_transforms", toggled_on)
+	
+	# Refresh overlay to show updated state
+	if _coordinator:
+		_coordinator.refresh_overlay()
+	
+	# Show feedback message if not in active mode
+	if _services and _services.overlay_manager:
+		if not _coordinator or not _coordinator.is_any_mode_active():
+			var status := "Smooth transforms %s" % ("enabled" if toggled_on else "disabled")
+			var color := Color(0.4, 0.85, 0.4) if toggled_on else Color(0.9, 0.45, 0.45)
+			_services.overlay_manager.show_status_message(status, color, 1.5)
+		_services.overlay_manager.refresh_overlay_buttons()
 
 func _on_cursor_warp_toggled(toggled_on: bool) -> void:
 	"""Toggle cursor warp preference"""
@@ -442,6 +508,11 @@ func _on_cursor_warp_toggled(toggled_on: bool) -> void:
 		if _services and _services.settings_manager:
 			_services.settings_manager.set_dock_setting("cursor_warp_enabled", toggled_on)
 			_services.settings_manager.set_plugin_setting("cursor_warp_enabled", toggled_on)
+	
+	# Refresh overlay to show updated state
+	if _coordinator:
+		_coordinator.refresh_overlay()
+	
 	if _services and _services.overlay_manager:
 		var status := "Cursor warp %s" % ("enabled" if toggled_on else "disabled")
 		var color := Color(0.4, 0.85, 0.4) if toggled_on else Color(0.9, 0.45, 0.45)
@@ -452,3 +523,34 @@ func _get_service() -> PlacementStrategyService:
 		_placement_service = PlacementStrategyService.new()
 		_placement_service.initialize()
 	return _placement_service
+
+func _apply_toggle_button_style(button: Button, active: bool) -> void:
+	"""Apply visual styling to a toggle button based on its active state"""
+	if not button:
+		return
+	
+	# Create style box for button background
+	var style_box = StyleBoxFlat.new()
+	if active:
+		# Darker background when ON
+		style_box.bg_color = Color(0.25, 0.3, 0.35, 0.9)
+		style_box.border_color = Color(0.45, 0.55, 0.65, 1.0)
+	else:
+		# Default/lighter background when OFF
+		style_box.bg_color = Color(0.18, 0.18, 0.22, 0.6)
+		style_box.border_color = Color(0.3, 0.3, 0.35, 0.7)
+	
+	style_box.border_width_left = 1
+	style_box.border_width_top = 1
+	style_box.border_width_right = 1
+	style_box.border_width_bottom = 1
+	style_box.corner_radius_top_left = 3
+	style_box.corner_radius_top_right = 3
+	style_box.corner_radius_bottom_right = 3
+	style_box.corner_radius_bottom_left = 3
+	
+	# Apply the style to the pressed state
+	button.add_theme_stylebox_override("pressed", style_box)
+	
+	# Also update modulate for visual feedback
+	button.modulate = Color(1, 1, 1, 1) if active else Color(0.85, 0.85, 0.85, 0.85)

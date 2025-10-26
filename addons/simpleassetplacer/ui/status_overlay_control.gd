@@ -239,7 +239,25 @@ func show_status_message(message: String, color: Color = Color.GREEN) -> void:
 		scale_label.text = ""
 	if keybinds_label:
 		keybinds_label.text = ""
-	_update_snap_badges({}, false)
+	
+	# Update badges with actual current settings instead of clearing them
+	var snap_state := {}
+	var smooth_enabled := false
+	if _services:
+		var combined_settings: Dictionary = _services.settings_manager.get_combined_settings() if _services.settings_manager else {}
+		snap_state = {
+			"position": combined_settings.get("snap_enabled", false),
+			"snap_y": combined_settings.get("snap_y_enabled", false),
+			"rotation": combined_settings.get("snap_rotation_enabled", false),
+			"scale": combined_settings.get("snap_scale_enabled", false),
+			"half_step": false,  # Half-step is runtime only
+			"align": combined_settings.get("align_with_normal", false),
+			"cursor_warp": combined_settings.get("cursor_warp_enabled", true)
+		}
+		if _services.smooth_transform_manager:
+			smooth_enabled = _services.smooth_transform_manager.is_smooth_transforms_enabled()
+	
+	_update_snap_badges(snap_state, smooth_enabled)
 	_update_modifier_badges({})
 	clear_numeric_state()
 	
@@ -297,6 +315,32 @@ func _set_toggle_badge(label: Label, name: String, active: bool) -> void:
 	var inactive_color := Color(0.6, 0.6, 0.6, 0.7)
 	label.add_theme_color_override("font_color", active_color if active else inactive_color)
 	label.self_modulate = Color(1, 1, 1, 1) if active else Color(1, 1, 1, 0.5)
+	
+	# Add background styling to reflect on/off state
+	var style_box = StyleBoxFlat.new()
+	if active:
+		# Darker background when ON
+		style_box.bg_color = Color(0.2, 0.25, 0.3, 0.8)
+		style_box.border_color = Color(0.4, 0.5, 0.6, 0.9)
+	else:
+		# Lighter/transparent background when OFF
+		style_box.bg_color = Color(0.15, 0.15, 0.2, 0.3)
+		style_box.border_color = Color(0.3, 0.3, 0.35, 0.5)
+	
+	style_box.border_width_left = 1
+	style_box.border_width_top = 1
+	style_box.border_width_right = 1
+	style_box.border_width_bottom = 1
+	style_box.corner_radius_top_left = 3
+	style_box.corner_radius_top_right = 3
+	style_box.corner_radius_bottom_right = 3
+	style_box.corner_radius_bottom_left = 3
+	style_box.content_margin_left = 4
+	style_box.content_margin_right = 4
+	style_box.content_margin_top = 2
+	style_box.content_margin_bottom = 2
+	
+	label.add_theme_stylebox_override("normal", style_box)
 
 func _set_modifier_badge(label: Label, name: String, active: bool) -> void:
 	if not label:

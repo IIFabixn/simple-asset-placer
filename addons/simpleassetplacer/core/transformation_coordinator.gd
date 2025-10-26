@@ -200,6 +200,16 @@ func get_current_scale() -> float:
 	var state = _state()
 	return _services.scale_manager.get_scale(state) if state else 1.0
 
+func refresh_overlay() -> void:
+	"""Refresh the overlay display if a mode is active"""
+	if not is_any_mode_active():
+		return
+	
+	var state = _state()
+	if state:
+		var mode = get_current_mode()
+		_update_overlay_display(mode, state)
+
 ## Public API - Configuration
 
 func set_placement_end_callback(callback: Callable) -> void:

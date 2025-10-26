@@ -54,6 +54,7 @@ var _half_step_grid_overlay: Node3D = null
 var _overlays_initialized: bool = false
 var _current_mode: int = 0
 var _show_overlays: bool = true
+var _status_message_timer: Timer = null  # Track active status message timer
 
 ## Getters
 
@@ -141,8 +142,21 @@ func show_transform_overlay(mode: int, node_name: String = "", position: Vector3
 			"rotation": transform_state.snap.snap_rotation_enabled,
 			"scale": transform_state.snap.snap_scale_enabled,
 			"half_step": transform_state.snap.use_half_step,
-		"align": transform_state.placement.align_with_normal
-	}
+			"align": transform_state.placement.align_with_normal
+		}
+	else:
+		# Fallback: read from settings when transform_state is not available
+		var combined_settings: Dictionary = _services.settings_manager.get_combined_settings()
+		snap_state = {
+			"position": combined_settings.get("snap_enabled", false),
+			"snap_y": combined_settings.get("snap_y_enabled", false),
+			"rotation": combined_settings.get("snap_rotation_enabled", false),
+			"scale": combined_settings.get("snap_scale_enabled", false),
+			"half_step": false,  # Half-step is runtime only
+			"align": combined_settings.get("align_with_normal", false)
+		}
+	
+	# Always add cursor_warp from settings
 	var combined_settings: Dictionary = _services.settings_manager.get_combined_settings()
 	snap_state["cursor_warp"] = combined_settings.get("cursor_warp_enabled", true)
 
@@ -174,16 +188,35 @@ func show_status_message(message: String, color: Color = Color.GREEN, duration: 
 	if not _is_overlay_ready():
 		return
 	
+	# Cancel any existing status message timer
+	if _status_message_timer and is_instance_valid(_status_message_timer):
+		_status_message_timer.stop()
+		_status_message_timer.queue_free()
+		_status_message_timer = null
+	
 	# Use the scene's controller method
 	_status_overlay.show_status_message(message, color)
 	
 	# Auto-hide after duration if specified
 	if duration > 0.0:
-		await Engine.get_main_loop().create_timer(duration).timeout
-		if NodeUtils.is_valid(_status_overlay) and _current_mode == 0:  # Only hide if not in active mode (0 = NONE)
-			_status_overlay.hide_overlay()
-		elif not NodeUtils.is_valid(_status_overlay):
-			_status_overlay = null  # Clear invalid reference
+		_status_message_timer = Timer.new()
+		_status_message_timer.wait_time = duration
+		_status_message_timer.one_shot = true
+		_status_message_timer.timeout.connect(_on_status_message_timeout)
+		Engine.get_main_loop().root.add_child(_status_message_timer)
+		_status_message_timer.start()
+
+func _on_status_message_timeout():
+	"""Handle status message timer timeout"""
+	if NodeUtils.is_valid(_status_overlay) and _current_mode == 0:  # Only hide if not in active mode (0 = NONE)
+		_status_overlay.hide_overlay()
+	elif not NodeUtils.is_valid(_status_overlay):
+		_status_overlay = null  # Clear invalid reference
+	
+	# Clean up timer
+	if _status_message_timer and is_instance_valid(_status_message_timer):
+		_status_message_timer.queue_free()
+		_status_message_timer = null
 
 func hide_transform_overlay():
 	"""Hide the unified transform overlay"""
@@ -219,6 +252,12 @@ func hide_all_overlays():
 
 func cleanup_all_overlays():
 	"""Clean up all overlay resources"""
+	# Clean up status message timer
+	if _status_message_timer and is_instance_valid(_status_message_timer):
+		_status_message_timer.stop()
+		_status_message_timer.queue_free()
+		_status_message_timer = null
+	
 	_status_overlay = NodeUtils.cleanup_and_null(_status_overlay)
 	_grid_overlay = NodeUtils.cleanup_and_null(_grid_overlay)
 	_half_step_grid_overlay = NodeUtils.cleanup_and_null(_half_step_grid_overlay)

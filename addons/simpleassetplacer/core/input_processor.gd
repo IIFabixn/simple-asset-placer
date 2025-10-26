@@ -216,14 +216,31 @@ func _apply_position_adjustment(wheel_input: Dictionary) -> void:
 	if not camera:
 		return
 	
-	# Calculate camera-relative direction snapped to world axis
-	var movement = _calculate_camera_relative_movement(camera, axis, direction, step)
-	
-	var mode = _services.mode_state_machine.get_current_mode()
 	var state = _services.transformation_coordinator._state()
 	
-	# Apply to manual position offset
-	state.values.manual_position_offset += movement
+	# Use plane-aware movement functions instead of hardcoded XZ projection
+	# This ensures intuitive controls on all plane orientations
+	match axis:
+		"forward":
+			if direction > 0:
+				_services.position_manager.move_forward(state, step, camera)
+			else:
+				_services.position_manager.move_backward(state, step, camera)
+		"backward":
+			if direction > 0:
+				_services.position_manager.move_backward(state, step, camera)
+			else:
+				_services.position_manager.move_forward(state, step, camera)
+		"left":
+			if direction > 0:
+				_services.position_manager.move_left(state, step, camera)
+			else:
+				_services.position_manager.move_right(state, step, camera)
+		"right":
+			if direction > 0:
+				_services.position_manager.move_right(state, step, camera)
+			else:
+				_services.position_manager.move_left(state, step, camera)
 
 ## Helper Methods
 
@@ -251,40 +268,6 @@ func _calculate_step(settings: Dictionary, base_key: String, fine_key: String, l
 		step = settings.get(fine_key, step)
 	
 	return abs(step)
-
-func _calculate_camera_relative_movement(camera: Camera3D, axis: String, direction: int, step: float) -> Vector3:
-	"""Calculate camera-relative movement vector snapped to world axes"""
-	var camera_forward = -camera.global_transform.basis.z
-	var camera_right = camera.global_transform.basis.x
-	
-	# Project to XZ plane and snap to nearest world axis
-	camera_forward.y = 0
-	camera_forward = camera_forward.normalized()
-	if abs(camera_forward.z) > abs(camera_forward.x):
-		camera_forward = Vector3(0, 0, sign(camera_forward.z))
-	else:
-		camera_forward = Vector3(sign(camera_forward.x), 0, 0)
-	
-	camera_right.y = 0
-	camera_right = camera_right.normalized()
-	if abs(camera_right.x) > abs(camera_right.z):
-		camera_right = Vector3(sign(camera_right.x), 0, 0)
-	else:
-		camera_right = Vector3(0, 0, sign(camera_right.z))
-	
-	# Determine movement based on axis
-	var movement = Vector3.ZERO
-	match axis:
-		"forward":
-			movement = camera_forward * direction
-		"backward":
-			movement = -camera_forward * direction
-		"left":
-			movement = -camera_right * direction
-		"right":
-			movement = camera_right * direction
-	
-	return movement * step
 
 func _cycle_placement_strategy(state: TransformState) -> void:
 	"""Cycle between placement strategies (collision/plane)"""

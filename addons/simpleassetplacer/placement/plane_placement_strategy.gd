@@ -81,6 +81,10 @@ var plane_height_locked: bool = false
 var last_position: Vector3 = Vector3.ZERO
 var has_last_position: bool = false
 
+# Plane cycling protection
+var _freeze_position_updates: bool = false
+var _freeze_frames_remaining: int = 0
+
 ## Helper Methods
 
 func _get_plane_data(type: PlaneType = plane_type) -> PlaneData:
@@ -115,6 +119,8 @@ func _clear_cache() -> void:
 	plane_height_locked = false
 	last_position = Vector3.ZERO
 	has_last_position = false
+	_freeze_position_updates = false
+	_freeze_frames_remaining = 0
 
 func _calculate_screen_delta_movement(camera: Camera3D, anchor_position: Vector3, screen_delta: Vector2) -> Variant:
 	"""Convert screen space mouse delta to world space movement on the plane
@@ -253,6 +259,16 @@ func calculate_position(from: Vector3, to: Vector3, config: Dictionary) -> Place
 	the object's current position. This gives direct mouse control (like collision strategy)
 	while preventing jumps when changing plane axes (plane moves with the object).
 	"""
+	
+	# Check if position updates are frozen (immediately after plane cycle)
+	if _freeze_position_updates:
+		_freeze_frames_remaining -= 1
+		if _freeze_frames_remaining <= 0:
+			_freeze_position_updates = false
+		
+		# Return last position without updating
+		var plane_data = _get_plane_data()
+		return PlacementResult.new(last_position, plane_data.normal, false, from.distance_to(last_position))
 	
 	# Extract configuration
 	_update_config(config)
@@ -459,6 +475,12 @@ func cycle_plane(current_position: Vector3 = Vector3.ZERO) -> PlaneType:
 		has_last_position = true
 		plane_height_locked = true
 		# No pending_reprojection flag needed - next frame's raycast handles it naturally
+	
+	# CRITICAL FIX: Freeze position updates for a few frames to prevent jumping
+	# The mouse ray will hit the new plane at a different location, so we need to
+	# ignore mouse motion for a brief moment until the user moves the mouse intentionally
+	_freeze_position_updates = true
+	_freeze_frames_remaining = 2  # Skip 2 frames of position updates
 	
 	PluginLogger.info(
 		PluginConstants.COMPONENT_POSITION,

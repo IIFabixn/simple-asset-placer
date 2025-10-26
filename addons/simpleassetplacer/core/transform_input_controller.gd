@@ -141,7 +141,7 @@ func process_height_adjustment(pos_input: PositionInputState, state: TransformSt
 		_services.position_manager.adjust_offset_normal(state, delta_normal)
 
 func process_wasd_movement(pos_input: PositionInputState, camera: Camera3D, state: TransformState, settings: Dictionary) -> void:
-	"""Process WASD position movement"""
+	"""Process WASD position movement (plane-aware)"""
 	var position_step = settings.get("position_adjustment_step", 0.1)
 	
 	# Apply modifiers
@@ -150,41 +150,19 @@ func process_wasd_movement(pos_input: PositionInputState, camera: Camera3D, stat
 	elif pos_input.large_increment_modifier_held:
 		position_step = settings.get("large_position_increment", 1.0)
 	
-	# Calculate camera-relative directions snapped to world axes
-	var camera_forward = -camera.global_transform.basis.z
-	var camera_right = camera.global_transform.basis.x
+	# Use plane-aware movement functions that handle all plane orientations correctly
+	# - XZ plane (horizontal): W/S moves along camera-snapped Z/X, A/D moves perpendicular
+	# - XY plane (vertical): W/S moves up/down (Y), A/D moves left/right on plane
+	# - YZ plane (vertical): W/S moves up/down (Y), A/D moves left/right on plane
 	
-	# Project to XZ plane
-	camera_forward.y = 0
-	camera_right.y = 0
-	camera_forward = camera_forward.normalized()
-	camera_right = camera_right.normalized()
-	
-	# Snap to nearest world axis for pure axis-aligned movement
-	if abs(camera_forward.z) > abs(camera_forward.x):
-		camera_forward = Vector3(0, 0, sign(camera_forward.z))
-	else:
-		camera_forward = Vector3(sign(camera_forward.x), 0, 0)
-	
-	if abs(camera_right.x) > abs(camera_right.z):
-		camera_right = Vector3(sign(camera_right.x), 0, 0)
-	else:
-		camera_right = Vector3(0, 0, sign(camera_right.z))
-	
-	# Calculate movement
-	var position_delta = Vector3.ZERO
 	if pos_input.position_forward_pressed:
-		position_delta += camera_forward * position_step
+		_services.position_manager.move_forward(state, position_step, camera)
 	if pos_input.position_backward_pressed:
-		position_delta -= camera_forward * position_step
+		_services.position_manager.move_backward(state, position_step, camera)
 	if pos_input.position_right_pressed:
-		position_delta += camera_right * position_step
+		_services.position_manager.move_right(state, position_step, camera)
 	if pos_input.position_left_pressed:
-		position_delta -= camera_right * position_step
-	
-	# Apply movement
-	if position_delta.length_squared() > 0.0:
-		_services.position_manager.apply_position_delta(state, position_delta)
+		_services.position_manager.move_left(state, position_step, camera)
 
 func process_rotation(rot_input: RotationInputState, state: TransformState, settings: Dictionary) -> void:
 	"""Process rotation input (X/Y/Z keys)"""

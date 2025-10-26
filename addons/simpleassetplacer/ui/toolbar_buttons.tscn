@@ -20,7 +20,7 @@ layout_mode = 2
 tooltip_text = "Toggle Grid Snapping
 Snap objects to grid positions"
 toggle_mode = true
-text = "📏"
+text = "🧲"
 
 [node name="GridOverlayButton" type="Button" parent="."]
 custom_minimum_size = Vector2(32, 28)
@@ -28,7 +28,7 @@ layout_mode = 2
 tooltip_text = "Toggle Grid Overlay
 Show/hide visual grid"
 toggle_mode = true
-text = "🔲"
+text = "#️⃣"
 
 [node name="SurfaceAlignButton" type="Button" parent="."]
 custom_minimum_size = Vector2(32, 28)
@@ -36,7 +36,7 @@ layout_mode = 2
 tooltip_text = "Toggle Surface Alignment
 Align placement rotation to surface normals"
 toggle_mode = true
-text = "SA"
+text = "🔺"
 
 [node name="SmoothTransformsButton" type="Button" parent="."]
 custom_minimum_size = Vector2(32, 28)
@@ -44,7 +44,7 @@ layout_mode = 2
 tooltip_text = "Toggle Smooth Transforms
 Lerp preview and transform updates"
 toggle_mode = true
-text = "SM"
+text = "✨"
 
 [node name="CursorWarpButton" type="Button" parent="."]
 custom_minimum_size = Vector2(32, 28)

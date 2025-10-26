@@ -531,9 +531,7 @@ func _on_context_menu_item_selected(id: int, menu_actions: Dictionary, popup: Po
 				# Asset was removed from favorites, need to update grid
 				update_asset_grid()
 			elif current_category_filter == "":
-				# Viewing all assets - could update badges, but that requires full regeneration
-				# For now, skip update to avoid thumbnail regeneration
-				# TODO: Add a refresh_badges() function to update badges without regenerating thumbnails
+				# Viewing all assets - skip update to avoid thumbnail regeneration
 				pass
 		
 		"ignore":

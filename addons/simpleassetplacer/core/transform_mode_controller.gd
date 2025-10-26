@@ -207,22 +207,30 @@ func update_node_transforms(state: TransformState) -> void:
 	var original_transforms: Dictionary = state.session.transform_data.get("original_transforms", {})
 	var original_rotations: Dictionary = state.session.transform_data.get("original_rotations", {})
 	
+	# Calculate rotation basis for group rotation around center
+	var rotation_basis = Basis.from_euler(state.values.manual_rotation_offset)
+	
 	# Apply transforms to each node
 	for node in nodes:
 		if not node or not node.is_inside_tree():
 			continue
 		
-		# Get node's offset from center
+		# Get node's original offset from center
 		var offset = node_offsets.get(node, Vector3.ZERO)
 		
-		# Calculate new position: center + offset + manual offset
-		var new_position = center_position + offset + state.values.manual_position_offset
+		# STEP 1: Group Rotation - Rotate the offset around the center
+		# This makes nodes orbit around the collective center when rotating
+		var rotated_offset = rotation_basis * offset
 		
-		# Calculate rotation: original + manual offset
+		# STEP 2: Calculate new position - center + rotated offset + manual position offset
+		var new_position = center_position + rotated_offset + state.values.manual_position_offset
+		
+		# STEP 3: Calculate rotation - original + manual offset
+		# Each node keeps its original rotation and adds the manual rotation
 		var original_rotation = original_rotations.get(node, Vector3.ZERO)
 		var new_rotation = original_rotation + state.values.manual_rotation_offset
 		
-		# Calculate scale: original + scale offset
+		# STEP 4: Calculate scale - original + scale offset
 		var original_transform = original_transforms.get(node, Transform3D())
 		var original_scale = original_transform.basis.get_scale()
 		var scale_offset = state.get_scale_vector() - Vector3.ONE

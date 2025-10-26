@@ -122,44 +122,21 @@ static func get_all_settings() -> Array:
 	cursor_warp_enabled.ui_tooltip = "Warp the mouse back toward the viewport center when it nears the edge during mouse-based transforms. Disable if you prefer no cursor repositioning."
 	settings.append(cursor_warp_enabled)
 	
-	# Mouse Control Sensitivity Section
-	var mouse_rotation_sensitivity = SettingMeta.new("mouse_rotation_sensitivity", "simple_asset_placer/mouse_rotation_sensitivity", 0.5, SettingType.FLOAT, "Mouse Rotation Sensitivity")
-	mouse_rotation_sensitivity.section = "mouse_controls"
-	mouse_rotation_sensitivity.min_value = 0.1
-	mouse_rotation_sensitivity.max_value = 2.0
-	mouse_rotation_sensitivity.step = 0.1
-	mouse_rotation_sensitivity.ui_tooltip = "Sensitivity for mouse rotation in R mode (pixels to degrees)"
-	settings.append(mouse_rotation_sensitivity)
-	
-	var mouse_scale_sensitivity = SettingMeta.new("mouse_scale_sensitivity", "simple_asset_placer/mouse_scale_sensitivity", 0.01, SettingType.FLOAT, "Mouse Scale Sensitivity")
-	mouse_scale_sensitivity.section = "mouse_controls"
-	mouse_scale_sensitivity.min_value = 0.001
-	mouse_scale_sensitivity.max_value = 0.1
-	mouse_scale_sensitivity.step = 0.001
-	mouse_scale_sensitivity.ui_tooltip = "Sensitivity for mouse scaling in L mode (pixels to scale factor)"
-	settings.append(mouse_scale_sensitivity)
-
-	var mouse_sensitivity_curve = SettingMeta.new("mouse_sensitivity_curve", "simple_asset_placer/mouse_sensitivity_curve", "linear", SettingType.OPTION, "Sensitivity Curve")
-	mouse_sensitivity_curve.section = "mouse_controls"
-	mouse_sensitivity_curve.options = ["linear", "ease_in", "ease_out", "ease_in_out"]
-	mouse_sensitivity_curve.ui_tooltip = "Shape mouse response when rotating or scaling: Linear = constant, Ease In = slower start, Ease Out = faster start, Ease In-Out = smooth blend."
-	settings.append(mouse_sensitivity_curve)
-	
-	# Mouse sensitivity modifiers
-	var fine_sensitivity_multiplier = SettingMeta.new("fine_sensitivity_multiplier", "simple_asset_placer/fine_sensitivity_multiplier", PluginConstants.FINE_SENSITIVITY_MULTIPLIER, SettingType.FLOAT, "Fine Sensitivity Multiplier")
-	fine_sensitivity_multiplier.section = "mouse_controls"
+	# Increment modifiers for keyboard-based transforms
+	var fine_sensitivity_multiplier = SettingMeta.new("fine_sensitivity_multiplier", "simple_asset_placer/fine_sensitivity_multiplier", PluginConstants.FINE_SENSITIVITY_MULTIPLIER, SettingType.FLOAT, "Fine Increment Multiplier")
+	fine_sensitivity_multiplier.section = "increments"
 	fine_sensitivity_multiplier.min_value = 0.01
 	fine_sensitivity_multiplier.max_value = 1.0
 	fine_sensitivity_multiplier.step = 0.05
-	fine_sensitivity_multiplier.ui_tooltip = "Multiplier for mouse sensitivity when CTRL is held in R/L modes (lower = more precise)"
+	fine_sensitivity_multiplier.ui_tooltip = "Multiplier for adjustment increments when CTRL modifier is held (lower = more precise)"
 	settings.append(fine_sensitivity_multiplier)
 	
-	var large_sensitivity_multiplier = SettingMeta.new("large_sensitivity_multiplier", "simple_asset_placer/large_sensitivity_multiplier", PluginConstants.LARGE_SENSITIVITY_MULTIPLIER, SettingType.FLOAT, "Large Sensitivity Multiplier")
-	large_sensitivity_multiplier.section = "mouse_controls"
+	var large_sensitivity_multiplier = SettingMeta.new("large_sensitivity_multiplier", "simple_asset_placer/large_sensitivity_multiplier", PluginConstants.LARGE_SENSITIVITY_MULTIPLIER, SettingType.FLOAT, "Large Increment Multiplier")
+	large_sensitivity_multiplier.section = "increments"
 	large_sensitivity_multiplier.min_value = 1.0
 	large_sensitivity_multiplier.max_value = 10.0
 	large_sensitivity_multiplier.step = 0.5
-	large_sensitivity_multiplier.ui_tooltip = "Multiplier for mouse sensitivity when ALT is held in R/L modes (higher = faster movement)"
+	large_sensitivity_multiplier.ui_tooltip = "Multiplier for adjustment increments when ALT modifier is held (higher = faster adjustments)"
 	settings.append(large_sensitivity_multiplier)
 	
 	# Advanced Grid Settings
@@ -194,7 +171,7 @@ static func get_all_settings() -> Array:
 	# Rotation Snap Settings
 	var snap_rotation_enabled = SettingMeta.new("snap_rotation_enabled", "simple_asset_placer/snap_rotation_enabled", false, SettingType.BOOL, "Enable Rotation Snapping")
 	snap_rotation_enabled.section = "grid_snapping"
-	snap_rotation_enabled.ui_tooltip = "Snap rotation to grid increments in R mode"
+	snap_rotation_enabled.ui_tooltip = "Snap rotation to grid increments"
 	settings.append(snap_rotation_enabled)
 	
 	var snap_rotation_step = SettingMeta.new("snap_rotation_step", "simple_asset_placer/snap_rotation_step", 15.0, SettingType.FLOAT, "Rotation Snap Step (degrees)")
@@ -208,7 +185,7 @@ static func get_all_settings() -> Array:
 	# Scale Snap Settings
 	var snap_scale_enabled = SettingMeta.new("snap_scale_enabled", "simple_asset_placer/snap_scale_enabled", false, SettingType.BOOL, "Enable Scale Snapping")
 	snap_scale_enabled.section = "grid_snapping"
-	snap_scale_enabled.ui_tooltip = "Snap scale to grid increments in L mode"
+	snap_scale_enabled.ui_tooltip = "Snap scale to grid increments"
 	settings.append(snap_scale_enabled)
 	
 	var snap_scale_step = SettingMeta.new("snap_scale_step", "simple_asset_placer/snap_scale_step", 0.1, SettingType.FLOAT, "Scale Snap Step")

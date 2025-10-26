@@ -71,7 +71,6 @@ var smooth_transform_speed: float = 8.0
 var continuous_placement_enabled: bool = true
 var auto_select_placed: bool = true
 var cursor_warp_enabled: bool = true
-var mouse_sensitivity_curve: String = "linear"
 
 # Advanced Grid Settings
 var snap_offset: Vector3 = Vector3.ZERO

@@ -114,7 +114,7 @@ func show_transform_info(mode: int, node_name: String = "", position: Vector3 = 
 		rotation: Current rotation in radians
 		scale_value: Current scale multiplier
 		offset_y: Current Y position offset
-		control_mode_state: ControlModeState instance for displaying G/R/L mode and axis constraints
+		control_mode_state: ControlModeState instance for displaying axis constraints
 	"""
 	if not mode_label or not position_label:
 		return
@@ -132,7 +132,7 @@ func show_transform_info(mode: int, node_name: String = "", position: Vector3 = 
 		if plane_name:
 			plane_info = " - " + plane_name
 	
-	# Show axis constraint info if available (modal system removed, only axis constraints remain)
+	# Show axis constraint info if available
 	var axis_constraint_text = ""
 	if control_mode_state and control_mode_state.has_axis_constraint():
 		axis_constraint_text = " | Axis: " + control_mode_state.get_axis_constraint_string()
@@ -194,7 +194,7 @@ func show_transform_info(mode: int, node_name: String = "", position: Vector3 = 
 			if strategy_type == "plane":
 				plane_hint = "  Middle Mouse (Cycle Plane)"
 			
-			# Show keybinds (modal system removed)
+			# Show keybinds
 			if mode == ModeStateMachine.Mode.PLACEMENT:
 				keybinds_label.text = "%s/%s (Quick Height)  X/Y/Z (Axis Constraints)  %s%s  ENTER (Place)" % [height_up, height_down, wheel_hint, plane_hint]
 			else:  # transform mode

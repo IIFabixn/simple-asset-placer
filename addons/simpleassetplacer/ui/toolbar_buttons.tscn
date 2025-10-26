@@ -50,7 +50,7 @@ text = "✨"
 custom_minimum_size = Vector2(32, 28)
 layout_mode = 2
 tooltip_text = "Toggle Cursor Warp
-Keep mouse centered during modal transforms"
+Keep mouse centered during transforms"
 toggle_mode = true
 text = "🖱"
 

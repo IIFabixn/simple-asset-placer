@@ -15,7 +15,6 @@ static func build_settings_ui(container: Control, owner_node: Node, settings_dat
 	# Define section order and titles
 	var section_config = {
 		"basic": "Placement & Behavior",
-		"mouse_controls": "Mouse Controls & Sensitivity",
 		"keybinds": "Keybinds",
 		"increments": "Adjustment Increments",
 		"grid_snapping": "Grid & Snapping",

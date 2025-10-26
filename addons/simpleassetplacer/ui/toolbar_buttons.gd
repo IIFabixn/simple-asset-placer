@@ -386,7 +386,7 @@ func _update_button_tooltips() -> void:
 		smooth_transforms_button.tooltip_text = "Toggle Smooth Transforms\nLerp preview and transform updates\nCurrent: %s" % ("On" if smooth_transforms_button.button_pressed else "Off")
 
 	if cursor_warp_button:
-		cursor_warp_button.tooltip_text = "Toggle Cursor Warp\nKeep mouse centered during modal transforms\nCurrent: %s" % ("On" if cursor_warp_button.button_pressed else "Off")
+		cursor_warp_button.tooltip_text = "Toggle Cursor Warp\nKeep mouse centered during transforms\nCurrent: %s" % ("On" if cursor_warp_button.button_pressed else "Off")
 
 func refresh_button_states() -> void:
 	"""Public method to refresh button states (called from overlay_manager)"""

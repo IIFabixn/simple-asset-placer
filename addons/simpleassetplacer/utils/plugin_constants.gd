@@ -56,9 +56,9 @@ const DEFAULT_POSITION_INCREMENT: float = 1.0  # Match typical grid snap size
 const FINE_POSITION_INCREMENT: float = 0.1     # Precise adjustments with CTRL
 const LARGE_POSITION_INCREMENT: float = 5.0    # Large movements with ALT
 
-## Mouse Sensitivity Modifiers (for modal R/L modes)
-const FINE_SENSITIVITY_MULTIPLIER: float = 0.1  # CTRL modifier makes mouse 10x more precise
-const LARGE_SENSITIVITY_MULTIPLIER: float = 2.0  # ALT modifier makes mouse 2x faster
+## Increment Modifiers (for keyboard-based transforms)
+const FINE_SENSITIVITY_MULTIPLIER: float = 0.1  # CTRL modifier makes adjustments 10x more precise
+const LARGE_SENSITIVITY_MULTIPLIER: float = 2.0  # ALT modifier makes adjustments 2x larger
 
 ## Preview Settings
 const DEFAULT_PREVIEW_OPACITY: float = 0.6

@@ -63,6 +63,12 @@ func add_node_to_scene(node: Node, parent: Node) -> void:
 	"""
 	parent.add_child(node)
 	node.owner = _services.editor_facade.get_edited_scene_root()
+	
+	# Verify node was added
+	if node.is_inside_tree():
+		PluginLogger.debug("UtilityManager", "Node added to scene: " + node.name + " (parent: " + parent.name + ", owner: " + str(node.owner) + ")")
+	else:
+		PluginLogger.error("UtilityManager", "Node failed to be added to scene tree: " + node.name)
 
 func extract_mesh_from_node3d(node: Node3D) -> Mesh:
 	"""Extract a mesh from a Node3D (MeshInstance3D, CSG nodes, etc.)"""
@@ -129,8 +135,8 @@ func place_asset_in_scene(asset_path: String, position: Vector3 = Vector3.ZERO, 
 		var final_rotation = Vector3.ZERO
 		if transform_state:
 			# Get rotation from transform state (includes surface alignment + manual offset)
-			var surface_transform = Transform3D(Basis.from_euler(transform_state.surface_alignment_rotation), Vector3.ZERO)
-			var manual_transform = Transform3D(Basis.from_euler(transform_state.manual_rotation_offset), Vector3.ZERO)
+			var surface_transform = Transform3D(Basis.from_euler(transform_state.values.surface_alignment_rotation), Vector3.ZERO)
+			var manual_transform = Transform3D(Basis.from_euler(transform_state.values.manual_rotation_offset), Vector3.ZERO)
 			var combined_transform = surface_transform * manual_transform
 			final_rotation = combined_transform.basis.get_euler()
 		
@@ -173,8 +179,9 @@ func place_from_meshlib(
 		var base_name = meshlib.get_item_name(item_id)
 		var unique_name = generate_unique_name(base_name, current_scene)
 		mesh_instance.name = unique_name
-		current_scene.add_child(mesh_instance)
-		mesh_instance.owner = current_scene
+		
+		# Add to scene (undo/redo handled by TransformationCoordinator)
+		add_node_to_scene(mesh_instance, current_scene)
 	
 	# Get base rotation from MeshLibrary
 	var base_rotation = _services.rotation_manager.get_current_rotation(transform_state)

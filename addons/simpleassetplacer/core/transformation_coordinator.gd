@@ -64,9 +64,9 @@ func start_transform_mode(target_nodes: Variant, dock_instance = null) -> void:
 	_ensure_undo_redo()
 	_transform_controller.start(target_nodes, dock_instance, _state())
 
-func exit_placement_mode() -> void:
+func exit_placement_mode(confirm_placement: bool = false) -> void:
 	"""Exit placement mode - delegates to PlacementModeController"""
-	_placement_controller.exit(_state())
+	_placement_controller.exit(_state(), confirm_placement)
 
 func exit_transform_mode(confirm_changes: bool = true) -> void:
 	"""Exit transform mode - delegates to TransformModeController"""
@@ -141,10 +141,10 @@ func process_frame_input(camera: Camera3D, input_settings: Dictionary = {}, delt
 				_placement_controller.update_preview_transform(state)
 				_update_overlay_display(mode, state)
 				
-				# Check for exit
+				# Check for placement confirmation
 				if state.session.placement_data.get("_confirm_exit", false):
 					state.session.placement_data.erase("_confirm_exit")
-					exit_placement_mode()
+					_placement_controller.confirm_placement(state)
 					return
 			
 			ModeStateMachine.Mode.TRANSFORM:

@@ -84,10 +84,35 @@ func start(mesh: Mesh, meshlib, item_id: int, asset_path: String, settings: Dict
 	
 	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Started placement mode")
 
-func exit(state: TransformState) -> void:
-	"""Exit placement mode and cleanup"""
+func confirm_placement(state: TransformState) -> void:
+	"""Confirm and place the asset, then check if we should continue or exit"""
 	if not _services.mode_state_machine.is_placement_mode():
 		return
+	
+	# Place the asset
+	_place_asset(state)
+	
+	# Check if continuous placement is enabled
+	var settings = state.session.placement_data.get("settings", {})
+	var continuous_enabled = settings.get("continuous_placement_enabled", true)
+	
+	if continuous_enabled:
+		# Stay in placement mode - just reset the preview position
+		PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Asset placed, continuing placement mode")
+		_reset_for_next_placement(state)
+	else:
+		# Exit placement mode
+		PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Asset placed, exiting placement mode")
+		exit(state, false)  # false because we already placed it
+
+func exit(state: TransformState, confirm_placement: bool = false) -> void:
+	"""Exit placement mode and optionally place the asset"""
+	if not _services.mode_state_machine.is_placement_mode():
+		return
+	
+	# Place asset if confirmed (used when exiting with confirmation)
+	if confirm_placement and state.session.placement_data:
+		_place_asset(state)
 	
 	# Cleanup preview
 	_services.preview_manager.cleanup_preview()
@@ -107,7 +132,8 @@ func exit(state: TransformState) -> void:
 	_services.mode_state_machine.clear_mode()
 	state.end_session()
 	
-	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Exited placement mode")
+	var action = "confirmed" if confirm_placement else "cancelled"
+	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Exited placement mode (%s)" % action)
 
 ## Input Processing
 
@@ -198,3 +224,84 @@ func _reset_transforms_on_exit(state: TransformState) -> void:
 	
 	if settings.get("reset_position_on_exit", false):
 		state.values.manual_position_offset = Vector3.ZERO
+
+func _place_asset(state: TransformState) -> void:
+	"""Actually place the asset in the scene"""
+	var placement_data = state.session.placement_data
+	if not placement_data:
+		PluginLogger.error(PluginConstants.COMPONENT_TRANSFORM, "No placement data available")
+		return
+	
+	# Get final position from state
+	var final_position = state.values.position + state.values.manual_position_offset
+	var settings = placement_data.get("settings", {})
+	
+	var placed_node = null
+	
+	# Check if this is a MeshLibrary item or an asset file
+	var meshlib = placement_data.get("meshlib", null)
+	var item_id = placement_data.get("item_id", -1)
+	
+	if meshlib and item_id >= 0:
+		# Place from MeshLibrary
+		var mesh = placement_data.get("mesh")
+		var rotation_offset = state.values.manual_rotation_offset
+		
+		placed_node = _services.utility_manager.place_from_meshlib(
+			mesh,
+			meshlib,
+			item_id,
+			final_position,
+			rotation_offset,
+			state,
+			settings
+		)
+	else:
+		# Place from asset file
+		var asset_path = placement_data.get("asset_path", "")
+		if asset_path.is_empty():
+			PluginLogger.error(PluginConstants.COMPONENT_TRANSFORM, "No asset path in placement data")
+			return
+		
+		placed_node = _services.utility_manager.place_asset_in_scene(
+			asset_path,
+			final_position,
+			settings,
+			state
+		)
+	
+	if placed_node:
+		PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Asset placed successfully: " + placed_node.name)
+		
+		# Register undo/redo for the placed node
+		if _services.undo_redo and _services.undo_redo_helper:
+			var action_name = "Place " + placed_node.name
+			var success = _services.undo_redo_helper.create_placement_undo(_services.undo_redo, placed_node, action_name)
+			if success:
+				PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Undo/redo registered for: " + placed_node.name)
+			else:
+				PluginLogger.error(PluginConstants.COMPONENT_TRANSFORM, "Failed to register undo/redo for: " + placed_node.name)
+		else:
+			PluginLogger.warning(PluginConstants.COMPONENT_TRANSFORM, "Undo/redo services not available, node may not persist: " + placed_node.name)
+	else:
+		PluginLogger.error(PluginConstants.COMPONENT_TRANSFORM, "Failed to place asset")
+
+func _reset_for_next_placement(state: TransformState) -> void:
+	"""Reset state for next placement while staying in placement mode"""
+	var settings = state.session.placement_data.get("settings", {})
+	
+	# Reset transforms based on settings
+	if settings.get("reset_height_on_exit", false):
+		_services.position_manager.reset_offset_normal(state)
+	
+	if settings.get("reset_rotation_on_exit", false):
+		_services.rotation_manager.reset_all_rotation(state)
+	
+	if settings.get("reset_scale_on_exit", false):
+		_services.scale_manager.reset_scale(state)
+	
+	if settings.get("reset_position_on_exit", false):
+		state.values.manual_position_offset = Vector3.ZERO
+	
+	# Reset focus grab for viewport
+	state.session.focus_grab_frames = PluginConstants.FOCUS_GRAB_FRAMES

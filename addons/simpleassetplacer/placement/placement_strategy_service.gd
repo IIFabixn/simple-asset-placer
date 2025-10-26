@@ -140,10 +140,14 @@ func get_active_strategy() -> PlacementStrategy:
 	_initialize_if_needed()
 	return _active_strategy
 
-func cycle_plane(current_position: Vector3 = Vector3.ZERO) -> String:
+func cycle_plane(current_position: Vector3 = Vector3.ZERO, mouse_position: Vector2 = Vector2.ZERO) -> String:
 	"""Cycle through plane types when plane strategy is active
-	current_position: Current preview position to avoid jumping when cycling
-	Returns the name of the new plane type"""
+	Args:
+		current_position: Current preview position to avoid jumping when cycling
+		mouse_position: Current mouse position to freeze updates until mouse moves
+	Returns:
+		The name of the new plane type
+	"""
 	_initialize_if_needed()
 	
 	# Only cycle if plane strategy is active
@@ -151,8 +155,8 @@ func cycle_plane(current_position: Vector3 = Vector3.ZERO) -> String:
 		PluginLogger.warning(PluginConstants.COMPONENT_POSITION, "Cannot cycle plane - plane strategy is not active")
 		return ""
 	
-	# Cycle the plane type with current position to prevent jumping
-	_plane_strategy.cycle_plane(current_position)
+	# Cycle the plane type with current position and mouse position to prevent jumping
+	_plane_strategy.cycle_plane(current_position, mouse_position)
 	
 	# Return the new plane name
 	return _plane_strategy.get_plane_name()

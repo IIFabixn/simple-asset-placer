@@ -81,9 +81,9 @@ var plane_height_locked: bool = false
 var last_position: Vector3 = Vector3.ZERO
 var has_last_position: bool = false
 
-# Plane cycling protection
-var _freeze_position_updates: bool = false
-var _freeze_frames_remaining: int = 0
+# Plane cycling protection - only freeze at the exact mouse position where plane was cycled
+var _freeze_mouse_position: Vector2 = Vector2(-1, -1)
+var _freeze_threshold: float = 5.0  # Pixels of mouse movement to unfreeze
 
 ## Helper Methods
 
@@ -119,8 +119,7 @@ func _clear_cache() -> void:
 	plane_height_locked = false
 	last_position = Vector3.ZERO
 	has_last_position = false
-	_freeze_position_updates = false
-	_freeze_frames_remaining = 0
+	_freeze_mouse_position = Vector2(-1, -1)
 
 func _calculate_screen_delta_movement(camera: Camera3D, anchor_position: Vector3, screen_delta: Vector2) -> Variant:
 	"""Convert screen space mouse delta to world space movement on the plane
@@ -260,23 +259,24 @@ func calculate_position(from: Vector3, to: Vector3, config: Dictionary) -> Place
 	while preventing jumps when changing plane axes (plane moves with the object).
 	"""
 	
-	# Check if position updates are frozen (immediately after plane cycle)
-	if _freeze_position_updates:
-		_freeze_frames_remaining -= 1
-		if _freeze_frames_remaining <= 0:
-			_freeze_position_updates = false
-		
-		# Return last position without updating
-		var plane_data = _get_plane_data()
-		return PlacementResult.new(last_position, plane_data.normal, false, from.distance_to(last_position))
-	
-	# Extract configuration
+	# Extract configuration early to get mouse position
 	_update_config(config)
 	
 	var camera: Camera3D = config.get("camera")
 	var has_camera: bool = camera and is_instance_valid(camera)
 	var mouse_position: Vector2 = config.get("mouse_position", Vector2.ZERO)
 	var settings: Dictionary = config.get("settings", {})
+	
+	# Check if position updates are frozen (mouse hasn't moved since plane cycle)
+	if _freeze_mouse_position.x >= 0:
+		var mouse_delta = mouse_position.distance_to(_freeze_mouse_position)
+		if mouse_delta < _freeze_threshold:
+			# Mouse hasn't moved enough - keep frozen
+			var plane_data = _get_plane_data()
+			return PlacementResult.new(last_position, plane_data.normal, false, from.distance_to(last_position))
+		else:
+			# Mouse moved - unfreeze
+			_freeze_mouse_position = Vector2(-1, -1)
 	
 	var plane_data = _get_plane_data()
 	var ray_dir = (to - from).normalized()
@@ -305,8 +305,11 @@ func calculate_position(from: Vector3, to: Vector3, config: Dictionary) -> Place
 	# Project ray onto plane at current height
 	var position = _project_ray_to_plane(from, ray_dir, last_position, true)
 	
-	# If projection failed (camera parallel to plane), keep last position
-	if position == Vector3.ZERO or position == last_position:
+	# If projection returned zero vector (complete failure), keep last position
+	# Note: We removed the check for "position == last_position" because that's a valid result
+	# when the mouse hasn't moved or is pointing at the same location
+	if position == Vector3.ZERO:
+		PluginLogger.warning("PlanePlacementStrategy", "Ray projection completely failed (returned zero)")
 		return PlacementResult.new(last_position, plane_data.normal, false, from.distance_to(last_position))
 	
 	# Apply grid snapping if enabled
@@ -441,13 +444,17 @@ func update_plane_height_from_position(position: Vector3) -> void:
 	plane_height = _get_plane_component(position)
 	last_position = position
 
-func cycle_plane(current_position: Vector3 = Vector3.ZERO) -> PlaneType:
+func cycle_plane(current_position: Vector3 = Vector3.ZERO, mouse_position: Vector2 = Vector2.ZERO) -> PlaneType:
 	"""Cycle through available plane types (XZ -> XY -> YZ -> XZ)
 	
 	With the new raycast-based approach, cycling is seamless:
 	- Plane height automatically updates to match object position
 	- No jumps because the plane always passes through the object
 	- Next mouse movement will raycast onto the new plane naturally
+	
+	Args:
+		current_position: Current object position to anchor the new plane
+		mouse_position: Current mouse position to freeze updates until mouse moves
 	"""
 	
 	var old_type = plane_type
@@ -475,22 +482,20 @@ func cycle_plane(current_position: Vector3 = Vector3.ZERO) -> PlaneType:
 		has_last_position = true
 		plane_height_locked = true
 		# No pending_reprojection flag needed - next frame's raycast handles it naturally
+		
+		PluginLogger.info(
+			PluginConstants.COMPONENT_POSITION,
+			"Plane cycled from %s to %s (plane_height: %.2f at position: %v)" % [
+				_get_type_name(old_type),
+				get_plane_name(),
+				plane_height,
+				reference_position
+			]
+		)
 	
-	# CRITICAL FIX: Freeze position updates for a few frames to prevent jumping
-	# The mouse ray will hit the new plane at a different location, so we need to
-	# ignore mouse motion for a brief moment until the user moves the mouse intentionally
-	_freeze_position_updates = true
-	_freeze_frames_remaining = 2  # Skip 2 frames of position updates
-	
-	PluginLogger.info(
-		PluginConstants.COMPONENT_POSITION,
-		"Plane cycled from %s to %s (height: %.2f at position: %v)" % [
-			_get_type_name(old_type),
-			get_plane_name(),
-			plane_height,
-			reference_position if reference_position != Vector3.ZERO else "<none>"
-		]
-	)
+	# CRITICAL FIX: Freeze position updates until mouse moves
+	# Store the current mouse position - we'll unfreeze once the mouse moves
+	_freeze_mouse_position = mouse_position
 	
 	return plane_type
 

@@ -422,7 +422,8 @@ func _forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 				if service_registry.preview_manager:
 					current_pos = service_registry.preview_manager.get_preview_position()
 				
-				var plane_name = service_registry.placement_strategy_service.cycle_plane(current_pos)
+				# Pass the current mouse position to freeze updates until mouse moves
+				var plane_name = service_registry.placement_strategy_service.cycle_plane(current_pos, event.position)
 				if plane_name:
 					PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Plane cycled to: " + plane_name)
 				# Consume the event

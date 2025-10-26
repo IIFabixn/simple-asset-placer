@@ -113,7 +113,13 @@ static func get_world_space_state_static(world_root: Node) -> PhysicsDirectSpace
 	return world_3d.direct_space_state
 
 static func project_to_horizontal_plane(from: Vector3, direction: Vector3, plane_height: float, fallback: Vector3 = Vector3.ZERO, use_fallback: bool = false) -> Vector3:
-	"""Helper to project a ray onto a horizontal plane at given height (XZ plane)"""
+	"""Helper to project a ray onto a horizontal plane at given height (XZ plane)
+	
+	For a plane at Y=plane_height:
+	- Normal: Vector3.UP = (0, 1, 0) pointing in +Y
+	- Equation: y + d = 0, we want y = plane_height
+	- So: plane_height + d = 0, therefore d = -plane_height
+	"""
 	var plane = Plane(Vector3.UP, -plane_height)
 	var intersection = plane.intersects_ray(from, direction)
     
@@ -129,8 +135,14 @@ static func project_to_horizontal_plane(from: Vector3, direction: Vector3, plane
 	return Vector3(from.x, plane_height, from.z)
 
 static func project_to_xy_plane(from: Vector3, direction: Vector3, plane_distance: float, fallback: Vector3 = Vector3.ZERO, use_fallback: bool = false) -> Vector3:
-	"""Helper to project a ray onto a vertical XY plane at given Z distance"""
-	var plane = Plane(Vector3.BACK, plane_distance)
+	"""Helper to project a ray onto a vertical XY plane at given Z distance
+	
+	For a plane at Z=plane_distance:
+	- Normal: Vector3.BACK = (0, 0, 1) pointing in +Z
+	- Equation: z + d = 0, we want z = plane_distance
+	- So: plane_distance + d = 0, therefore d = -plane_distance
+	"""
+	var plane = Plane(Vector3.BACK, -plane_distance)
 	var intersection = plane.intersects_ray(from, direction)
     
 	if intersection:
@@ -145,7 +157,13 @@ static func project_to_xy_plane(from: Vector3, direction: Vector3, plane_distanc
 	return Vector3(from.x, from.y, plane_distance)
 
 static func project_to_yz_plane(from: Vector3, direction: Vector3, plane_distance: float, fallback: Vector3 = Vector3.ZERO, use_fallback: bool = false) -> Vector3:
-	"""Helper to project a ray onto a vertical YZ plane at given X distance"""
+	"""Helper to project a ray onto a vertical YZ plane at given X distance
+	
+	For a plane at X=plane_distance:
+	- Normal: Vector3.RIGHT = (1, 0, 0) pointing in +X
+	- Equation: x + d = 0, we want x = plane_distance
+	- So: plane_distance + d = 0, therefore d = -plane_distance
+	"""
 	var plane = Plane(Vector3.RIGHT, -plane_distance)
 	var intersection = plane.intersects_ray(from, direction)
     

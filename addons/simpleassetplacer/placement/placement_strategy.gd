@@ -115,12 +115,13 @@ static func get_world_space_state_static(world_root: Node) -> PhysicsDirectSpace
 static func project_to_horizontal_plane(from: Vector3, direction: Vector3, plane_height: float, fallback: Vector3 = Vector3.ZERO, use_fallback: bool = false) -> Vector3:
 	"""Helper to project a ray onto a horizontal plane at given height (XZ plane)
 	
-	For a plane at Y=plane_height:
-	- Normal: Vector3.UP = (0, 1, 0) pointing in +Y
-	- Equation: y + d = 0, we want y = plane_height
-	- So: plane_height + d = 0, therefore d = -plane_height
+	Godot Plane: The 'd' parameter is the distance from origin along the normal.
+	For a plane at Y=y0, with normal pointing in +Y (UP = (0,1,0)):
+	- Plane equation: dot(normal, point) = d
+	- For point on plane: (0,1,0)·(x,y0,z) = y0
+	- So d = plane_height (the Y coordinate itself)
 	"""
-	var plane = Plane(Vector3.UP, -plane_height)
+	var plane = Plane(Vector3.UP, plane_height)
 	var intersection = plane.intersects_ray(from, direction)
     
 	if intersection:
@@ -137,12 +138,13 @@ static func project_to_horizontal_plane(from: Vector3, direction: Vector3, plane
 static func project_to_xy_plane(from: Vector3, direction: Vector3, plane_distance: float, fallback: Vector3 = Vector3.ZERO, use_fallback: bool = false) -> Vector3:
 	"""Helper to project a ray onto a vertical XY plane at given Z distance
 	
-	For a plane at Z=plane_distance:
-	- Normal: Vector3.BACK = (0, 0, 1) pointing in +Z
-	- Equation: z + d = 0, we want z = plane_distance
-	- So: plane_distance + d = 0, therefore d = -plane_distance
+	Godot Plane: The 'd' parameter is the distance from origin along the normal.
+	For a plane at Z=z0, with normal pointing in +Z (BACK = (0,0,1)):
+	- Plane equation: dot(normal, point) = d
+	- For point on plane: (0,0,1)·(x,y,z0) = z0
+	- So d = plane_distance (the Z coordinate itself)
 	"""
-	var plane = Plane(Vector3.BACK, -plane_distance)
+	var plane = Plane(Vector3.BACK, plane_distance)
 	var intersection = plane.intersects_ray(from, direction)
     
 	if intersection:
@@ -159,12 +161,13 @@ static func project_to_xy_plane(from: Vector3, direction: Vector3, plane_distanc
 static func project_to_yz_plane(from: Vector3, direction: Vector3, plane_distance: float, fallback: Vector3 = Vector3.ZERO, use_fallback: bool = false) -> Vector3:
 	"""Helper to project a ray onto a vertical YZ plane at given X distance
 	
-	For a plane at X=plane_distance:
-	- Normal: Vector3.RIGHT = (1, 0, 0) pointing in +X
-	- Equation: x + d = 0, we want x = plane_distance
-	- So: plane_distance + d = 0, therefore d = -plane_distance
+	Godot Plane: The 'd' parameter is the distance from origin along the normal.
+	For a plane at X=x0, with normal pointing in +X (RIGHT = (1,0,0)):
+	- Plane equation: dot(normal, point) = d
+	- For point on plane: (1,0,0)·(x0,y,z) = x0
+	- So d = plane_distance (the X coordinate itself)
 	"""
-	var plane = Plane(Vector3.RIGHT, -plane_distance)
+	var plane = Plane(Vector3.RIGHT, plane_distance)
 	var intersection = plane.intersects_ray(from, direction)
     
 	if intersection:

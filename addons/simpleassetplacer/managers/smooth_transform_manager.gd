@@ -44,6 +44,11 @@ var _smooth_data: Dictionary = {}
 var _smooth_enabled: bool = true
 var _smooth_speed: float = 8.0
 
+# Rounding precision settings (loaded from settings)
+var _position_precision: float = 0.01  # Default fine_position_increment
+var _rotation_precision: float = 5.0   # Default fine_rotation_increment (degrees)
+var _scale_precision: float = 0.01     # Default fine_scale_increment
+
 # Smooth transform data structure
 class SmoothTransform:
 	var node: Node3D
@@ -76,6 +81,11 @@ func configure(smooth_enabled_or_settings, smooth_speed: float = 8.0):
 		var settings: Dictionary = smooth_enabled_or_settings
 		enabled = settings.get("smooth_enabled", _smooth_enabled)
 		speed = settings.get("smooth_speed", _smooth_speed)
+		
+		# Load rounding precision from settings (fine increments)
+		_position_precision = settings.get("fine_position_increment", 0.01)
+		_rotation_precision = settings.get("fine_rotation_increment", 5.0)
+		_scale_precision = settings.get("fine_scale_increment", 0.01)
 	# Handle direct boolean + float input
 	else:
 		enabled = smooth_enabled_or_settings
@@ -148,14 +158,55 @@ func cleanup() -> void:
 	"""Override from InstanceManagerBase - called when instance is being destroyed"""
 	cleanup_all()
 
+## ROUNDING UTILITIES
+
+func _round_position(position: Vector3) -> Vector3:
+	"""Round position to configured precision"""
+	if _position_precision <= 0.0:
+		return position
+	return Vector3(
+		snappedf(position.x, _position_precision),
+		snappedf(position.y, _position_precision),
+		snappedf(position.z, _position_precision)
+	)
+
+func _round_rotation(rotation: Vector3) -> Vector3:
+	"""Round rotation to configured precision (in radians)"""
+	if _rotation_precision <= 0.0:
+		return rotation
+	var precision_rad = deg_to_rad(_rotation_precision)
+	return Vector3(
+		snappedf(rotation.x, precision_rad),
+		snappedf(rotation.y, precision_rad),
+		snappedf(rotation.z, precision_rad)
+	)
+
+func _round_scale(scale: Vector3) -> Vector3:
+	"""Round scale to configured precision"""
+	if _scale_precision <= 0.0:
+		return scale
+	return Vector3(
+		snappedf(scale.x, _scale_precision),
+		snappedf(scale.y, _scale_precision),
+		snappedf(scale.z, _scale_precision)
+	)
+
 ## TRANSFORM UPDATES
 
 func set_target_position(node: Node3D, position: Vector3):
-	"""Set target position for smooth interpolation"""
+	"""Set target position for smooth interpolation
+	
+	Rounding is ALWAYS applied regardless of smooth transform setting.
+	- If smooth disabled: rounded value applied immediately
+	- If smooth enabled: rounded value used as lerp target
+	"""
+	# Round position to configured precision
+	var rounded_position = _round_position(position)
+	
 	if not _smooth_enabled or not node or not node.is_inside_tree():
 		# Apply directly if smooth transforms disabled or node invalid
 		if node and node.is_inside_tree():
-			node.global_position = position
+			node.global_position = rounded_position
 		return
 	
 	var node_id = node.get_instance_id()
@@ -164,15 +215,23 @@ func set_target_position(node: Node3D, position: Vector3):
 	
 	var smooth_data = _smooth_data.get(node_id)
 	if smooth_data:
-		smooth_data.target_position = position
+		smooth_data.target_position = rounded_position
 		smooth_data.is_lerping = true
 
 func set_target_rotation(node: Node3D, rotation: Vector3):
-	"""Set target rotation for smooth interpolation"""
+	"""Set target rotation for smooth interpolation
+	
+	Rounding is ALWAYS applied regardless of smooth transform setting.
+	- If smooth disabled: rounded value applied immediately
+	- If smooth enabled: rounded value used as lerp target
+	"""
+	# Round rotation to configured precision
+	var rounded_rotation = _round_rotation(rotation)
+	
 	if not _smooth_enabled or not node or not node.is_inside_tree():
 		# Apply directly if smooth transforms disabled or node invalid
 		if node and node.is_inside_tree():
-			node.rotation = rotation
+			node.rotation = rounded_rotation
 		return
 	
 	var node_id = node.get_instance_id()
@@ -181,15 +240,23 @@ func set_target_rotation(node: Node3D, rotation: Vector3):
 	
 	var smooth_data = _smooth_data.get(node_id)
 	if smooth_data:
-		smooth_data.target_rotation = rotation
+		smooth_data.target_rotation = rounded_rotation
 		smooth_data.is_lerping = true
 
 func set_target_scale(node: Node3D, scale: Vector3):
-	"""Set target scale for smooth interpolation"""
+	"""Set target scale for smooth interpolation
+	
+	Rounding is ALWAYS applied regardless of smooth transform setting.
+	- If smooth disabled: rounded value applied immediately
+	- If smooth enabled: rounded value used as lerp target
+	"""
+	# Round scale to configured precision
+	var rounded_scale = _round_scale(scale)
+	
 	if not _smooth_enabled or not node or not node.is_inside_tree():
 		# Apply directly if smooth transforms disabled or node invalid
 		if node and node.is_inside_tree():
-			node.scale = scale
+			node.scale = rounded_scale
 		return
 	
 	var node_id = node.get_instance_id()
@@ -198,17 +265,27 @@ func set_target_scale(node: Node3D, scale: Vector3):
 	
 	var smooth_data = _smooth_data.get(node_id)
 	if smooth_data:
-		smooth_data.target_scale = scale
+		smooth_data.target_scale = rounded_scale
 		smooth_data.is_lerping = true
 
 func set_target_transform(node: Node3D, position: Vector3, rotation: Vector3, scale: Vector3):
-	"""Set all target transform components at once"""
+	"""Set all target transform components at once
+	
+	Rounding is ALWAYS applied regardless of smooth transform setting.
+	- If smooth disabled: rounded values applied immediately
+	- If smooth enabled: rounded values used as lerp targets
+	"""
+	# Round all components to configured precision
+	var rounded_position = _round_position(position)
+	var rounded_rotation = _round_rotation(rotation)
+	var rounded_scale = _round_scale(scale)
+	
 	if not _smooth_enabled or not node or not node.is_inside_tree():
 		# Apply directly if smooth transforms disabled or node invalid
 		if node and node.is_inside_tree():
-			node.global_position = position
-			node.rotation = rotation
-			node.scale = scale
+			node.global_position = rounded_position
+			node.rotation = rounded_rotation
+			node.scale = rounded_scale
 		return
 	
 	var node_id = node.get_instance_id()
@@ -217,27 +294,35 @@ func set_target_transform(node: Node3D, position: Vector3, rotation: Vector3, sc
 	
 	var smooth_data = _smooth_data.get(node_id)
 	if smooth_data:
-		smooth_data.target_position = position
-		smooth_data.target_rotation = rotation
-		smooth_data.target_scale = scale
+		smooth_data.target_position = rounded_position
+		smooth_data.target_rotation = rounded_rotation
+		smooth_data.target_scale = rounded_scale
 		smooth_data.is_lerping = true
 
 func apply_transform_immediately(node: Node3D, position: Vector3, rotation: Vector3, scale: Vector3):
-	"""Apply transform immediately without smoothing (for initialization)"""
+	"""Apply transform immediately without smoothing (for initialization)
+	
+	Rounding is ALWAYS applied to ensure consistent precision.
+	"""
 	if not node or not node.is_inside_tree():
 		return
 	
-	node.global_position = position
-	node.rotation = rotation
-	node.scale = scale
+	# Round all components to configured precision
+	var rounded_position = _round_position(position)
+	var rounded_rotation = _round_rotation(rotation)
+	var rounded_scale = _round_scale(scale)
+	
+	node.global_position = rounded_position
+	node.rotation = rounded_rotation
+	node.scale = rounded_scale
 	
 	# Update smooth data if registered
 	var node_id = node.get_instance_id()
 	if _smooth_data.has(node_id):
 		var smooth_data = _smooth_data.get(node_id)
-		smooth_data.target_position = position
-		smooth_data.target_rotation = rotation
-		smooth_data.target_scale = scale
+		smooth_data.target_position = rounded_position
+		smooth_data.target_rotation = rounded_rotation
+		smooth_data.target_scale = rounded_scale
 		smooth_data.is_lerping = false
 
 func force_update_to_targets():
@@ -304,6 +389,7 @@ func update_smooth_transforms(delta: float):
 		
 		if pos_diff < 0.001 and rot_diff < 0.001 and scale_diff < 0.001:
 			# Snap to exact target and stop lerping
+			# Targets are already rounded, so we can apply directly
 			node.global_position = smooth_data.target_position
 			node.rotation = smooth_data.target_rotation
 			node.scale = smooth_data.target_scale

@@ -164,7 +164,7 @@ func show_transform_info(mode: int, node_name: String = "", position: Vector3 = 
 	
 	# Update transform values
 	if position_label:
-		position_label.text = "Pos: X: %.2f  Y: %.2f  Z: %.2f" % [position.x, position.y, position.z]
+		position_label.text = "Pos: X: %.3f  Y: %.3f  Z: %.3f" % [position.x, position.y, position.z]
 	
 	if rotation_label:
 		rotation_label.text = "Rot: X: %.1f°  Y: %.1f°  Z: %.1f°" % [rad_to_deg(rotation.x), rad_to_deg(rotation.y), rad_to_deg(rotation.z)]

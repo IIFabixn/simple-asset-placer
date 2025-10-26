@@ -303,10 +303,16 @@ func _configure_smooth_transforms(settings: Dictionary) -> void:
 	"""Configure smooth transform system"""
 	var smooth_enabled = settings.get("smooth_transforms", true)
 	var smooth_speed = settings.get("smooth_transform_speed", 8.0)
-	var smooth_config = {"smooth_enabled": smooth_enabled, "smooth_speed": smooth_speed}
+	var smooth_config = {
+		"smooth_enabled": smooth_enabled, 
+		"smooth_speed": smooth_speed,
+		"fine_position_increment": settings.get("fine_position_increment", 0.01),
+		"fine_rotation_increment": settings.get("fine_rotation_increment", 5.0),
+		"fine_scale_increment": settings.get("fine_scale_increment", 0.01)
+	}
 	
 	_services.preview_manager.configure(smooth_config)
-	_services.smooth_transform_manager.configure(smooth_enabled, smooth_speed)
+	_services.smooth_transform_manager.configure(smooth_config)
 	
 	var state = _state()
 	_services.rotation_manager.configure(state, smooth_config)
@@ -319,6 +325,7 @@ func _update_overlay_display(mode: int, state: TransformState) -> void:
 	
 	var node_name = ""
 	var rotation = state.values.surface_alignment_rotation + state.values.manual_rotation_offset
+	var position = state.values.position + state.values.manual_position_offset
 	
 	if mode == ModeStateMachine.Mode.TRANSFORM:
 		var nodes = state.session.transform_data.get("target_nodes", [])
@@ -326,12 +333,12 @@ func _update_overlay_display(mode: int, state: TransformState) -> void:
 			node_name = nodes[0].name if nodes[0] else ""
 			if nodes[0] and is_instance_valid(nodes[0]):
 				rotation = nodes[0].rotation
+				position = nodes[0].global_position  # Use actual node position in transform mode
 		elif nodes.size() > 1:
 			node_name = "%d nodes" % nodes.size()
 			if nodes[0] and is_instance_valid(nodes[0]):
 				rotation = nodes[0].rotation
-	
-	var position = state.values.position + state.values.manual_position_offset
+				position = nodes[0].global_position  # Use actual node position in transform mode
 	var scale_value = state.values.scale_multiplier
 	
 	var plane_normal = Vector3.UP

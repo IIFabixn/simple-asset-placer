@@ -322,16 +322,14 @@ func calculate_position(from: Vector3, to: Vector3, config: Dictionary) -> Place
 			position.x = snappedf(position.x - snap_offset.x, snap_step) + snap_offset.x
 			position.y = snappedf(position.y - snap_offset.y, snap_step) + snap_offset.y
 			position.z = snappedf(position.z - snap_offset.z, snap_step) + snap_offset.z
-	
-	# Ensure position stays on plane (snapping might have moved it off)
-	position = _set_plane_component(position, plane_height)
+			
+			# After snapping, ensure the plane component is exactly at plane_height
+			# Grid snapping might cause tiny floating point drift off the plane
+			position = _set_plane_component(position, plane_height)
 	
 	# Update cache
 	last_position = position
 	has_last_position = true
-	
-	# Debug logging
-	PluginLogger.debug("PlanePlacementStrategy", "Calculated position: %s (plane_height: %.3f)" % [position, plane_height])
 	
 	# Update tracking if enabled
 	if track_height:

@@ -305,12 +305,18 @@ func _handle_asset_cycling(nav_input, state: TransformState) -> void:
 		return
 	
 	# Check for cycling input
+	var cycled = false
 	if nav_input.cycle_next_asset:
 		if dock.has_method("cycle_next_asset"):
-			dock.cycle_next_asset()
+			cycled = dock.cycle_next_asset()
 	elif nav_input.cycle_previous_asset:
 		if dock.has_method("cycle_previous_asset"):
-			dock.cycle_previous_asset()
+			cycled = dock.cycle_previous_asset()
+	
+	# If we cycled to a new asset, update the position immediately
+	# This prevents the preview from staying at the old position until the mouse moves
+	if cycled:
+		_update_position_after_asset_cycle(state)
 
 func _handle_tab_activation(state: TransformState, ignore_focus_lock: bool) -> void:
 	"""Handle Tab key to enter transform mode"""
@@ -393,3 +399,16 @@ func _get_current_camera() -> Camera3D:
 	"""Get current editor camera"""
 	var viewport = _services.editor_facade.get_editor_viewport_3d(0)
 	return viewport.get_camera_3d() if viewport else null
+
+func _update_position_after_asset_cycle(state: TransformState) -> void:
+	"""Update position immediately after cycling to a new asset to prevent preview lag"""
+	# Get current mouse position
+	var mouse_pos = _services.input_handler.get_mouse_position()
+	
+	# Get camera
+	var camera = _get_current_camera()
+	if not camera:
+		return
+	
+	# Update position from current mouse location
+	_services.position_manager.update_position_from_mouse(state, camera, mouse_pos)

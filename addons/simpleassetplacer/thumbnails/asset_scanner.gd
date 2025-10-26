@@ -23,22 +23,23 @@ const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger
 
 ## Asset Scanning
 
-static func scan_for_assets(root_path: String = "res://", include_meshlibs: bool = true) -> Array:
+static func scan_for_assets(root_path: String = "res://", include_meshlibs: bool = true, category_manager = null) -> Array:
 	"""
 	Scan directory tree for all supported 3D assets
 	
 	Args:
 		root_path: Starting directory for scan
 		include_meshlibs: Whether to include MeshLibrary files
+		category_manager: Optional CategoryManager to filter ignored folders during scan
 		
 	Returns:
 		Array of asset info dictionaries with keys: path, name, extension, type, is_meshlib
 	"""
 	var discovered_assets: Array = []
-	_scan_directory_recursive(root_path, discovered_assets, include_meshlibs)
+	_scan_directory_recursive(root_path, discovered_assets, include_meshlibs, category_manager)
 	return discovered_assets
 
-static func _scan_directory_recursive(path: String, discovered_assets: Array, include_meshlibs: bool) -> void:
+static func _scan_directory_recursive(path: String, discovered_assets: Array, include_meshlibs: bool, category_manager) -> void:
 	"""Recursively scan directory for assets"""
 	var dir = DirAccess.open(path)
 	if not dir:
@@ -54,12 +55,23 @@ static func _scan_directory_recursive(path: String, discovered_assets: Array, in
 		if dir.current_is_dir() and not file_name.begins_with("."):
 			# Skip hidden directories and .godot
 			if file_name != ".godot":
-				_scan_directory_recursive(full_path, discovered_assets, include_meshlibs)
+				# Check if this directory should be ignored
+				var should_scan = true
+				if category_manager:
+					should_scan = not category_manager.is_in_ignored_folder(full_path)
+				
+				if should_scan:
+					_scan_directory_recursive(full_path, discovered_assets, include_meshlibs, category_manager)
 		else:
 			var extension = file_name.get_extension().to_lower()
 			
 			# Check if this is a supported extension
 			if _is_supported_extension(extension):
+				# Check if this asset should be ignored
+				if category_manager and category_manager.is_ignored(full_path):
+					file_name = dir.get_next()
+					continue
+				
 				var asset_info = _process_asset_file(full_path, extension, include_meshlibs)
 				if asset_info:
 					discovered_assets.append(asset_info)

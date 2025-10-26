@@ -5,6 +5,7 @@ class_name ThumbnailGenerator
 
 const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
+const NodeUtils = preload("res://addons/simpleassetplacer/utils/node_utils.gd")
 
 # LRU Cache implementation
 static var thumbnail_cache: Dictionary = {}  # key -> texture
@@ -17,6 +18,13 @@ static var scene_container: Node3D  # Container for full scene instances
 static var light: DirectionalLight3D
 static var generation_mutex: Mutex = Mutex.new()
 static var is_generating: bool = false
+
+# Performance optimization constants
+const MAX_AABB_DEPTH = 15  # Maximum recursion depth for AABB calculation
+const MAX_NODES_PER_AABB = 200  # Maximum nodes to process in AABB calculation
+const YIELD_INTERVAL = 10  # Yield control every N nodes to prevent UI freeze
+static var _nodes_processed: int = 0  # Track nodes processed in current AABB calculation
+static var _max_nodes_warning_logged: bool = false  # Track if we've logged the max nodes warning
 
 static func _cleanup_generation():
 	generation_mutex.unlock()
@@ -75,6 +83,8 @@ static func initialize():
 	hidden_container.name = "ThumbnailGeneratorContainer"
 	
 	# Add to editor but in a way that's completely isolated
+	# Note: EditorInterface is acceptable here as this is a specialized thumbnail utility
+	# that needs direct editor access for viewport management
 	var main_screen = EditorInterface.get_editor_main_screen()
 	if not main_screen:
 		PluginLogger.error(PluginConstants.COMPONENT_THUMBNAIL, "Could not get editor main screen!")
@@ -264,7 +274,7 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 		return cached_texture
 
 	# Clear any previous mesh and materials to prevent contamination
-	if mesh_instance:
+	if mesh_instance and is_instance_valid(mesh_instance):
 		# First clear the mesh to reset the surface count
 		var old_mesh = mesh_instance.mesh
 		mesh_instance.mesh = null
@@ -327,32 +337,67 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 			use_full_scene = true
 			
 			# Clear scene container
-			for child in scene_container.get_children():
-				child.queue_free()
+			if scene_container and is_instance_valid(scene_container):
+				for child in scene_container.get_children():
+					child.queue_free()
 			
-			# Add the complete scene to the container
-			scene_container.add_child(scene_instance)
+				# Add the complete scene to the container
+				scene_container.add_child(scene_instance)
+			else:
+				PluginLogger.error(PluginConstants.COMPONENT_THUMBNAIL, "scene_container is null or invalid!")
+				scene_container = null
+				_cleanup_generation()
+				return null
 			
 			# Hide the single mesh instance since we're using the full scene
-			if mesh_instance:
+			if mesh_instance and is_instance_valid(mesh_instance):
 				mesh_instance.visible = false
+			elif mesh_instance and not is_instance_valid(mesh_instance):
+				mesh_instance = null
 		
 		# Wait a frame for the scene to be fully added to the tree
 		await Engine.get_main_loop().process_frame
 		
+		# Validate scene_container after await - might have been freed during rapid enable/disable
+		if not scene_container or not is_instance_valid(scene_container):
+			PluginLogger.debug(PluginConstants.COMPONENT_THUMBNAIL, "scene_container became invalid after await (plugin disabled during generation)")
+			scene_container = null
+			_cleanup_generation()
+			return null
+		
 		# Get the AABB of the entire scene container (includes all children)
 		var scene_aabb = VisualInstance3D.new().get_aabb() if scene_container.get_child_count() == 0 else AABB()
 		
-		# Calculate AABB from all VisualInstance3D children
+		# Calculate AABB from all VisualInstance3D children (async for better performance)
+		_nodes_processed = 0  # Reset node counter
+		_max_nodes_warning_logged = false  # Reset warning flag
 		var first = true
-		for child in scene_container.get_children():
-			var child_aabb = _get_node_aabb_recursive(child)
-			if child_aabb.has_volume():
-				if first:
-					scene_aabb = child_aabb
-					first = false
-				else:
-					scene_aabb = scene_aabb.merge(child_aabb)
+		if scene_container and is_instance_valid(scene_container):
+			for child in scene_container.get_children():
+				# Use async version for large scenes
+				var child_aabb = await _get_node_aabb_recursive_async(child, 0)
+				
+				# Validate scene_container after await - might have been freed
+				if not scene_container or not is_instance_valid(scene_container):
+					PluginLogger.debug(PluginConstants.COMPONENT_THUMBNAIL, 
+						"scene_container became invalid during AABB calculation (plugin disabled)")
+					scene_container = null
+					_cleanup_generation()
+					return null
+				
+				if child_aabb.has_volume():
+					if first:
+						scene_aabb = child_aabb
+						first = false
+					else:
+						scene_aabb = scene_aabb.merge(child_aabb)
+		
+		# Log AABB calculation stats
+		if _nodes_processed > 0:
+			var reached_limit = _nodes_processed > MAX_NODES_PER_AABB
+			var limit_msg = " (limit reached)" if reached_limit else ""
+			PluginLogger.debug(PluginConstants.COMPONENT_THUMBNAIL, 
+				"AABB calculated from %d nodes%s" % [_nodes_processed, limit_msg])
 		
 		# Position camera to view the entire scene
 		if scene_aabb.has_volume():
@@ -382,8 +427,10 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 		mesh_instance.force_update_transform()
 	else:
 		# Using full scene - ensure mesh_instance is hidden
-		if mesh_instance:
+		if mesh_instance and is_instance_valid(mesh_instance):
 			mesh_instance.visible = false
+		elif mesh_instance and not is_instance_valid(mesh_instance):
+			mesh_instance = null
 	
 	# Only do mesh-specific setup if not using full scene mode
 	if not use_full_scene:
@@ -446,8 +493,14 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 		_position_camera_simple(mesh)
 	
 	# Clear viewport render cache and force complete re-render
-	viewport.render_target_clear_mode = SubViewport.CLEAR_MODE_ALWAYS
-	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	if viewport and is_instance_valid(viewport):
+		viewport.render_target_clear_mode = SubViewport.CLEAR_MODE_ALWAYS
+		viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	else:
+		PluginLogger.error(PluginConstants.COMPONENT_THUMBNAIL, "viewport is null or invalid before rendering!")
+		viewport = null
+		_cleanup_generation()
+		return null
 	
 	# Wait multiple frames to ensure complete re-render
 	await Engine.get_main_loop().process_frame
@@ -457,7 +510,8 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 	
 	# Check if viewport is still valid after awaits (could be cleaned up externally)
 	if not viewport or not is_instance_valid(viewport):
-		PluginLogger.warning(PluginConstants.COMPONENT_THUMBNAIL, "Viewport became invalid during generation for " + str(asset_path.get_file()))
+		# This is normal during plugin disable or scene changes during async operations
+		PluginLogger.debug(PluginConstants.COMPONENT_THUMBNAIL, "Viewport became invalid during generation for %s (likely plugin disabled or scene changed - this is safe)" % asset_path.get_file())
 		_cleanup_generation()
 		return null
 	
@@ -485,10 +539,13 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 	# Always clear the mesh/scene after capturing to prevent leftover state
 	if use_full_scene:
 		# Clean up scene container
-		for child in scene_container.get_children():
-			child.queue_free()
+		if scene_container and is_instance_valid(scene_container):
+			for child in scene_container.get_children():
+				child.queue_free()
+		elif scene_container and not is_instance_valid(scene_container):
+			scene_container = null
 	else:
-		if mesh_instance:
+		if mesh_instance and is_instance_valid(mesh_instance):
 			# Clear surface materials safely before clearing mesh
 			var current_mesh = mesh_instance.mesh
 			if current_mesh:
@@ -546,9 +603,93 @@ static func _get_node_aabb_recursive(node: Node) -> AABB:
 	
 	return combined_aabb
 
+
+static func _get_node_aabb_recursive_async(node: Node, depth: int = 0) -> AABB:
+	"""
+	Asynchronously calculate the combined AABB of a node and all its children.
+	Yields control periodically to prevent UI freezing on large scenes.
+	
+	Performance limits:
+	- MAX_AABB_DEPTH: Maximum recursion depth (prevents infinite loops)
+	- MAX_NODES_PER_AABB: Maximum nodes to process (prevents excessive processing)
+	- YIELD_INTERVAL: Yield every N nodes (keeps UI responsive)
+	"""
+	var combined_aabb = AABB()
+	var first = true
+	
+	# Early exit: Check depth limit
+	if depth > MAX_AABB_DEPTH:
+		PluginLogger.debug(PluginConstants.COMPONENT_THUMBNAIL, 
+			"AABB calculation reached max depth: %d" % MAX_AABB_DEPTH)
+		return combined_aabb
+	
+	# Early exit: Check node count limit
+	if _nodes_processed > MAX_NODES_PER_AABB:
+		# Only log once per thumbnail generation to avoid spam
+		if not _max_nodes_warning_logged:
+			_max_nodes_warning_logged = true
+			PluginLogger.debug(PluginConstants.COMPONENT_THUMBNAIL, 
+				"AABB calculation reached max nodes: %d (this is normal for complex scenes)" % MAX_NODES_PER_AABB)
+		return combined_aabb
+	
+	# Increment node counter
+	_nodes_processed += 1
+	
+	# Yield control periodically to keep UI responsive
+	if _nodes_processed % YIELD_INTERVAL == 0:
+		await Engine.get_main_loop().process_frame
+		
+		# Validate node after await - might have been freed
+		if not NodeUtils.is_valid(node):
+			PluginLogger.debug(PluginConstants.COMPONENT_THUMBNAIL, 
+				"Node became invalid during async AABB calculation")
+			return combined_aabb
+	
+	# Check if this node has a visual representation
+	if node is VisualInstance3D:
+		var visual = node as VisualInstance3D
+		var local_aabb = visual.get_aabb()
+		
+		if local_aabb.has_volume():
+			# Transform AABB to global space
+			var transform = visual.global_transform
+			var corners = [
+				transform * (local_aabb.position),
+				transform * (local_aabb.position + Vector3(local_aabb.size.x, 0, 0)),
+				transform * (local_aabb.position + Vector3(0, local_aabb.size.y, 0)),
+				transform * (local_aabb.position + Vector3(0, 0, local_aabb.size.z)),
+				transform * (local_aabb.position + Vector3(local_aabb.size.x, local_aabb.size.y, 0)),
+				transform * (local_aabb.position + Vector3(local_aabb.size.x, 0, local_aabb.size.z)),
+				transform * (local_aabb.position + Vector3(0, local_aabb.size.y, local_aabb.size.z)),
+				transform * (local_aabb.position + local_aabb.size)
+			]
+			
+			combined_aabb = AABB(corners[0], Vector3.ZERO)
+			for corner in corners:
+				combined_aabb = combined_aabb.expand(corner)
+			first = false
+	
+	# Process children recursively
+	for child in node.get_children():
+		# Validate child before processing
+		if not child or not is_instance_valid(child):
+			continue
+			
+		var child_aabb = await _get_node_aabb_recursive_async(child, depth + 1)
+		if child_aabb.has_volume():
+			if first:
+				combined_aabb = child_aabb
+				first = false
+			else:
+				combined_aabb = combined_aabb.merge(child_aabb)
+	
+	return combined_aabb
+
 static func _position_camera_for_aabb(aabb: AABB):
 	"""Position camera to view the entire AABB"""
-	if not camera:
+	if not camera or not is_instance_valid(camera):
+		if camera and not is_instance_valid(camera):
+			camera = null
 		return
 	
 	var center = aabb.get_center()
@@ -614,6 +755,17 @@ static func find_first_mesh_in_node(node: Node) -> Mesh:
 	return selected.mesh
 
 static func _position_camera_simple(mesh: Mesh):
+	# Validate instances first
+	if not mesh_instance or not is_instance_valid(mesh_instance):
+		if mesh_instance and not is_instance_valid(mesh_instance):
+			mesh_instance = null
+		return
+	
+	if not camera or not is_instance_valid(camera):
+		if camera and not is_instance_valid(camera):
+			camera = null
+		return
+	
 	# Calculate mesh bounds
 	var aabb = mesh.get_aabb()
 	var center = aabb.get_center()
@@ -788,14 +940,20 @@ static func generate_meshlib_thumbnail(meshlib: MeshLibrary, item_id: int = -1) 
 	var max_extent = max(max(aabb.size.x, aabb.size.y), aabb.size.z)
 	
 	if max_extent > 0:
-		camera.size = max_extent * 1.5
-		var distance = max_extent * 2.5
-		camera.position = Vector3(distance * 0.7, distance * 0.5, distance * 0.7)
-		camera.look_at(Vector3.ZERO, Vector3.UP)
-		
-		# Update light position relative to camera
-		light.position = camera.position + Vector3(1, 2, 1)
-		light.look_at(Vector3.ZERO, Vector3.UP)
+		if camera and is_instance_valid(camera):
+			camera.size = max_extent * 1.5
+			var distance = max_extent * 2.5
+			camera.position = Vector3(distance * 0.7, distance * 0.5, distance * 0.7)
+			camera.look_at(Vector3.ZERO, Vector3.UP)
+			
+			# Update light position relative to camera
+			if light and is_instance_valid(light):
+				light.position = camera.position + Vector3(1, 2, 1)
+				light.look_at(Vector3.ZERO, Vector3.UP)
+			elif light and not is_instance_valid(light):
+				light = null
+		elif camera and not is_instance_valid(camera):
+			camera = null
 	
 	# Force viewport update
 
@@ -808,7 +966,8 @@ static func generate_meshlib_thumbnail(meshlib: MeshLibrary, item_id: int = -1) 
 	
 	# Check if viewport is still valid after awaits
 	if not viewport or not is_instance_valid(viewport):
-		PluginLogger.warning("ThumbnailGenerator", "Viewport became invalid during meshlib generation")
+		# This is normal during plugin disable or scene changes during async operations
+		PluginLogger.debug(PluginConstants.COMPONENT_THUMBNAIL, "Viewport became invalid during meshlib generation (likely plugin disabled or scene changed - this is safe)")
 		return null
 	
 	# Get the viewport texture

@@ -1,10 +1,202 @@
 # Changelog
 
+## [2.0.0] - 2025-10-26
+
+### 🏗️ Major Architecture Refactor
+
+**BREAKING CHANGES**: Internal architecture has been completely refactored. This is primarily an internal restructuring - the plugin API and user-facing features remain the same. However, any custom scripts or extensions that directly accessed internal manager classes will need updates.
+
+#### Service Registry Pattern
+
+- **Introduced ServiceRegistry for Dependency Injection**: New centralized service container pattern
+  - Replaced global static managers with instance-based architecture
+  - All manager instances now held in `ServiceRegistry` container
+  - Created `ServiceRegistryBuilder` for clean initialization
+  - Eliminates global state and improves testability
+  - Files: `core/service_registry.gd`, `core/service_registry_builder.gd`
+
+#### Command Pattern for Transform Operations
+
+- **Transform Command System**: New command pattern for input handling
+  - Introduced `TransformCommand` data object for transform operations
+  - Captures position, rotation, and scale deltas in single frame
+  - Supports multiple input sources with precedence rules
+  - Enables cleaner separation between input and execution
+  - File: `core/transform_command.gd`
+
+#### Controller Pattern Separation
+
+- **Split TransformationManager into Focused Controllers**: Refactored 1,610-line god object
+  - `TransformationCoordinator` (~450 lines): Delegates to specialized controllers
+  - `PlacementModeController`: Handles placement mode logic
+  - `TransformModeController`: Handles transform mode logic  
+  - `InputProcessor`: Unified input handling across modes
+  - `ModeStateMachine`: Centralized mode state management
+  - Files: `core/transformation_coordinator.gd`, `core/*_controller.gd`, `core/mode_state_machine.gd`
+
+#### Input System Refinement
+
+- **Structured Input State Classes**: New input state hierarchy
+  - `RawInputSnapshot`: Captures raw input with tap detection
+  - Specialized state classes: `PositionInputState`, `RotationInputState`, `ScaleInputState`
+  - `ControlModeInputState`: Handles axis constraints (X/Y/Z keys)
+  - `NavigationInputState`: Handles camera input filtering
+  - Files: `managers/input/*.gd`
+
+#### Manager Organization
+
+- **Relocated Core Managers**: Moved managers from `core/` to `managers/` directory
+  - `PositionManager`: `core/` → `managers/`
+  - `RotationManager`: `core/` → `managers/`
+  - `ScaleManager`: `core/` → `managers/`
+  - `SmoothTransformManager`: `core/` → `managers/`
+  - Created `GridManager` for grid operations
+  - Better separation of concerns and logical grouping
+
+#### Utility Extraction
+
+- **New Utility Classes**: Extracted reusable components
+  - `AxisOperationsHelper`: Axis-constrained transform operations
+  - `CursorWarpAdapter`: Testable cursor warping logic
+  - `TransformMath`: Mathematical transform utilities
+  - `NodeUtils`: Node tree manipulation helpers
+  - `LayoutCalculator`: UI layout calculations
+  - `UndoRedoHelper`: Undo/redo operation wrapper
+  - Files: `utils/*.gd`
+
+#### Settings System Improvements
+
+- **Enhanced Settings Architecture**: Better separation and validation
+  - `SettingsStorage`: Handles settings persistence
+  - `SettingsValidator`: Validates setting values
+  - Improved `SettingsManager` with cleaner API
+  - Better error handling and logging
+
+#### Placement Strategy Refactor
+
+- **Renamed PlacementStrategyManager**: Better naming consistency
+  - `PlacementStrategyManager` → `PlacementStrategyService`
+  - Consistent with service-oriented architecture
+  - File: `placement/placement_strategy_service.gd`
+
+### ✨ New Features
+
+#### Cursor Warping Enhancement
+
+- **Cursor Warp Toggle**: New toolbar button for cursor warping
+  - Toggle cursor warping during mouse-driven transforms
+  - Visual indicator in toolbar
+  - Setting: `cursor_warp_enabled`
+  - File: `ui/toolbar_buttons.gd`
+
+#### About Tab
+
+- **New About Tab UI**: Plugin information and credits
+  - Shows version, author, and links
+  - First-time visibility flag
+  - File: `ui/about_tab.gd`
+
+### 🐛 Bug Fixes
+
+#### Removed Legacy Code
+
+- **Cleaned Up Backup Files**: Removed leftover backup files
+  - Deleted `core/transformation_coordinator.gd.backup`
+  - Deleted `ui/status_overlay.tscn.backup`
+
+### 📝 Documentation
+
+#### Code Documentation
+
+- **Comprehensive Inline Documentation**: Added detailed docstrings
+  - Every class now has PURPOSE, RESPONSIBILITIES, and ARCHITECTURE sections
+  - Clear dependency documentation (USED BY / USES)
+  - Improved code navigation and understanding
+  - Consistent documentation format across all files
+
+#### Updated README
+
+- **Restructured README**: More accurate feature documentation
+  - Added source file references for all features
+  - Verified against actual codebase
+  - Better organization of feature sections
+  - File: `README.md`
+
+### ⚙️ Technical Improvements
+
+#### Dependency Management
+
+- **Explicit Dependency Injection**: All managers receive dependencies via constructor
+  - No more hidden global dependencies
+  - Clear service relationships
+  - Easier to test and mock
+
+#### Error Handling
+
+- **Improved Error Handling**: Better error recovery and logging
+  - Safe cleanup with `_safe_cleanup()` wrapper
+  - Graceful degradation on errors
+  - More informative error messages
+
+#### Code Organization
+
+- **Better File Structure**: Logical grouping of related functionality
+  - `core/` - Core state and coordination
+  - `managers/` - Specialized managers
+  - `placement/` - Placement strategies
+  - `settings/` - Settings management
+  - `ui/` - User interface
+  - `utils/` - Shared utilities
+  - `thumbnails/` - Thumbnail generation
+  - `tests/` - Unit tests
+
+### 🔧 Migration Notes
+
+#### For Plugin Users
+
+- **No Action Required**: All user-facing features work identically
+- Settings and preferences are preserved
+- Keyboard shortcuts unchanged
+- UI and workflow remain the same
+
+#### For Extension Developers
+
+If you have custom scripts that access plugin internals:
+
+**Manager Access Changes:**
+
+```gdscript
+# OLD (static global access)
+SettingsManager.get_setting("key")
+PositionManager.configure(settings)
+TransformationManager.start_placement_mode(...)
+
+# NEW (instance-based via plugin)
+var plugin = EditorPlugin.get_editor_interface().get_plugin("SimpleAssetPlacer")
+var registry = plugin.service_registry
+registry.settings_manager.get_setting("key")
+registry.position_manager.configure(settings)
+registry.transformation_coordinator.start_placement_mode(...)
+```
+
+**Renamed Classes:**
+
+- `PlacementStrategyManager` → `PlacementStrategyService`
+- `TransformationManager` → `TransformationCoordinator`
+
+**Moved Files:**
+
+- `core/position_manager.gd` → `managers/position_manager.gd`
+- `core/rotation_manager.gd` → `managers/rotation_manager.gd`
+- `core/scale_manager.gd` → `managers/scale_manager.gd`
+- `core/smooth_transform_manager.gd` → `managers/smooth_transform_manager.gd`
+
 ## [1.4.1] - 2025-10-11
 
 ### 🐛 Bug Fixes
 
 #### Scale and Transform Fixes
+
 - **Fixed Smooth Transforms Scale Application**: Assets now placed with correct scale when smooth transforms enabled
   - Preview manager now returns target transforms instead of mid-lerp values
   - Added `get_target_rotation()` method to SmoothTransformManager
@@ -18,6 +210,7 @@
   - Added floating point rounding (snappedf to 0.001) to prevent 0.999999 values
 
 #### Tag Management Dialog Fixes
+
 - **Fixed "Manage Tags" Dialog Compatibility**: Dialog now works with both asset browsers
   - Added `_get_asset_identifier()` helper to handle different asset structures
   - Regular assets use 'path' key, meshlib items use 'meshlib_path:name' format
@@ -29,6 +222,7 @@
 ### ✨ New Features
 
 #### Quick Action Toolbar Enhancements
+
 - **Transform Mode Button** (🔧): Added dedicated toolbar button for transform mode
   - Toggle button with visual feedback when active
   - Displays configured keyboard shortcut in tooltip (default: TAB)
@@ -45,6 +239,7 @@
   - Eliminates confusion from hardcoded hints
 
 #### Keyboard Confirmation
+
 - **Configurable Confirmation Key**: Added keyboard shortcut for confirming placements/transformations
   - Default: Enter key (customizable in Settings → Control Keys)
   - Works alongside left mouse click
@@ -52,6 +247,7 @@
   - Settings persist across sessions
 
 #### Visual Enhancements
+
 - **Placement Strategy Indicator**: On-screen overlay shows active placement mode
   - 🎯 Collision icon for raycast placement
   - 📐 Plane icon for horizontal plane projection
@@ -65,6 +261,7 @@
 ### 🎨 UI/UX Improvements
 
 #### Toolbar Integration
+
 - **Quick Actions Moved to Viewport Toolbar**: Buttons relocated from overlay to 3D viewport menu
   - Appears in `CONTAINER_SPATIAL_EDITOR_MENU` next to Transform/View tools
   - Icon-only format (71% space reduction: 440px → 128px)
@@ -79,6 +276,7 @@
   - Two-way sync with settings panel
 
 #### Status Overlay Redesign
+
 - **Compact Layout**: Restructured with organized information hierarchy
   - Title Row: Mode label + Node name + Strategy indicator
   - Transform Row: Color-coded Position | Rotation | Scale (with VSeparator dividers)
@@ -89,6 +287,7 @@
 ### 🏗️ Architecture Improvements
 
 #### Directory Reorganization
+
 - **Logical Folder Structure**: Organized 33 files into 7 subdirectories
   - `core/` - Transform & state management (7 files)
   - `placement/` - Strategy pattern system (4 files)
@@ -100,6 +299,7 @@
   - Updated 100+ import paths
 
 #### State Management Refactor
+
 - **Stateless Design Pattern**: Eliminated scattered static variables
   - **TransformState**: Unified container for all transform state (237 lines)
   - **TransformApplicator**: Centralized transform application (238 lines)
@@ -110,6 +310,7 @@
     - Improved testability (pure functions)
 
 #### Placement Strategy Pattern
+
 - **Strategy-Based Architecture**: Clean separation of placement modes
   - Base `PlacementStrategy` class with `CollisionPlacementStrategy` and `PlanePlacementStrategy`
   - `PlacementStrategyManager` coordinates strategy selection
@@ -117,6 +318,7 @@
   - 60% reduction in positioning logic complexity
 
 #### Settings System Refactor
+
 - **Data-Driven Architecture**: 86% reduction in settings code
   - **SettingsDefinition**: Single source of truth for metadata (229 lines)
   - **SettingsUIBuilder**: Automated UI generation (234 lines)
@@ -153,6 +355,7 @@
 ### 📁 Technical Changes
 
 **New Files:**
+
 - `core/transform_state.gd` - Unified transform state container
 - `core/transform_applicator.gd` - Centralized transform application
 - `core/smooth_transform_manager.gd` - Interpolation system
@@ -170,6 +373,7 @@
 - `utils/increment_calculator.gd` - Increment calculations
 
 **Reorganized Files:**
+
 - Moved all managers to respective folders (core/, managers/, etc.)
 - Updated 100+ import paths across codebase
 
@@ -178,6 +382,7 @@
 ## [1.3.2] - 2025-10-05
 
 ### 🐛 Fixed
+
 - **Orphaned Tag Data**: Tag system now automatically cleans up data for deleted assets
   - Tags, favorites, and recent assets for deleted files are automatically removed
   - Cleanup runs automatically when plugin loads or when refresh button is clicked
@@ -208,6 +413,7 @@
   - All 11 previously unconnected controls now properly save/load their values
 
 ### 🔧 Improved
+
 - **Settings Persistence**: All placement settings now correctly persist across Godot sessions
   - Grid display size setting now saves/loads properly
   - Y-axis snapping settings (enabled and step size) now persist
@@ -219,6 +425,7 @@
 ## [1.3.1] - 2025-10-05
 
 ### 🐛 Fixed
+
 - **Critical Runtime Error**: Fixed missing `fine_increment_modifier_held` key in rotation and scale input dictionaries
   - Added `fine_increment_modifier_held` to `get_rotation_input()` function
   - Added `fine_increment_modifier_held` to `get_scale_input()` function
@@ -226,6 +433,7 @@
   - Ensures consistent modifier key structure across all input query functions
 
 ### 🏗️ Technical Improvements
+
 - **Code Cleanup**: Removed deprecated helper functions (`is_shift_held()`, `is_ctrl_held()`, `is_alt_held()`) from input dictionaries
   - All input now uses configurable modifier system (`reverse_modifier_held`, `large_increment_modifier_held`, `fine_increment_modifier_held`)
 
@@ -234,6 +442,7 @@
 ### ✨ New Features
 
 #### Hold-to-Repeat System
+
 - **Continuous Actions While Holding Keys**: Hold transformation keys to repeatedly apply actions
   - **Grace Period**: 150ms delay before repeat starts (preserves tap behavior for mouse wheel combos)
   - **Smart Repeat Intervals**: Optimized for each action type
@@ -248,6 +457,7 @@
   - **Tap Behavior Preserved**: Quick press (< 150ms) still performs single action for wheel combos
 
 ### 🐛 Fixed
+
 - **Grid Overlay Coordinate System**: Fixed grid overlay moving in opposite direction when transforming nodes
   - Root cause: Grid was inheriting flipped coordinate system from scene root nodes with 180° Y-axis rotation
   - Solution: Set `top_level = true` on grid overlay to make it independent of parent transform
@@ -267,6 +477,7 @@
   - Users can now bind all modifiers to any key combination
 
 ### 🏗️ Technical Improvements
+
 - **InputHandler Enhancements**:
   - Added `is_action_key_held_with_repeat()` function with comprehensive state tracking
   - New tracking variables: `active_repeat_key`, `active_repeat_modifiers`, `wheel_interrupted_keys`, `repeat_intervals`
@@ -289,6 +500,7 @@
 ## [1.2.1] - 2025-10-04
 
 ### 🐛 Fixed
+
 - **Pure Modifier Key Bindings**: Fixed support for binding pure modifiers (ALT, CTRL, SHIFT, META) to modifier keys (Large Increment, Reverse Direction)
 - **Modifier-Only Combinations**: Fixed capturing modifier-only combinations like CTRL+ALT without requiring a base key
 - **Key Chord Recording**: Improved key binding capture to record all pressed keys and capture complete combinations on release
@@ -297,6 +509,7 @@
 - **Input Dictionary Completeness**: Added missing `reverse_modifier_held` field to scale input dictionary
 
 ### 🔧 Improved
+
 - **Key Binding Capture Logic**: Redesigned to use a recording approach that tracks all pressed keys and captures on complete release
 - **Action Key Detection**: Action keys (Y, X, Z, Q, E, etc.) now properly detected even when modifiers are held
 - **Modifier Separation**: Modifier state checks are now independent from action key detection, allowing proper combinations like SHIFT+Y for reverse rotation
@@ -308,6 +521,7 @@
 ### ✨ New Features
 
 #### Asset Cycling System
+
 - **Cycle Through Assets During Placement**: Press `]` or `[` to browse assets without leaving the viewport
   - **Next Asset**: Press `]` (BRACKETRIGHT) to cycle forward through visible assets
   - **Previous Asset**: Press `[` (BRACKETLEFT) to cycle backward through visible assets
@@ -320,6 +534,7 @@
   - **Wrap-Around**: Seamlessly loops from last asset back to first
 
 #### Cycling Configuration
+
 - Added "Cycle Next Asset" keybind in Settings → Control Keys
 - Added "Cycle Previous Asset" keybind in Settings → Control Keys
 - Fully customizable key assignments
@@ -328,6 +543,7 @@
 ### 🌍 Enhanced - Universal Keyboard Layout Support
 
 #### International Keyboard Compatibility
+
 - **ALL keybinds now support modifier combinations** (CTRL+ALT+8, SHIFT+X, etc.)
   - Rotation keys (X, Y, Z, Reset)
   - Scale keys (Page Up, Page Down, Home)
@@ -337,6 +553,7 @@
   - Asset cycling keys (], [)
 
 #### Modifier Combination Support
+
 - **Full chord detection**: Press CTRL+ALT+8 to configure keybinds requiring modifiers
 - **Conflict prevention**: Simple key bindings won't trigger when modifiers are held
 - **Exact matching**: Each keybind checks for precise modifier state
@@ -344,6 +561,7 @@
 - **Works with all modifiers**: CTRL, ALT, SHIFT, META (Windows/Command key)
 
 #### Keybind Capture Improvements
+
 - Settings UI now properly captures modifier combinations
 - Ignores standalone modifier key presses (waits for actual key)
 - Displays full key combination in settings (e.g., "CTRL+ALT+9")
@@ -351,11 +569,13 @@
 - ESC to cancel key binding
 
 ### 🐛 Fixed
+
 - **Keybind capture bug**: Settings now correctly captures full modifier combinations instead of first key pressed
 - **Modifier isolation**: Modifiers no longer interfere with simple key bindings
 - **International layouts**: Keyboards requiring modifiers for brackets/special chars now work properly
 
 ### 🏗️ Technical Improvements
+
 - New `InputHandler._check_key_with_modifiers()` - Universal modifier detection
 - Enhanced input state tracking for tap vs hold detection
 - `ModelLibraryBrowser.cycle_to_next_asset()` - Cycles through 3D models
@@ -368,6 +588,7 @@
 - Auto-scroll implementation for browser visibility management
 
 ### 🎯 Workflow Enhancements
+
 - Stay in creative flow - no need to return to dock during placement
 - Quick asset iteration for level design
 - Visual comparison by rapidly cycling between options
@@ -381,6 +602,7 @@
 ### 🔧 Architecture & Bug Fixes
 
 #### Offset-Based Architecture Refactor
+
 - **RotationManager**: Complete refactor to use offset-based system instead of absolute rotations
   - Renamed `current_rotation` → `manual_rotation_offset` (breaking change for internal API)
   - Renamed `set_rotation()` → `set_rotation_offset()`
@@ -394,6 +616,7 @@
   - Scale formula: `final_scale = original_scale * scale_multiplier`
 
 #### Transform Mode Improvements
+
 - **Fixed critical bug**: Node rotations no longer reset to zero when entering transform mode with multiple nodes
 - **Group rotation**: Implemented rotation around collective center while preserving individual node rotations
 - **Position updates**: Eliminated `initial_frame` workaround for cleaner logic
@@ -401,11 +624,13 @@
 - Unified transform application flow with consistent offset-based approach
 
 #### Visual Improvements
+
 - **Thumbnail camera angle**: Adjusted from `Vector3(1, 0.7, 1)` to `Vector3(1, 1, -1)` (frontal-diagonal view)
 - Increased camera padding from 1.5x to 2x for better framing
 - Thumbnails now show frontal view of assets for better preview quality and identification
 
 #### Stability & Compatibility
+
 - **Removed Terrain3D plugin**: Completely removed Terrain3D addon to prevent conflicts
   - Deleted 169 files including binaries, brushes, icons, tools, and utilities
   - Cleaned up sample scenes and terrain data
@@ -413,6 +638,7 @@
 - Added Terrain3D usage tip in README for users who want to use it separately
 
 ### 🏗️ Technical Improvements
+
 - **Unified architecture**: All transformation managers now use consistent offset-based calculations
 - **Better encapsulation**: Original node values preserved and never directly modified
 - **Cleaner code**: Removed workarounds and simplified logic flows
@@ -426,6 +652,7 @@
 ### 🎉 Major Features
 
 #### Grid Snapping System
+
 - Added comprehensive grid snapping functionality to position management
 - Implemented center snapping options for X, Y, and Z axes independently
 - Added grid overlay visualization with dynamic updates based on object movement
@@ -433,12 +660,14 @@
 - Enhanced snapping features with improved position adjustment logic
 
 #### Surface Normal Alignment
+
 - Added alignment with surface normal feature for object rotation
 - Implemented Y position handling with surface normal alignment
 - Enhanced clipping prevention with improved surface alignment
 - Added surface alignment reset functionality in rotation management
 
 #### Position Management Overhaul
+
 - Complete refactor of position management system
 - Added initial position tracking and Y-axis locking functionality
 - Implemented base position retrieval for ground-level placement
@@ -448,6 +677,7 @@
 - Height offset now properly saved when switching assets
 
 #### Transform Mode Enhancement
+
 - Multi-node transformation support - apply adjustments to all target nodes
 - Enhanced height, scale, and rotation adjustments for multiple objects
 - Improved height adjustment handling with fine increments in placement mode
@@ -455,6 +685,7 @@
 - Refactored to use unified TransformationManager.Mode for mode handling
 
 #### Height Adjustment System
+
 - Comprehensive height adjustment system with reset functionality
 - Added reset height button and UI controls
 - Implemented "Reset All Settings" button with confirmation dialog
@@ -463,6 +694,7 @@
 - Height offset properly persists when switching between assets
 
 #### Asset Management Improvements
+
 - Added "Ignore Asset" functionality to filter unwanted assets
 - Improved thumbnail generation with async request handling
 - Enhanced thumbnail generation for scene files (.tscn)
@@ -471,6 +703,7 @@
 - Async asset filtering and processing
 
 #### Settings & Preferences
+
 - Implemented last selected mesh library and category restoration
 - Settings now persist between sessions
 - Added reset position offset option on exit
@@ -480,6 +713,7 @@
 ### 🔧 Major Refactoring
 
 #### Plugin Architecture Refactor
+
 - Created modular plugin architecture with specialized managers:
   - **AssetScanner**: Handles asset discovery and scanning
   - **ErrorHandler**: Centralized error handling and reporting
@@ -490,6 +724,7 @@
 - Improved code maintainability and separation of concerns
 
 #### Manager Enhancements
+
 - **TransformationManager**: 885+ lines of improvements
   - Unified mode handling (placement/transform)
   - Better state management
@@ -508,11 +743,13 @@
   - Offset adjustment support
 
 #### Preview Management Refactor
+
 - Preserve original materials by applying transparency instead of material overrides
 - Improved preview visibility without affecting asset materials
 - Better handling of preview state transitions
 
 ### 🐛 Bug Fixes
+
 - Fixed export-ignore rules for addons in .gitattributes
 - Removed debug print statements from production code
 - Fixed viewport bounds checking for mouse position
@@ -520,6 +757,7 @@
 - Fixed height offset not saving when switching assets
 
 ### 🎨 UI/UX Improvements
+
 - Added shift key detection for scaling operations
 - Improved rotation display logic with better visual feedback
 - Enhanced placement settings UI with more controls
@@ -528,17 +766,20 @@
 - Improved control responsiveness
 
 ### 📦 Asset Categories
+
 - Updated asset categories with improved tagging
 - Added new terrain asset support (Terrain3D integration for testing)
 - Enhanced input handling for category management
 
 ### 🏗️ Sample/Demo Updates
+
 - Added building_b scene to sample project
 - Updated building scene configurations with improved transformations
 - Enhanced wall and roof node transformations
 - Improved demo scene references and examples
 
 ### 📝 Technical Improvements
+
 - Better input coordinate conversion with viewport support
 - Enhanced modifier key handling (Shift, Ctrl, Alt)
 - Improved signal connections throughout the plugin
@@ -547,6 +788,7 @@
 - Improved performance with optimized update logic
 
 ### 🔄 Internal Changes
+
 - Added 611+ lines to placement_settings.gd for enhanced controls
 - Enhanced thumbnail_generator.gd with 400+ lines of improvements
 - Improved category_manager.gd with better tag management
@@ -560,9 +802,11 @@
 This plugin helps you quickly place assets in your Godot 3D scenes with powerful transform controls, grid snapping, and asset management features.
 
 ### Breaking Changes
+
 - v1.1.1: Internal API changes in RotationManager and ScaleManager (offset-based architecture)
 
 ### Known Issues
+
 None currently reported
 
 ---

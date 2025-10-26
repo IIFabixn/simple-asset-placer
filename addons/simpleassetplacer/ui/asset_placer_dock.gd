@@ -11,8 +11,11 @@ const MeshLibraryBrowser = preload("res://addons/simpleassetplacer/ui/meshlib_br
 const ModelLibraryBrowser = preload("res://addons/simpleassetplacer/ui/modellib_browser.gd")
 const PlacementSettings = preload("res://addons/simpleassetplacer/ui/placement_settings.gd")
 const AssetThumbnailItem = preload("res://addons/simpleassetplacer/ui/asset_thumbnail_item.gd")
+const AboutTab = preload("res://addons/simpleassetplacer/ui/about_tab.gd")
 const CategoryManager = preload("res://addons/simpleassetplacer/managers/category_manager.gd")
 const SettingsDefinition = preload("res://addons/simpleassetplacer/settings/settings_definition.gd")
+const LayoutCalculator = preload("res://addons/simpleassetplacer/utils/layout_calculator.gd")
+const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
 
 signal asset_selected(asset_path: String, mesh_resource: Resource, settings: Dictionary)
 signal meshlib_item_selected(meshlib: MeshLibrary, item_id: int, settings: Dictionary)
@@ -26,29 +29,51 @@ var models_tab: Control
 var meshlib_tab: Control
 var scroll_container: ScrollContainer
 var grid_container: GridContainer
-var meshlib_browser: MeshLibraryBrowser
-var modellib_browser: ModelLibraryBrowser
+var meshlib_browser  # MeshLibraryBrowser (no type hint to avoid initialization issues)
+var modellib_browser  # ModelLibraryBrowser (no type hint to avoid initialization issues)
 var placement_settings: PlacementSettings
 var settings_tab: Control
-var thumbnail_size: int = 64
+var about_tab: AboutTab
+var thumbnail_size: int = LayoutCalculator.THUMBNAIL_SIZE_DEFAULT  # Use optimized default size
 
 # Asset Management
 var discovered_assets: Array = []
 var supported_extensions = ["obj", "fbx", "dae", "gltf", "glb", "blend", "tscn", "scn", "tres", "res", "meshlib"]
-var category_manager: CategoryManager = null
+var _category_manager: CategoryManager = null
+
+# Category manager property with setter to propagate to child browsers
+var category_manager: CategoryManager:
+	get:
+		return _category_manager
+	set(value):
+		_category_manager = value
+		# Propagate to child browsers
+		if modellib_browser:
+			modellib_browser.set_category_manager(value)
+		if meshlib_browser:
+			meshlib_browser.set_category_manager(value)
+
+# ServiceRegistry instance (injected)
+var _services: ServiceRegistry = null
+
+func set_services(services: ServiceRegistry) -> void:
+	"""Inject ServiceRegistry for access to manager instances"""
+	_services = services
 
 func _ready():
 	name = "Asset Placer"
 	
-	# Initialize category manager
-	category_manager = CategoryManager.new()
-	category_manager.load_config_file()
+	# Note: CategoryManager will be injected from plugin via set_category_manager()
+	# Cannot create it here as it requires ServiceRegistry
+	# category_manager = CategoryManager.new(service_registry)
 	
 	setup_ui()
-	discover_assets()
+	# Don't discover assets here - wait until category_manager is injected
+	# so that ignored folders can be properly filtered
+	# discover_assets() will be called from the plugin after injection
 
 func setup_ui():
-	set_custom_minimum_size(Vector2(200, 400))
+	set_custom_minimum_size(Vector2(260, 400))  # Match browser minimum width for consistent layout
 	
 	# Use anchors and offsets to fill the entire available space
 	var main_margin = MarginContainer.new()
@@ -103,8 +128,17 @@ func setup_ui():
 	
 	# Create ModelLibraryBrowser
 	modellib_browser = ModelLibraryBrowser.new()
-	modellib_browser.set_category_manager(category_manager)
-	modellib_browser.asset_item_selected.connect(_on_asset_selected)
+	if not modellib_browser:
+		PluginLogger.error(PluginConstants.COMPONENT_DOCK, "Failed to create ModelLibraryBrowser!")
+	else:
+		# Set category_manager if it was already injected before _ready()
+		if _category_manager:
+			modellib_browser.set_category_manager(_category_manager)
+		# Pass services to browser
+		if _services:
+			modellib_browser.set_services(_services)
+		modellib_browser.asset_item_selected.connect(_on_asset_selected)
+		PluginLogger.debug(PluginConstants.COMPONENT_DOCK, "ModelLibraryBrowser created successfully")
 	models_margin.add_child(modellib_browser)
 	
 	# MeshLibrary tab
@@ -122,10 +156,19 @@ func setup_ui():
 	meshlib_tab.add_child(margin)
 	
 	meshlib_browser = MeshLibraryBrowser.new()
-	meshlib_browser.set_category_manager(category_manager)
-	meshlib_browser.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	meshlib_browser.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	margin.add_child(meshlib_browser)
+	if not meshlib_browser:
+		PluginLogger.error(PluginConstants.COMPONENT_DOCK, "Failed to create MeshLibraryBrowser!")
+	else:
+		# Set category_manager if it was already injected before _ready()
+		if _category_manager:
+			meshlib_browser.set_category_manager(_category_manager)
+		# Pass services to browser
+		if _services:
+			meshlib_browser.set_services(_services)
+		meshlib_browser.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		meshlib_browser.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		margin.add_child(meshlib_browser)
+		PluginLogger.debug(PluginConstants.COMPONENT_DOCK, "MeshLibraryBrowser created successfully")
 	
 	# Initialize search state for meshlib browser
 	if search_line_edit:
@@ -135,6 +178,11 @@ func setup_ui():
 	settings_tab = Control.new()
 	settings_tab.name = "Settings"
 	tab_container.add_child(settings_tab)
+
+	# About tab provides inline documentation and links
+	about_tab = AboutTab.new()
+	about_tab.ensure_ready()
+	tab_container.add_child(about_tab)
 	
 	# Add margin container for settings tab
 	var settings_margin = MarginContainer.new()
@@ -146,6 +194,15 @@ func setup_ui():
 	settings_tab.add_child(settings_margin)
 	
 	placement_settings = PlacementSettings.new()
+	if _services:
+		if _services.placement_strategy_service:
+			placement_settings.set_placement_strategy_service(_services.placement_strategy_service)
+		if _services.settings_persistence:
+			placement_settings.set_settings_persistence(_services.settings_persistence)
+		if _services.thumbnail_queue_manager:
+			placement_settings.set_thumbnail_queue_manager(_services.thumbnail_queue_manager)
+		if _services.settings_manager:
+			placement_settings.set_settings_manager(_services.settings_manager)
 	placement_settings.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	settings_margin.add_child(placement_settings)
 	
@@ -172,19 +229,7 @@ func _on_dock_resized():
 	# Adjust grid columns based on available width - fully adaptive
 	if grid_container:
 		var available_width = get_rect().size.x - 60  # Account for scroll margins
-		var item_width = thumbnail_size + 16  # AssetThumbnailItem width (thumbnail + margins)
-		var spacing = 12  # Grid separation - match grid_container settings
-		
-		# Calculate how many columns can fit with proper spacing
-		var columns_that_fit = 1
-		var total_width_needed = item_width
-		
-		# Keep adding columns while they fit (with 20px buffer for safety)
-		while total_width_needed + spacing + item_width <= available_width - 20:
-			columns_that_fit += 1
-			total_width_needed += spacing + item_width
-		
-		grid_container.columns = max(1, columns_that_fit)
+		grid_container.columns = LayoutCalculator.calculate_grid_columns(available_width, thumbnail_size)
 	
 	# Also update both browser grids
 	if meshlib_browser:
@@ -196,31 +241,8 @@ func update_responsive_sizes():
 	var dock_width = get_rect().size.x
 	var old_thumbnail_size = thumbnail_size
 	
-	# Calculate optimal thumbnail size within 64-128px range based on available space
-	var available_width = dock_width - 60  # Account for scroll margins
-	var grid_spacing = 12   # Space between grid items - match grid_container settings
-	
-	# Start with minimum size and see how many columns we can fit
-	var best_thumbnail_size = 64
-	var best_columns = 1
-	
-	# Test different thumbnail sizes to find the best fit
-	for test_size in range(64, 129, 8):  # Test in 8px increments from 64 to 128
-		var test_item_width = test_size + 16  # AssetThumbnailItem width calculation
-		var columns = 1
-		var total_width = test_item_width
-		
-		# Calculate how many columns fit with this thumbnail size (with 20px buffer)
-		while total_width + grid_spacing + test_item_width <= available_width - 20:
-			columns += 1
-			total_width += grid_spacing + test_item_width
-		
-		# Prefer more columns, but not at the expense of too-small thumbnails
-		if columns > best_columns or (columns == best_columns and test_size > best_thumbnail_size):
-			best_thumbnail_size = test_size
-			best_columns = columns
-	
-	thumbnail_size = clamp(best_thumbnail_size, 64, 128)
+	# Use LayoutCalculator for responsive thumbnail sizing
+	thumbnail_size = LayoutCalculator.calculate_responsive_thumbnail_size(dock_width)
 	
 	# Only refresh if size actually changed
 	if old_thumbnail_size != thumbnail_size:
@@ -240,7 +262,14 @@ func update_responsive_sizes():
 
 func discover_assets():
 	"""Discover all 3D assets in the project using AssetScanner"""
-	discovered_assets = AssetScanner.scan_for_assets("res://", true)
+	PluginLogger.info(PluginConstants.COMPONENT_DOCK, "Starting asset discovery...")
+	
+	# Pass category_manager to AssetScanner so it filters during scan (more efficient)
+	var all_assets = AssetScanner.scan_for_assets("res://", true, category_manager)
+	PluginLogger.info(PluginConstants.COMPONENT_DOCK, "AssetScanner found %d assets after filtering" % all_assets.size())
+	
+	# Assets are already filtered by AssetScanner, so just use them directly
+	discovered_assets = all_assets
 	
 	# Clean up orphaned data after scanning assets
 	if category_manager and discovered_assets.size() > 0:
@@ -252,12 +281,22 @@ func discover_assets():
 		category_manager.cleanup_all_orphaned_data(asset_paths)
 	
 	update_meshlib_browser()
-	# Discover assets for the model library browser
+	
+	# Pass discovered assets to the model library browser (no need to scan again)
 	if modellib_browser:
-		modellib_browser.discover_assets()
+		PluginLogger.debug(PluginConstants.COMPONENT_DOCK, "Passing discovered assets to ModelLibBrowser...")
+		# Filter to only non-meshlib assets for the model browser
+		var model_assets = AssetScanner.exclude_meshlibs(discovered_assets)
+		modellib_browser.set_discovered_assets(model_assets)
+	else:
+		PluginLogger.warning(PluginConstants.COMPONENT_DOCK, "ModelLibBrowser not initialized, skipping discovery")
 
 func update_meshlib_browser():
 	"""Update MeshLibrary browser with discovered MeshLibrary assets"""
+	if not meshlib_browser:
+		PluginLogger.warning(PluginConstants.COMPONENT_DOCK, "MeshLibBrowser not initialized yet, skipping meshlib update")
+		return
+	
 	var meshlib_paths = AssetScanner.get_meshlib_paths(discovered_assets)
 	meshlib_browser.populate_meshlib_options(meshlib_paths)
 
@@ -312,10 +351,13 @@ func _on_cache_cleared():
 		modellib_browser.update_asset_grid()
 
 func _on_settings_changed():
-	"""Handle settings change event - reload SettingsManager from EditorSettings"""
-	# Reload SettingsManager from EditorSettings to sync with UI changes
-	var SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
-	SettingsManager.reload_from_editor_settings()
+	"""Handle settings change event"""
+	# NOTE: Don't reload from EditorSettings here!
+	# The settings_changed signal means PlacementSettings just saved new values,
+	# but EditorSettings might not have them yet (async write).
+	# Reloading here would restore old values and cause button states to flip back.
+	# The button update handlers will get the correct values from PlacementSettings directly.
+	pass
 
 func _ensure_settings_loaded():
 	"""Ensure settings are properly loaded and applied to UI after initialization"""
@@ -369,11 +411,9 @@ func update_placement_strategy_ui(strategy: String):
 				# Update the node property
 				placement_settings.set("placement_strategy", strategy)
 				
-				# Save to EditorSettings so it persists
-				placement_settings.save_settings()
-				
-				# Emit settings_changed to update toolbar buttons
-				placement_settings.settings_changed.emit()
+				# Save to EditorSettings so it persists (but don't emit settings_changed signal)
+				# The coordinator already updated SettingsManager and triggered necessary reconfigurations
+				placement_settings.save_settings_without_signal()
 				
 				PluginLogger.info(PluginConstants.COMPONENT_DOCK, "Updated placement strategy UI to: " + strategy)
 			else:
@@ -381,6 +421,15 @@ func update_placement_strategy_ui(strategy: String):
 			return
 	
 	PluginLogger.warning(PluginConstants.COMPONENT_DOCK, "Could not find placement_strategy setting definition")
+
+
+func show_about_tab() -> void:
+	"""Switch the tab container to the About documentation panel"""
+	if not tab_container or not about_tab:
+		return
+	var tab_index = tab_container.get_tab_idx_from_control(about_tab)
+	if tab_index >= 0:
+		tab_container.set_current_tab(tab_index)
 
 ## Asset Cycling Coordination
 

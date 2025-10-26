@@ -3,10 +3,33 @@ extends RefCounted
 
 class_name SettingsPersistence
 
+"""
+SETTINGS PERSISTENCE (INSTANCE-BASED)
+==================================
+
+PURPOSE: Handle persistence of settings to/from EditorSettings and UI
+
+ARCHITECTURE: Pure instance-based (no static methods)
+- Created once during plugin initialization via ServiceRegistry
+- Injected to UI components that need settings I/O
+- All methods are instance methods
+
+USED BY: PlacementSettings UI component
+DEPENDS ON: SettingsDefinition
+"""
+
 const SettingsDefinition = preload("res://addons/simpleassetplacer/settings/settings_definition.gd")
 
-# Save all settings to EditorSettings
-static func save_settings(owner_node: Node):
+## Initialization
+
+func _init() -> void:
+	"""Initialize the settings persistence handler"""
+	pass
+
+## Settings Persistence
+
+func save_settings(owner_node: Node) -> void:
+	"""Save all settings to EditorSettings"""
 	var editor_settings = EditorInterface.get_editor_settings()
 	var all_settings = SettingsDefinition.get_all_settings()
 	
@@ -15,8 +38,8 @@ static func save_settings(owner_node: Node):
 		if value != null:
 			editor_settings.set_setting(setting.editor_key, value)
 
-# Load all settings from EditorSettings
-static func load_settings(owner_node: Node):
+func load_settings(owner_node: Node) -> void:
+	"""Load all settings from EditorSettings"""
 	var editor_settings = EditorInterface.get_editor_settings()
 	var all_settings = SettingsDefinition.get_all_settings()
 	
@@ -28,15 +51,15 @@ static func load_settings(owner_node: Node):
 			# Use default value if setting doesn't exist
 			owner_node.set(setting.id, setting.default_value)
 
-# Reset all settings to defaults
-static func reset_to_defaults(owner_node: Node):
+func reset_to_defaults(owner_node: Node) -> void:
+	"""Reset all settings to defaults"""
 	var all_settings = SettingsDefinition.get_all_settings()
 	
 	for setting in all_settings:
 		owner_node.set(setting.id, setting.default_value)
 
-# Get all settings as a dictionary
-static func get_settings_dict(owner_node: Node) -> Dictionary:
+func get_settings_dict(owner_node: Node) -> Dictionary:
+	"""Get all settings as a dictionary"""
 	var result = {}
 	var all_settings = SettingsDefinition.get_all_settings()
 	
@@ -47,8 +70,10 @@ static func get_settings_dict(owner_node: Node) -> Dictionary:
 	
 	return result
 
-# Update UI controls from current settings
-static func update_ui_from_settings(ui_controls: Dictionary, owner_node: Node):
+## UI Synchronization
+
+func update_ui_from_settings(ui_controls: Dictionary, owner_node: Node) -> void:
+	"""Update UI controls from current settings"""
 	var all_settings = SettingsDefinition.get_all_settings()
 	
 	for setting in all_settings:
@@ -81,8 +106,8 @@ static func update_ui_from_settings(ui_controls: Dictionary, owner_node: Node):
 					if selected_index >= 0:
 						control.selected = selected_index
 
-# Read settings from UI controls back to properties
-static func read_ui_to_settings(ui_controls: Dictionary, owner_node: Node):
+func read_ui_to_settings(ui_controls: Dictionary, owner_node: Node) -> void:
+	"""Read settings from UI controls back to properties"""
 	var all_settings = SettingsDefinition.get_all_settings()
 	
 	for setting in all_settings:
@@ -116,7 +141,6 @@ static func read_ui_to_settings(ui_controls: Dictionary, owner_node: Node):
 			SettingsDefinition.SettingType.KEY_BINDING:
 				if control is Button:
 					owner_node.set(setting.id, control.text)
-
 
 
 

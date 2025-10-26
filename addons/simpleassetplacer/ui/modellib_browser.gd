@@ -6,19 +6,25 @@ class_name ModelLibraryBrowser
 const AssetThumbnailItem = preload("res://addons/simpleassetplacer/ui/asset_thumbnail_item.gd")
 const CategoryManager = preload("res://addons/simpleassetplacer/managers/category_manager.gd")
 const TagManagementDialog = preload("res://addons/simpleassetplacer/ui/tag_management_dialog.gd")
+const LayoutCalculator = preload("res://addons/simpleassetplacer/utils/layout_calculator.gd")
+const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
 
 signal asset_item_selected(asset_info: Dictionary)
 
+# Dependency injection
+var _services: ServiceRegistry = null
+var _thumbnail_queue_manager = null
+
+# UI state
 var category_filter: OptionButton
 var filter_options: OptionButton
 var items_grid: GridContainer
 var scroll_container: ScrollContainer
 var discovered_assets: Array = []
-var thumbnail_size: int = 64
+var thumbnail_size: int = LayoutCalculator.THUMBNAIL_SIZE_DEFAULT  # Use optimized default size
 var selected_item: AssetThumbnailItem = null
 var current_search_text: String = ""
 var current_category_filter: String = ""
-var supported_extensions = ["obj", "fbx", "gltf", "glb", "dae", "blend", "tscn", "scn", "tres", "res"]
 var category_manager: CategoryManager = null
 var tag_management_dialog: TagManagementDialog = null
 var manage_tags_button: Button = null
@@ -34,19 +40,20 @@ func setup_ui():
 	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(vbox)
 	
-	# Category filter with manage button
+	# Category filter with manage button (side-by-side)
 	var category_hbox = HBoxContainer.new()
 	vbox.add_child(category_hbox)
 	
 	category_filter = OptionButton.new()
 	category_filter.add_item("All Categories")
 	category_filter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	category_filter.clip_text = true  # Enable text clipping for long names
 	category_hbox.add_child(category_filter)
 	
 	manage_tags_button = Button.new()
 	manage_tags_button.text = "Manage Tags..."
 	manage_tags_button.tooltip_text = "Open advanced tag management dialog for bulk operations"
-	manage_tags_button.custom_minimum_size = Vector2(110, 0)
+	manage_tags_button.size_flags_horizontal = Control.SIZE_SHRINK_END  # Shrink to content
 	manage_tags_button.pressed.connect(_on_manage_tags_pressed)
 	category_hbox.add_child(manage_tags_button)
 	
@@ -87,117 +94,52 @@ func setup_ui():
 func set_category_manager(manager: CategoryManager):
 	category_manager = manager
 
+func set_services(services: ServiceRegistry) -> void:
+	"""Inject ServiceRegistry for access to managers"""
+	_services = services
+	if _services and _services.thumbnail_queue_manager:
+		_thumbnail_queue_manager = _services.thumbnail_queue_manager
+
 func update_grid_columns(available_width: float):
 	if items_grid:
-		# Calculate columns based on available width
-		var item_width = thumbnail_size + 36  # Thumbnail + padding + text + margins
-		var new_columns = max(1, int((available_width - 48) / item_width))
-		items_grid.columns = min(new_columns, 3)  # Max 3 columns for model items
+		# Use LayoutCalculator for consistent grid calculation
+		# Calculate columns based on actual thumbnail size (margins added internally)
+		var columns = LayoutCalculator.calculate_grid_columns(available_width - 48, thumbnail_size, 12, 20)
+		items_grid.columns = columns  # Fully adaptive - no artificial limit
 
 func update_thumbnail_size(new_size: int):
 	thumbnail_size = new_size
 	# Refresh the items display with new thumbnail size
 	update_asset_grid()
 
-func discover_assets():
+func set_discovered_assets(assets: Array):
+	"""
+	Receive pre-discovered assets from AssetPlacerDock
+	AssetScanner is used once by the dock, then results are passed here
+	"""
+	const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
+	const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
+	
+	PluginLogger.info(PluginConstants.COMPONENT_DOCK, "ModelLibBrowser: Received %d pre-discovered assets" % assets.size())
 	discovered_assets.clear()
-	_scan_directory("res://")
+	
+	# Process each asset to add category information
+	for asset in assets:
+		var asset_with_categories = asset.duplicate()
+		
+		# Extract category information
+		if category_manager:
+			asset_with_categories["folder_categories"] = category_manager.extract_folder_categories(asset.path)
+			asset_with_categories["custom_tags"] = category_manager.get_custom_tags(asset.path)
+		else:
+			asset_with_categories["folder_categories"] = []
+			asset_with_categories["custom_tags"] = []
+		
+		discovered_assets.append(asset_with_categories)
+	
+	PluginLogger.info(PluginConstants.COMPONENT_DOCK, "ModelLibBrowser: Processed %d assets with categories" % discovered_assets.size())
 	populate_category_filter()
 	update_asset_grid()
-
-func _scan_directory(path: String):
-	var dir = DirAccess.open(path)
-	if dir:
-		dir.list_dir_begin()
-		var file_name = dir.get_next()
-		
-		while file_name != "":
-			var full_path = path + "/" + file_name
-			
-			if dir.current_is_dir() and not file_name.begins_with("."):
-				# Skip .godot and other hidden directories
-				if file_name != ".godot":
-					_scan_directory(full_path)
-			else:
-				var extension = file_name.get_extension().to_lower()
-				if extension in supported_extensions:
-					# Check if it's a MeshLibrary resource
-					var is_meshlib = false
-					var has_mesh = false
-					
-					if extension in ["tres", "res", "meshlib"]:
-						# Try to load resource safely
-						var resource = null
-						if ResourceLoader.exists(full_path):
-							resource = load(full_path)
-						
-						if resource != null and resource is MeshLibrary:
-							is_meshlib = true
-							# Skip MeshLibraries in the model browser
-							file_name = dir.get_next()
-							continue
-						elif resource != null:
-							# Check if other .tres/.res files contain meshes
-							has_mesh = _resource_contains_mesh(resource)
-					elif extension in ["tscn", "scn"]:
-						# For Godot scene files, check if they contain meshes
-						has_mesh = _scene_file_contains_mesh(full_path)
-					else:
-						# For 3D model files (.fbx, .obj, .gltf, .blend, etc.), check if they contain meshes
-						has_mesh = _model_file_contains_mesh(full_path)
-					
-					# Only add assets that have meshes but are not MeshLibraries
-					if has_mesh and not is_meshlib:
-						var asset_type = "3D Model"
-						if extension in ["tscn", "scn"]:
-							asset_type = "Scene"
-						
-						# Extract category information
-						var folder_categories = []
-						var custom_tags = []
-						if category_manager:
-							folder_categories = category_manager.extract_folder_categories(full_path)
-							custom_tags = category_manager.get_custom_tags(full_path)
-						
-						var asset_info = {
-							"path": full_path,
-							"name": file_name.get_basename(),
-							"extension": extension,
-							"is_meshlib": false,
-							"type": asset_type,
-							"folder_categories": folder_categories,
-							"custom_tags": custom_tags
-						}
-						discovered_assets.append(asset_info)
-			
-			file_name = dir.get_next()
-
-func _resource_contains_mesh(resource: Resource) -> bool:
-	# Check if a .tres/.res resource contains mesh data
-	if resource is Mesh:
-		return true
-	elif resource is PackedScene:
-		# For PackedScene, assume it contains meshes for simplicity
-		return true
-	elif resource is Material or resource.get_class().contains("Material"):
-		# Materials don't contain meshes
-		return false
-	elif resource.get_class().contains("Terrain") or resource.get_class().contains("terrain"):
-		# Terrain resources don't contain meshes
-		return false
-	
-	# Unknown resource type, assume it might contain a mesh
-	return false
-
-func _scene_file_contains_mesh(path: String) -> bool:
-	# For Godot scene files, assume they contain meshes for now
-	# This could be enhanced to actually parse the scene if needed
-	return true
-
-func _model_file_contains_mesh(path: String) -> bool:
-	# For 3D model formats, assume they contain meshes
-	# These are standard 3D model file formats, so they should contain meshes
-	return true
 
 func clear_items():
 	for child in items_grid.get_children():
@@ -213,6 +155,8 @@ func update_asset_grid():
 	for asset in filtered_assets:
 		var thumbnail_item = AssetThumbnailItem.create_for_asset(asset, thumbnail_size)
 		thumbnail_item.set_category_manager(category_manager)
+		if _thumbnail_queue_manager:
+			thumbnail_item.set_queue_manager(_thumbnail_queue_manager)
 		thumbnail_item.asset_item_selected.connect(_on_asset_item_selected)
 		thumbnail_item.context_menu_requested.connect(_on_context_menu_requested)
 		items_grid.add_child(thumbnail_item)
@@ -226,7 +170,10 @@ func get_filtered_assets() -> Array:
 	
 	var filtered = []
 	for asset in discovered_assets:
-		var is_ignored = category_manager and category_manager.is_ignored(asset.path)
+		# Properly check if asset is ignored (handles null category_manager safely)
+		var is_ignored = false
+		if category_manager:
+			is_ignored = category_manager.is_ignored(asset.path)
 		
 		# Filter based on ignored state and current view
 		if viewing_ignored:
@@ -319,9 +266,9 @@ func _on_category_filter_changed(index: int):
 			current_category_filter = category_filter.get_item_text(index)
 	
 	# Save the selected category to settings
-	const SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
-	SettingsManager.set_plugin_setting("last_model_category", current_category_filter)
-	SettingsManager.save_to_file()
+	if _services and _services.settings_manager:
+		_services.settings_manager.set_plugin_setting("last_model_category", current_category_filter)
+		_services.settings_manager.save_plugin_settings_to_editor()
 	
 	update_asset_grid()
 
@@ -336,8 +283,8 @@ func populate_category_filter():
 	var last_category_index = 0
 	
 	# Try to load the last selected category from settings
-	const SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
-	last_category = SettingsManager.get_setting("last_model_category", "")
+	if _services and _services.settings_manager:
+		last_category = _services.settings_manager.get_setting("last_model_category", "")
 	
 	# Add special categories first
 	var favorites = category_manager.get_favorites()
@@ -377,12 +324,17 @@ func populate_category_filter():
 		
 		for cat_info in folder_category_paths:
 			# Display full path, but store leaf name for matching
-			category_filter.add_item("  " + cat_info["display"])
+			var display_text = "  " + cat_info["display"]
+			category_filter.add_item(display_text)
+			var item_index = category_filter.get_item_count() - 1
 			# Store the leaf name in metadata for filtering
-			category_filter.set_item_metadata(category_filter.get_item_count() - 1, cat_info["match"])
+			category_filter.set_item_metadata(item_index, cat_info["match"])
+			# Add tooltip for long names to show full path
+			if display_text.length() > 25:
+				category_filter.set_item_tooltip(item_index, cat_info["display"])
 			# Check if this matches the last selected category
 			if cat_info["match"] == last_category:
-				last_category_index = category_filter.get_item_count() - 1
+				last_category_index = item_index
 	
 	# Get custom tags (only show tags that have at least one non-ignored asset)
 	var all_custom_tags = category_manager.get_all_custom_tags()
@@ -406,10 +358,15 @@ func populate_category_filter():
 		category_filter.set_item_disabled(category_filter.get_item_count() - 1, true)
 		
 		for tag in custom_tags:
-			category_filter.add_item("  " + tag)
+			var display_text = "  " + tag
+			category_filter.add_item(display_text)
+			var item_index = category_filter.get_item_count() - 1
+			# Add tooltip for long tag names
+			if display_text.length() > 25:
+				category_filter.set_item_tooltip(item_index, tag)
 			# Check if this matches the last selected category
 			if tag == last_category:
-				last_category_index = category_filter.get_item_count() - 1
+				last_category_index = item_index
 	
 	# Restore last category selection if found
 	if last_category_index > 0:
@@ -518,6 +475,14 @@ func _on_context_menu_requested(asset_item: AssetThumbnailItem, position: Vector
 	menu_actions[menu_id] = {"type": "ignore", "asset_path": asset_path}
 	menu_id += 1
 	
+	# Ignore folder
+	var asset_folder = category_manager.get_asset_folder(asset_path)
+	var is_folder_ignored = category_manager.is_folder_ignored(asset_folder)
+	var folder_ignore_text = "✓ Unignore Folder" if is_folder_ignored else "📁 Ignore Parent Folder"
+	popup.add_item(folder_ignore_text, menu_id)
+	menu_actions[menu_id] = {"type": "ignore_folder", "folder_path": asset_folder}
+	menu_id += 1
+	
 	# Connect signal with proper dictionary
 	popup.id_pressed.connect(func(id): _on_context_menu_item_selected(id, menu_actions, popup))
 	
@@ -542,8 +507,9 @@ func _on_context_menu_item_selected(id: int, menu_actions: Dictionary, popup: Po
 				category_manager.add_tag(asset_path, tag_name)
 			category_manager.save_config_file()
 			
-			# Refresh asset data
-			discover_assets()
+			# Refresh display after tag change
+			populate_category_filter()
+			update_asset_grid()
 		
 		"new_tag":
 			# Show dialog to create new tag
@@ -565,9 +531,7 @@ func _on_context_menu_item_selected(id: int, menu_actions: Dictionary, popup: Po
 				# Asset was removed from favorites, need to update grid
 				update_asset_grid()
 			elif current_category_filter == "":
-				# Viewing all assets - could update badges, but that requires full regeneration
-				# For now, skip update to avoid thumbnail regeneration
-				# TODO: Add a refresh_badges() function to update badges without regenerating thumbnails
+				# Viewing all assets - skip update to avoid thumbnail regeneration
 				pass
 		
 		"ignore":
@@ -587,6 +551,16 @@ func _on_context_menu_item_selected(id: int, menu_actions: Dictionary, popup: Po
 			elif not was_ignored:
 				# Asset was just ignored, remove it from the current view
 				update_asset_grid()
+		
+		"ignore_folder":
+			var folder_path = action["folder_path"]
+			category_manager.toggle_folder_ignored(folder_path)
+			
+			# Update category filter dropdown
+			populate_category_filter()
+			
+			# Always update the grid when ignoring/unignoring folders
+			update_asset_grid()
 		
 		"all_tags_submenu":
 			# Show all tags dialog
@@ -625,7 +599,8 @@ func _show_new_tag_dialog(asset_path: String):
 		category_manager.save_config_file()
 		
 		# Refresh display
-		discover_assets()
+		populate_category_filter()
+		update_asset_grid()
 		
 		dialog.queue_free()
 	)
@@ -687,7 +662,8 @@ func _show_all_tags_dialog(asset_path: String):
 	
 	# Handle dialog close
 	dialog.confirmed.connect(func():
-		discover_assets()  # Refresh after dialog closes
+		populate_category_filter()
+		update_asset_grid()
 		dialog.queue_free()
 	)
 	
@@ -717,7 +693,8 @@ func _on_manage_tags_pressed() -> void:
 
 func _on_tags_modified_in_dialog() -> void:
 	# Refresh the asset grid and category filter when tags are modified
-	discover_assets()
+	populate_category_filter()
+	update_asset_grid()
 
 ## Asset Cycling
 

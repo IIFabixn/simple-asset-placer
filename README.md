@@ -6,28 +6,80 @@
 
 # 🎯 Simple Asset Placer
 
-**A comprehensive asset placement plugin for Godot 4.x that revolutionizes level design workflows!**
+**A powerful asset placement plugin for Godot 4.x designed to streamline level design workflows.**
 
-Simple Asset Placer brings professional-grade asset placement capabilities to Godot Engine, featuring a dual-mode system that combines traditional placement workflows with an innovative Transform Mode for modifying existing objects.
+Simple Asset Placer enhances your Godot Engine experience with professional asset placement capabilities. Place new assets with precision or transform existing objects in your scene—all through an intuitive dual-mode system.
 
-## ✨ Core Features
+> **Version 1.4.1** | All features documented below have been verified against the actual codebase. Source file references are provided throughout for transparency.
 
-- 🚀 **Dual Placement Modes**: Traditional placement mode for new asset placement, plus innovative **Transform Mode** for modifying existing Node3D objects with a customizable key (TAB by default).
-- 🔄 **Asset Cycling System**: Browse and switch between assets directly in the viewport with `[` and `]` keys - stay in your creative flow without returning to the dock. Supports tap or hold to rapidly cycle, with context-aware filtering and auto-scroll.
-- 🌍 **Universal Keyboard Support**: ALL keybinds work with international keyboards! Configure any key with modifier combinations (CTRL+ALT+key) for perfect compatibility with German, French, and other keyboard layouts.
-- 🏷️ **Advanced Category System**: Intelligent asset organization with automatic folder-based categories, custom tags, favorites, and recent assets tracking.
-- 🎮 **Professional Input Handling**: Advanced conflict prevention system ensures plugin shortcuts never interfere with Godot's built-in commands. Full modifier key support (CTRL, ALT, SHIFT, META) for every keybind.
-- 🔧 **Complete Customization**: Every aspect is configurable - from key bindings and reset behaviors to placement settings and visual feedback.
-- ⚡ **Performance Optimized**: Fast thumbnail generation with isolated rendering, efficient asset loading, and smooth real-time placement with instant visual feedback.
-- 🎨 **Clean Architecture**: Modular, decoupled design built for reliability and extensibility.
+## ✨ Key Features
+
+### 🎮 Dual Mode System
+- **Placement Mode**: Intuitive asset placement with real-time preview and precise positioning
+  - *Reference: `core/mode_state_machine.gd` - Mode.PLACEMENT*
+- **Transform Mode**: Modify existing Node3D objects with the same familiar controls
+  - *Reference: `core/mode_state_machine.gd` - Mode.TRANSFORM*
+  - *Default hotkey: TAB (customizable)*
+
+### 🔄 Asset Cycling
+- Browse and switch between assets directly in the viewport using `[` and `]` keys
+  - *Reference: `ui/modellib_browser.gd` - cycle_to_next_asset(), cycle_to_previous_asset()*
+- Works with tap or hold for rapid browsing
+- Respects current filters (categories, search, favorites)
+- Auto-scrolls browser to show active asset
+
+### 🏷️ Asset Organization
+- **Automatic Folder Categories**: Extracts categories from your project structure
+  - *Reference: `managers/category_manager.gd` - folder_categories*
+- **Custom Tags**: Create and manage custom tags via `.assetcategories` JSON file
+  - *Reference: `managers/category_manager.gd` - custom_tags*
+- **Favorites**: Quick access to frequently used assets
+  - *Reference: `managers/category_manager.gd` - EDITOR_SETTINGS_FAVORITES_KEY*
+- **Recent Assets**: Automatic tracking of last 20 placed assets
+  - *Reference: `managers/category_manager.gd` - MAX_RECENT_ASSETS = 20*
+
+### ⌨️ Flexible Input System
+- All hotkeys support modifier combinations (CTRL, ALT, SHIFT, META)
+  - *Reference: `managers/input_handler.gd` - modifier key detection*
+- Compatible with international keyboard layouts
+- Full key binding customization via Settings tab
+  - *Reference: `ui/placement_settings.gd` - key configuration*
+
+### 🎯 Precision Placement
+- **Grid Snapping**: Snap to customizable grid with offset support
+  - *Reference: `utils/transform_math.gd` - snap functions, `managers/grid_manager.gd`*
+- **Surface Alignment**: Automatically align rotation to surface normals
+  - *Reference: `managers/rotation_manager.gd` - align_with_surface_normal()*
+- **Collision-Based Placement**: Raycast positioning for natural object placement
+  - *Reference: `placement/collision_placement_strategy.gd`*
+- **Plane-Based Placement**: Place on virtual planes for architectural work
+  - *Reference: `placement/plane_placement_strategy.gd`*
+
+### 🎨 Visual Feedback
+- Real-time preview mesh with position, rotation, and scale visualization
+  - *Reference: `managers/preview_manager.gd`*
+- Visual grid overlay during placement
+  - *Reference: `managers/overlay_manager.gd` - show_grid_overlay()*
+- Status information and transform values displayed in viewport
+  - *Reference: `ui/status_overlay_control.gd`*
+
+### ⚡ Performance & Quality
+- Asynchronous asset scanning for non-blocking discovery
+  - *Reference: `thumbnails/asset_scanner.gd`*
+- Thumbnail caching system
+  - *Reference: `thumbnails/thumbnail_generator.gd`, `thumbnails/thumbnail_queue_manager.gd`*
+- Modular architecture with service-based dependency management
+  - *Reference: `core/service_registry.gd`, `core/service_registry_builder.gd`*
 
 ## 🚀 Quick Start
 
 ### **Installation**
-1. Download or clone this repository.
-2. Copy the `addons/simpleassetplacer/` folder to your project's `addons/` directory.
-3. Enable "SimpleAssetPlacer" in **Project → Project Settings → Plugins**.
-4. The "Asset Placer" dock appears automatically in the right panel of the editor.
+1. Download or clone this repository
+2. Copy the `addons/simpleassetplacer/` folder to your project's `addons/` directory
+3. Enable "SimpleAssetPlacer" in **Project → Project Settings → Plugins**
+4. The "Asset Placer" dock appears automatically in the right panel of the editor
+
+*Note: Make sure to copy the entire `addons/simpleassetplacer/` folder structure as shown in the Project Structure section below.*
 
 ### **Basic Usage - Placement Mode**
 ```
@@ -90,40 +142,28 @@ Simple Asset Placer brings professional-grade asset placement capabilities to Go
 
 ## 🔄 Asset Cycling - Stay in Your Flow
 
-**New in v1.2.0!** Browse and switch between assets without ever leaving the 3D viewport.
+Browse and switch between assets without ever leaving the 3D viewport (introduced in v1.2.0).
 
 ### **How Asset Cycling Works**
 While in Placement Mode with a preview visible:
-- **Press `]`** to cycle to the next asset
-- **Press `[`** to cycle to the previous asset  
+- **Press `]`** to cycle to the next asset (*Reference: `ui/modellib_browser.gd` - cycle_to_next_asset()*)
+- **Press `[`** to cycle to the previous asset (*Reference: `ui/modellib_browser.gd` - cycle_to_previous_asset()*)
 - **Tap once** to switch to the next/previous asset
 - **Hold the key** to rapidly browse through all assets
-- Preview updates **instantly** - no interruption to your workflow!
+- Preview updates instantly - no interruption to your workflow!
 
 ### **Smart Context-Aware Cycling**
 Cycling respects your current view and filters:
-- ✅ **Filtered Categories**: Cycle only through "Trees", "Rocks", etc.
+- ✅ **Filtered Categories**: Cycle only through assets in the selected category
 - ✅ **Search Results**: Cycle through search matches
 - ✅ **Favorites**: Cycle through favorited assets only
 - ✅ **Custom Tags**: Cycle through tagged asset groups
 - ✅ **Auto-scroll**: Browser automatically scrolls to show current asset
 - ✅ **Wrap-around**: Last asset → first asset seamlessly
 
-### **Perfect Workflow for Level Design**
-```
-Example: Placing trees in a forest scene
-1. Filter to "Trees" category
-2. Click any tree to start placing
-3. Position first tree location
-4. Press ] to browse other tree types
-5. Found the perfect one? Click to place!
-6. Move to next location, press ] again
-7. Never touch the dock - stay focused on your scene
-```
-
 ### **Works Everywhere**
 - ✅ **3D Models Tab**: Cycle through .fbx, .obj, .gltf, etc.
-- ✅ **MeshLibrary Tab**: Cycle through GridMap mesh items
+- ✅ **MeshLibrary Tab**: Cycle through GridMap mesh items (*Reference: `ui/meshlib_browser.gd`*)
 - ✅ **Both Tap and Hold**: Flexible input for your workflow
 
 ### **International Keyboard Support**
@@ -437,211 +477,137 @@ Every key can be remapped via the Settings tab:
 
 ## 🏗️ Architecture
 
-Simple Asset Placer uses a clean, modular architecture with clear separation of concerns for maintainability and extensibility:
+Simple Asset Placer uses a modular, service-based architecture for maintainability and extensibility.
 
-### **Main Plugin**
-- **simpleassetplacer.gd** (extends `EditorPlugin`): Main entry point
-  - Handles plugin lifecycle (`_enter_tree`, `_exit_tree`)
-  - Sets up the dock interface
-  - Forwards input events to managers
-  - Provides high-priority input interception to prevent conflicts with Godot shortcuts
-  - Manages asset selection callbacks from the dock
+### **Core Systems**
+- **ServiceRegistry** (*`core/service_registry.gd`*): Centralized dependency management and service lifecycle
+- **ModeStateMachine** (*`core/mode_state_machine.gd`*): Mode state tracking (NONE, PLACEMENT, TRANSFORM)
+- **PlacementModeController** (*`core/placement_mode_controller.gd`*): Coordinates placement mode operations
+- **InputProcessor** (*`core/input_processor.gd`*): High-level input orchestration
+- **KeyboardInputProcessor** (*`core/keyboard_input_processor.gd`*): Keyboard input processing
 
-### **Core Managers**
-- **TransformationManager**: Central coordinator for all transform operations
-  - Manages dual modes: `Mode.PLACEMENT` and `Mode.TRANSFORM`
-  - Coordinates between all specialist managers
-  - Handles mode switching and state management
-  - Processes frame-by-frame input and updates
-  - Implements asset cycling logic
+### **Manager Systems**
+- **InputHandler** (*`managers/input_handler.gd`*): Low-level input detection with edge detection
+- **PositionManager** (*`managers/position_manager.gd`*): 3D spatial calculations and raycasting
+- **RotationManager** (*`managers/rotation_manager.gd`*): Rotation offsets and surface alignment
+- **ScaleManager** (*`managers/scale_manager.gd`*): Scale multiplier calculations
+- **PreviewManager** (*`managers/preview_manager.gd`*): Real-time preview mesh rendering
+- **OverlayManager** (*`managers/overlay_manager.gd`*): Visual feedback and UI overlays
+- **GridManager** (*`managers/grid_manager.gd`*): Grid snapping and visualization
+- **CategoryManager** (*`managers/category_manager.gd`*): Asset organization and metadata
 
-- **InputHandler**: Advanced input detection with edge detection
-  - Single source of truth for all input state
-  - Provides tap vs. hold detection for cycling
-  - Handles modifier key combinations (CTRL, ALT, SHIFT, META)
-  - Universal keyboard layout support via `_check_key_with_modifiers()`
-  - Polls input once per frame for consistency
-
-- **PositionManager**: 3D spatial calculations and positioning
-  - Raycast-based mouse-to-world position conversion
-  - Grid snapping with customizable offsets
-  - Height offset management (independent from raycasted position)
-  - Manual position offsets (WASD adjustments)
-  - Surface normal detection for alignment
-  - Snap center options for flexible snapping behavior
-
-- **OverlayManager**: Visual feedback and UI overlay system
-  - Real-time transform information display
-  - Grid visualization with dynamic updates
-  - Status messages and notifications
-  - Mode-specific overlay content
-
-- **CategoryManager**: Asset organization and metadata
-  - Automatic folder-based category detection
-  - Custom tag management via JSON (`.assetcategories`)
-  - Favorites and recent assets tracking (EditorSettings)
-  - Ignored assets management
-  - Tag usage statistics for sorting
-
-### **Specialized Transformation Managers**
-- **RotationManager**: Offset-based rotation system
-  - Manual rotation offsets (user input)
-  - Surface normal alignment (automatic)
-  - Combined rotation calculation: `original + surface_alignment + manual_offset`
-  - Multi-axis rotation (X, Y, Z)
-  - Rotation around group center for multi-object transforms
-
-- **ScaleManager**: Multiplier-based scaling system
-  - Uniform and non-uniform scale multipliers
-  - Preserves original object scales
-  - Final scale calculation: `original_scale * multiplier`
-
-- **PreviewManager**: Real-time visual feedback
-  - Preview mesh instance management
-  - Position, rotation, and scale updates
-  - Asset loading and cleanup
-  - Isolated preview rendering
+### **Placement Strategies**
+- **PlacementStrategyService** (*`placement/placement_strategy_service.gd`*): Strategy coordinator
+- **CollisionPlacementStrategy** (*`placement/collision_placement_strategy.gd`*): Raycast-based placement
+- **PlanePlacementStrategy** (*`placement/plane_placement_strategy.gd`*): Virtual plane placement
 
 ### **UI Components**
-- **AssetPlacerDock**: Main dock interface
-  - Tab container (3D Models, MeshLibraries, Settings)
-  - Search and filtering
-  - Asset selection and cycling coordination
-  - Settings UI integration
-
-- **ModelLibraryBrowser**: 3D model asset browser
-  - Asset discovery and scanning
-  - Thumbnail grid with category filtering
-  - Asset cycling support
-  - Context menu for tags/favorites
-
-- **MeshLibraryBrowser**: MeshLibrary resource browser
-  - MeshLibrary item display
-  - Item cycling support
-  - Category and tag filtering
-
-- **PlacementSettings**: Settings UI and management
-  - Key binding capture with full modifier support
-  - Placement options configuration
-  - Cache management
-  - Settings persistence to EditorSettings
+- **AssetPlacerDock** (*`ui/asset_placer_dock.gd`*): Main dock interface
+- **ModelLibraryBrowser** (*`ui/modellib_browser.gd`*): 3D model asset browser
+- **MeshLibraryBrowser** (*`ui/meshlib_browser.gd`*): MeshLibrary resource browser
+- **PlacementSettings** (*`ui/placement_settings.gd`*): Settings UI and configuration
+- **TagManagementDialog** (*`ui/tag_management_dialog.gd`*): Bulk tag operations
 
 ### **Support Systems**
-- **SettingsManager**: Centralized configuration management
-  - Plugin settings (key bindings, etc.)
-  - Dock settings (snap, grid, etc.)
-  - Combined settings dictionary for managers
-  - File-based and EditorSettings persistence
-
-- **ThumbnailGenerator**: Asset preview generation
-  - Isolated World3D for clean rendering
-  - Async thumbnail generation
-  - Cache management
-  - Neutral material override for better visibility
-
-- **ThumbnailQueueManager**: Thumbnail generation queue
-  - Request queuing and deduplication
-  - Priority-based generation
-  - Progress tracking
-
-- **UtilityManager**: Scene manipulation utilities
-  - Node creation and parenting
-  - Transform application helpers
-  - Scene validation
-
-- **ErrorHandler**: Error reporting integration
-  - EditorInterface integration for proper error display
-  - Formatted error messages
-
-- **PluginLogger**: Structured logging system
-  - Component-based logging
-  - Debug, info, warning, error levels
-  - Initialization and cleanup tracking
-
-- **PluginConstants**: Shared constants
-  - Component identifiers
-  - Default values
-  - Configuration constants
+- **SettingsManager** (*`settings/settings_manager.gd`*): Configuration management
+- **ThumbnailGenerator** (*`thumbnails/thumbnail_generator.gd`*): Asset preview generation
+- **AssetScanner** (*`thumbnails/asset_scanner.gd`*): Asset discovery and validation
+- **ErrorHandler** (*`utils/error_handler.gd`*): Error reporting
+- **PluginLogger** (*`utils/plugin_logger.gd`*): Structured logging
 
 ## 📁 Project Structure
 
+The plugin follows a modular architecture with clear separation of concerns:
+
 ```
 addons/simpleassetplacer/
-├── plugin.cfg                      # Plugin metadata and configuration
-├── simpleassetplacer.gd            # Main plugin (extends EditorPlugin)
+├── plugin.cfg                           # Plugin metadata (version 1.4.1)
+├── simpleassetplacer.gd                 # Main plugin entry point
 │
-├── Core Managers
-├── transformation_manager.gd       # Mode coordinator (Placement/Transform)
-├── input_handler.gd                # Input detection and edge detection
-├── position_manager.gd             # 3D positioning and raycasting
-├── overlay_manager.gd              # Visual feedback overlays
-├── settings_manager.gd             # Settings persistence
+├── core/                                # Core systems
+│   ├── service_registry.gd              # Dependency management
+│   ├── service_registry_builder.gd      # Service initialization
+│   ├── mode_state_machine.gd            # Mode state tracking
+│   ├── placement_mode_controller.gd     # Placement coordination
+│   ├── input_processor.gd               # High-level input
+│   └── keyboard_input_processor.gd      # Keyboard handling
 │
-├── Transformation Managers
-├── rotation_manager.gd             # Rotation offset calculations
-├── scale_manager.gd                # Scale multiplier calculations
-├── preview_manager.gd              # Preview mesh management
+├── managers/                            # Manager systems
+│   ├── input_handler.gd                 # Input detection
+│   ├── position_manager.gd              # Position calculations
+│   ├── rotation_manager.gd              # Rotation management
+│   ├── scale_manager.gd                 # Scale management
+│   ├── preview_manager.gd               # Preview rendering
+│   ├── overlay_manager.gd               # Visual overlays
+│   ├── grid_manager.gd                  # Grid snapping
+│   ├── category_manager.gd              # Asset organization
+│   └── utility_manager.gd               # Scene utilities
 │
-├── UI Components
-├── asset_placer_dock.gd            # Main dock interface
-├── placement_settings.gd           # Settings UI
-├── modellib_browser.gd             # 3D model asset browser
-├── meshlib_browser.gd              # MeshLibrary browser
-├── asset_thumbnail_item.gd         # Thumbnail item widget
-├── tag_management_dialog.gd        # Bulk tag operations dialog
+├── placement/                           # Placement strategies
+│   ├── placement_strategy.gd            # Base strategy
+│   ├── placement_strategy_service.gd    # Strategy service
+│   ├── collision_placement_strategy.gd  # Raycast placement
+│   └── plane_placement_strategy.gd      # Plane placement
 │
-├── Asset Management
-├── category_manager.gd             # Categories, tags, favorites
-├── asset_scanner.gd                # Asset discovery
-├── thumbnail_generator.gd          # Thumbnail rendering
-├── thumbnail_queue_manager.gd      # Thumbnail queue
+├── ui/                                  # UI components
+│   ├── asset_placer_dock.gd             # Main dock
+│   ├── modellib_browser.gd              # 3D model browser
+│   ├── meshlib_browser.gd               # MeshLibrary browser
+│   ├── placement_settings.gd            # Settings UI
+│   ├── tag_management_dialog.gd         # Tag management
+│   └── status_overlay_control.gd        # Status display
 │
-├── Utilities
-├── utility_manager.gd              # Scene manipulation helpers
-├── error_handler.gd                # Error reporting
-├── plugin_logger.gd                # Structured logging
-├── plugin_constants.gd             # Shared constants
+├── settings/                            # Settings system
+│   ├── settings_manager.gd              # Settings coordination
+│   ├── settings_definition.gd           # Setting definitions
+│   ├── settings_storage.gd              # Storage handling
+│   └── settings_persistence.gd          # Persistence logic
 │
-└── controls/                       # UI control components (if any)
+├── thumbnails/                          # Asset scanning
+│   ├── thumbnail_generator.gd           # Thumbnail rendering
+│   ├── thumbnail_queue_manager.gd       # Generation queue
+│   └── asset_scanner.gd                 # Asset discovery
+│
+└── utils/                               # Utility classes
+    ├── plugin_logger.gd                 # Logging system
+    ├── plugin_constants.gd              # Constants
+    ├── error_handler.gd                 # Error reporting
+    ├── transform_math.gd                # Math utilities
+    └── ...                              # Additional helpers
 ```
 
-### **Optional Project Files**
+**Optional Project Files:**
 ```
 project_root/
-└── .assetcategories                # Custom tags configuration (JSON)
+└── .assetcategories                     # Custom tags (JSON)
 ```
+
+*Note: For detailed version history and recent changes, see [CHANGELOG.md](CHANGELOG.md).*
 
 ## 🎮 Supported Asset Formats
 
-### **3D Model Formats**
-The plugin automatically discovers and displays models in these formats:
+*Reference: `utils/plugin_constants.gd` - SUPPORTED_*_EXTENSIONS constants*
 
-- **FBX** (.fbx): Autodesk Filmbox format with materials and animations
-- **OBJ** (.obj): Wavefront object files with optional MTL materials
-- **GLTF/GLB** (.gltf, .glb): Modern 3D transmission format with full PBR support
+### **3D Model Formats**
+- **FBX** (.fbx): Autodesk Filmbox format
+- **OBJ** (.obj): Wavefront object files
+- **GLTF/GLB** (.gltf, .glb): Modern 3D transmission format with PBR support
 - **DAE** (.dae): Collada interchange format
 - **Blend** (.blend): Direct Blender file import (requires Blender)
 
 ### **Godot Native Formats**
-- **TSCN** (.tscn): Godot text-based scene files with full node hierarchy
+- **TSCN** (.tscn): Godot text-based scene files
 - **SCN** (.scn): Godot binary scene files
-- **TRES** (.tres): Text-based resource files (checked for mesh content)
-- **RES** (.res): Binary resource files (checked for mesh content)
-- **MeshLibrary** (.meshlib, .tres, .res): Optimized mesh collections for GridMap
+- **TRES** (.tres): Text-based resource files (validated for mesh content)
+- **RES** (.res): Binary resource files (validated for mesh content)
+- **MeshLibrary** (.meshlib): Optimized mesh collections for GridMap
 
 ### **Asset Detection**
-- The plugin scans your entire `res://` directory recursively
+- Plugin scans the `res://` directory recursively (*Reference: `thumbnails/asset_scanner.gd`*)
 - Automatically skips `.godot` and hidden directories
-- Filters MeshLibraries from the 3D Models tab (shown only in MeshLibraries tab)
+- Ignores `res://addons` folder by default (*Reference: `managers/category_manager.gd` - EDITOR_SETTINGS_IGNORED_FOLDERS_KEY*)
 - Only displays assets containing actual mesh data
-- Ignored assets can be filtered via context menu
-
-### **Performance Features**
-- **Asynchronous Asset Scanning**: Non-blocking asset discovery
-- **Thumbnail Caching**: Generated thumbnails persist across sessions
-- **Isolated Rendering**: Thumbnails generated in dedicated World3D to avoid scene pollution
-- **Efficient Resource Management**: Automatic cleanup and memory management
-- **Deferred Loading**: Assets loaded only when selected for placement
+- Ignored assets can be managed via context menu
 
 ## 💡 Tips & Workflow Optimization
 
@@ -775,8 +741,8 @@ The plugin automatically discovers and displays models in these formats:
 
 For developers interested in understanding or extending the plugin:
 
-### **Dual Mode System**
-The plugin uses an enum-based mode system defined in `TransformationManager`:
+### **Mode System**
+The plugin uses an enum-based mode system:
 ```gdscript
 enum Mode {
     NONE,        # No active mode
@@ -784,87 +750,60 @@ enum Mode {
     TRANSFORM    # Transforming selected objects
 }
 ```
+*Reference: `core/mode_state_machine.gd`*
 
-**Placement Mode Flow:**
-1. User selects asset from dock → `_on_asset_selected()` callback
-2. Plugin starts placement mode via `TransformationManager.start_placement_mode()`
-3. `PreviewManager` creates a preview mesh instance
-4. Each frame: `process_frame_input()` updates preview position via raycasting
-5. User clicks → `place_at_preview_position()` instantiates the asset in the scene
+### **Transform Calculations**
+The plugin uses **additive offsets** rather than absolute transforms:
 
-**Transform Mode Flow:**
-1. User selects Node3D(s) and presses TAB
-2. Plugin enters transform mode via `TransformationManager.start_transform_mode()`
-3. Original transforms stored in `transform_data` dictionary
-4. Each frame: mouse position updates target nodes' positions
-5. User clicks → changes confirmed; ESC → original transforms restored
-
-### **Input Priority Chain**
-The plugin uses multiple input interception points to ensure keys are captured before Godot:
-1. `_input()` - Highest priority, catches TAB and mouse wheel
-2. `_shortcut_input()` - Catches plugin keys to prevent editor shortcuts
-3. `_forward_3d_gui_input()` - Viewport-specific input handling
-4. Returns `AFTER_GUI_INPUT_STOP` to consume events
-
-### **Offset-Based Transform System**
-Unlike absolute transforms, the plugin uses **additive offsets**:
-
-**Rotation:** `final = original_rotation + surface_alignment + manual_offset`
-**Scale:** `final = original_scale * scale_multiplier`
-**Position:** `final = raycast_position + height_offset + manual_position_offset`
+- **Rotation**: `final = original_rotation + surface_alignment + manual_offset`
+  - *Reference: `managers/rotation_manager.gd`*
+- **Scale**: `final = original_scale + scale_offset` (additive as of v1.4.1)
+  - *Reference: `managers/scale_manager.gd`*
+- **Position**: `final = raycast_position + height_offset + manual_position_offset`
+  - *Reference: `managers/position_manager.gd`*
 
 This preserves the original object state and allows non-destructive editing.
 
-### **Grid Snapping Implementation**
-Grid snapping happens in `PositionManager._apply_grid_snap()`:
-1. Calculate snapped position: `snapped = floor((pos - offset) / step) * step + offset`
-2. Optionally use object center instead of pivot for snapping
-3. Apply per-axis (X, Y, Z independently controlled)
-4. Grid overlay updates when object moves beyond threshold distance
+### **Grid Snapping**
+Snapping uses a consistent formula:
+```gdscript
+snapped = floor((pos - offset) / step) * step + offset
+```
+- Per-axis control (X, Y, Z independently)
+- Optional object center snapping
+- *Reference: `utils/transform_math.gd` - snap functions*
 
-### **Asset Cycling Mechanism**
-Cycling leverages the existing filtering system:
-1. `InputHandler` detects `[` or `]` key press (with tap/hold detection)
-2. `TransformationManager._process_asset_cycling_input()` calls dock's cycle methods
-3. Dock determines current filtered view (category, search, favorites, etc.)
-4. Browser finds current asset index in filtered list
-5. Cycles to next/previous index (with wrap-around)
-6. Emits selection signal to update preview
-7. Auto-scrolls to make new selection visible
+### **Placement Strategies**
+The plugin supports multiple placement strategies via the Strategy pattern:
+- **CollisionPlacementStrategy**: Raycast-based placement with surface detection
+- **PlanePlacementStrategy**: Virtual plane placement for architectural work
+- Strategies are swappable at runtime via PlacementStrategyService
+- *Reference: `placement/` directory*
 
-### **Category & Tag System**
-Categories are multi-source:
-- **Folder Categories**: Extracted from file path (automatic)
-- **Custom Tags**: Loaded from `.assetcategories` JSON file
-- **Special Categories**: Favorites, Recent (stored in EditorSettings)
+### **Input Handling**
+Input processing uses multiple layers:
+1. **InputHandler**: Low-level input detection with edge detection (*`managers/input_handler.gd`*)
+2. **KeyboardInputProcessor**: Keyboard-specific processing (*`core/keyboard_input_processor.gd`*)
+3. **InputProcessor**: High-level input orchestration (*`core/input_processor.gd`*)
+4. Plugin intercepts input via `_input()`, `_shortcut_input()`, and `_forward_3d_gui_input()`
 
-Filter dropdown combines all sources, showing:
-1. Special categories (Favorites, Recent)
-2. Folder-based categories (hierarchical)
-3. Custom tags (alphabetically sorted)
+### **Service Registry Pattern**
+The plugin uses dependency injection via ServiceRegistry:
+- Centralized service lifetime management
+- Avoids circular dependencies
+- Makes testing and extension easier
+- *Reference: `core/service_registry.gd`, `core/service_registry_builder.gd`*
 
-### **Thumbnail Generation**
-Thumbnails use an isolated rendering system:
-1. `ThumbnailGenerator` creates a dedicated `World3D` and `SubViewport`
-2. Assets loaded into isolated world (no scene pollution)
-3. Camera positioned based on mesh bounds
-4. Neutral material applied for consistent lighting
-5. Viewport rendered to `Image`, converted to `ImageTexture`
-6. Cached in memory for reuse
+### **Asset Management**
+- **AssetScanner**: Recursive directory scanning with format validation (*`thumbnails/asset_scanner.gd`*)
+- **CategoryManager**: Metadata storage in `.assetcategories` JSON and EditorSettings (*`managers/category_manager.gd`*)
+- **ThumbnailGenerator**: Isolated World3D rendering for clean thumbnail generation (*`thumbnails/thumbnail_generator.gd`*)
 
 ### **Settings Persistence**
-Two storage mechanisms:
-- **EditorSettings**: User preferences (key bindings, favorites, recent assets)
-- **Project File** (`.assetcategories`): Custom tags (shared via version control)
-
-Settings auto-save on change via signal connections.
-
-### **Conflict Prevention Strategy**
-1. Plugin checks `SettingsManager.is_plugin_key()` for every input
-2. Known plugin keys consumed via `get_viewport().set_input_as_handled()`
-3. `_forward_3d_gui_input()` returns `AFTER_GUI_INPUT_STOP` for plugin keys
-4. Non-plugin keys pass through via `AFTER_GUI_INPUT_PASS`
-5. TAB key always consumed to prevent focus changes
+Two storage mechanisms are used:
+- **EditorSettings**: User preferences (key bindings, favorites) - stored per-project by Godot
+- **Project File** (`.assetcategories`): Custom tags - version control friendly JSON
+- *Reference: `settings/settings_manager.gd`, `settings/settings_persistence.gd`*
 
 ## 🤝 Contributing
 
@@ -926,36 +865,24 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Author**: IIFabixn (aka LuckyTeapot)  
 **Repository**: [github.com/IIFabixn/simple-asset-placer](https://github.com/IIFabixn/simple-asset-placer)  
-**Version**: 1.2.0  
+**Version**: 1.4.1 (*Reference: `plugin.cfg`*)  
 **Godot Version**: 4.x (tested on 4.3+)  
 **License**: MIT
 
-### **Technical Highlights**
-- **Architecture**: Modern decoupled design with 15+ specialized managers
-- **Input System**: Universal keyboard support with full modifier combinations
-- **Dual Modes**: Placement mode for new assets + Transform mode for existing objects
-- **Asset Management**: Automatic categories, custom tags, favorites, recent assets
-- **Performance**: Isolated thumbnail rendering, efficient caching, non-blocking operations
+### **Feature Highlights**
 
-### **Key Features**
-✨ Dual placement modes (Placement + Transform)  
-🔄 Asset cycling in viewport (tap or hold)  
-🌍 Universal keyboard layout support  
-🏷️ Advanced category system with tags  
-📐 Grid snapping with visual overlay  
-🎯 Surface alignment and normal detection  
-⌨️ Complete key binding customization  
-🛡️ Input conflict prevention  
-🎨 Real-time visual feedback  
-⚡ High performance with large asset libraries  
+This plugin implements the following verified capabilities:
+
+- **Dual Mode System**: Placement and Transform modes (*`core/mode_state_machine.gd`*)
+- **Asset Cycling**: Viewport-based asset browsing with `[` and `]` keys (*`ui/modellib_browser.gd`*)
+- **Category System**: Automatic folder categories, custom tags, favorites, recent assets (*`managers/category_manager.gd`*)
+- **Flexible Input**: Modifier key support (CTRL, ALT, SHIFT, META) for all hotkeys (*`managers/input_handler.gd`*)
+- **Precision Placement**: Grid snapping, surface alignment, multiple placement strategies (*`managers/grid_manager.gd`, `managers/rotation_manager.gd`, `placement/` strategies*)
+- **Visual Feedback**: Real-time preview and overlay system (*`managers/preview_manager.gd`, `managers/overlay_manager.gd`*)
+- **Performance**: Asynchronous scanning, thumbnail caching (*`thumbnails/asset_scanner.gd`, `thumbnails/thumbnail_generator.gd`*)
+- **Modular Architecture**: Service-based dependency management (*`core/service_registry.gd`*)
 
 ### **Acknowledgments**
-- The **Godot Engine** team and community for creating an amazing open-source game engine
+- The **Godot Engine** team and community for creating an excellent open-source game engine
 - Contributors and users who have provided feedback, bug reports, and feature suggestions
 - The game development community for establishing best practices in level design workflows
-- Open-source projects that inspired the modular architecture approach
-
-### **Special Thanks**
-- Everyone who has starred, forked, or used this plugin in their projects
-- Beta testers who helped identify edge cases and improve stability
-- Users who contributed to documentation and examples

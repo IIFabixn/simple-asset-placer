@@ -51,10 +51,14 @@ const DEFAULT_HEIGHT_STEP: float = 0.1
 const FINE_HEIGHT_INCREMENT: float = 0.01
 const LARGE_HEIGHT_INCREMENT: float = 1.0
 
-## Position Adjustment Settings
-const DEFAULT_POSITION_INCREMENT: float = 0.1
-const FINE_POSITION_INCREMENT: float = 0.01
-const LARGE_POSITION_INCREMENT: float = 1.0
+## Position Adjustment Settings (WASD keyboard movement)
+const DEFAULT_POSITION_INCREMENT: float = 1.0  # Match typical grid snap size
+const FINE_POSITION_INCREMENT: float = 0.1     # Precise adjustments with CTRL
+const LARGE_POSITION_INCREMENT: float = 5.0    # Large movements with ALT
+
+## Increment Modifiers (for keyboard-based transforms)
+const FINE_SENSITIVITY_MULTIPLIER: float = 0.1  # CTRL modifier makes adjustments 10x more precise
+const LARGE_SENSITIVITY_MULTIPLIER: float = 2.0  # ALT modifier makes adjustments 2x larger
 
 ## Preview Settings
 const DEFAULT_PREVIEW_OPACITY: float = 0.6

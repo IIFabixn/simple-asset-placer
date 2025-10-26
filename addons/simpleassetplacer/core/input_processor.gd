@@ -72,7 +72,7 @@ func handle_mouse_wheel(event: InputEventMouseButton) -> bool:
 ## Navigation Input
 
 func handle_navigation(nav_input, ui_locked: bool, focus_owner: Control, state: TransformState) -> void:
-	"""Handle navigation keys (Tab, ESC, P)"""
+	"""Handle navigation keys (Tab, ESC, P, [ / ])"""
 	if not nav_input:
 		return
 	
@@ -80,6 +80,10 @@ func handle_navigation(nav_input, ui_locked: bool, focus_owner: Control, state: 
 	if _services.input_handler.should_cycle_placement_mode():
 		if _services.mode_state_machine.is_any_mode_active():
 			_cycle_placement_strategy(state)
+	
+	# Handle asset cycling ([ / ] keys) - only works in placement mode
+	if _services.mode_state_machine.is_placement_mode():
+		_handle_asset_cycling(nav_input, state)
 	
 	# Other navigation requires UI not locked
 	if ui_locked:
@@ -286,6 +290,27 @@ func _cycle_placement_strategy(state: TransformState) -> void:
 	
 	var strategy_name = placement_service.get_active_strategy_name()
 	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Placement mode: " + strategy_name)
+
+func _handle_asset_cycling(nav_input, state: TransformState) -> void:
+	"""Handle asset cycling input ([ / ] keys) during placement mode"""
+	if not nav_input:
+		return
+	
+	# Get the dock reference to call cycling methods
+	var dock = state.session.placement_data.get("dock_reference", null)
+	if not dock:
+		dock = state.dock_reference
+	
+	if not dock:
+		return
+	
+	# Check for cycling input
+	if nav_input.cycle_next_asset:
+		if dock.has_method("cycle_next_asset"):
+			dock.cycle_next_asset()
+	elif nav_input.cycle_previous_asset:
+		if dock.has_method("cycle_previous_asset"):
+			dock.cycle_previous_asset()
 
 func _handle_tab_activation(state: TransformState, ignore_focus_lock: bool) -> void:
 	"""Handle Tab key to enter transform mode"""

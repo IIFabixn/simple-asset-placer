@@ -326,6 +326,7 @@ func _update_overlay_display(mode: int, state: TransformState) -> void:
 	var node_name = ""
 	var rotation = state.values.surface_alignment_rotation + state.values.manual_rotation_offset
 	var position = state.values.position + state.values.manual_position_offset
+	var scale_value = state.values.scale_multiplier
 	
 	if mode == ModeStateMachine.Mode.TRANSFORM:
 		var nodes = state.session.transform_data.get("target_nodes", [])
@@ -334,12 +335,13 @@ func _update_overlay_display(mode: int, state: TransformState) -> void:
 			if nodes[0] and is_instance_valid(nodes[0]):
 				rotation = nodes[0].rotation
 				position = nodes[0].global_position  # Use actual node position in transform mode
+				scale_value = nodes[0].scale.x  # Use actual node scale in transform mode
 		elif nodes.size() > 1:
 			node_name = "%d nodes" % nodes.size()
 			if nodes[0] and is_instance_valid(nodes[0]):
 				rotation = nodes[0].rotation
 				position = nodes[0].global_position  # Use actual node position in transform mode
-	var scale_value = state.values.scale_multiplier
+				scale_value = nodes[0].scale.x  # Use actual node scale in transform mode
 	
 	var plane_normal = Vector3.UP
 	if _services.position_manager:

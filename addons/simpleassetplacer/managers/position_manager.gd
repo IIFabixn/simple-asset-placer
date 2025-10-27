@@ -305,6 +305,39 @@ func _apply_surface_offset(hit_position: Vector3, surface_normal: Vector3, trans
 	
 	return hit_position + surface_normal * offset
 
+func _transform_aabb(aabb: AABB, transform: Transform3D) -> AABB:
+	"""Transform an AABB by a Transform3D
+	
+	In Godot 4.x, AABB doesn't have a transformed() method, so we manually
+	transform all 8 corners and create a new AABB that contains them all.
+	"""
+	if aabb.size == Vector3.ZERO:
+		return aabb
+	
+	# Get all 8 corners of the AABB
+	var corners = [
+		aabb.position,
+		aabb.position + Vector3(aabb.size.x, 0, 0),
+		aabb.position + Vector3(0, aabb.size.y, 0),
+		aabb.position + Vector3(0, 0, aabb.size.z),
+		aabb.position + Vector3(aabb.size.x, aabb.size.y, 0),
+		aabb.position + Vector3(aabb.size.x, 0, aabb.size.z),
+		aabb.position + Vector3(0, aabb.size.y, aabb.size.z),
+		aabb.position + aabb.size
+	]
+	
+	# Transform all corners
+	var transformed_corners = []
+	for corner in corners:
+		transformed_corners.append(transform * corner)
+	
+	# Create new AABB from transformed corners
+	var result = AABB(transformed_corners[0], Vector3.ZERO)
+	for i in range(1, transformed_corners.size()):
+		result = result.expand(transformed_corners[i])
+	
+	return result
+
 func _get_combined_mesh_bounds(node: Node) -> AABB:
 	"""Get combined AABB of all visual instances in local space
 	
@@ -331,7 +364,7 @@ func _get_combined_mesh_bounds(node: Node) -> AABB:
 			if child_aabb.size != Vector3.ZERO:
 				# Transform child AABB by its local transform
 				if child is Node3D and child.transform != Transform3D.IDENTITY:
-					child_aabb = child_aabb.transformed(child.transform)
+					child_aabb = _transform_aabb(child_aabb, child.transform)
 				
 				if not has_bounds:
 					combined = child_aabb
@@ -344,7 +377,7 @@ func _get_combined_mesh_bounds(node: Node) -> AABB:
 			if child_bounds.size != Vector3.ZERO:
 				# Transform by child's local transform
 				if child.transform != Transform3D.IDENTITY:
-					child_bounds = child_bounds.transformed(child.transform)
+					child_bounds = _transform_aabb(child_bounds, child.transform)
 				
 				if not has_bounds:
 					combined = child_bounds

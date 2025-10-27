@@ -86,15 +86,17 @@ func start_preview_mesh(mesh: Mesh, settings: Dictionary = {}) -> void:
 	_preview_mesh.mesh = mesh
 	# Don't override materials - preserve original mesh appearance
 	# Instead, use transparency property to make it semi-transparent
+	# Apply transparency to mesh
 	_preview_mesh.transparency = 1.0 - _preview_opacity  # transparency: 0.0 = opaque, 1.0 = fully transparent
 	_preview_mesh.name = "AssetPlacerPreview"
 	_preview_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_preview_mesh.layers = 1  # Default render layer
 	
-	# Add to scene first
-	current_scene.add_child(_preview_mesh)
+	# Disable collision on preview to prevent raycast interference
+	_disable_collision_on_preview(_preview_mesh)
 	
-	# Apply initial transform (after node is in tree)
+	# Add to scene first
+	current_scene.add_child(_preview_mesh)	# Apply initial transform (after node is in tree)
 	_preview_mesh.global_position = _current_position
 	_preview_mesh.rotation = _current_rotation
 	_preview_mesh.scale = _current_scale
@@ -152,6 +154,9 @@ func start_preview_asset(asset_path: String, settings: Dictionary = {}) -> void:
 	# Apply transparency to all mesh instances
 	_apply_preview_transparency_to_children(_preview_mesh)
 	
+	# Disable collision on preview to prevent raycast interference
+	_disable_collision_on_preview(_preview_mesh)
+	
 	# Add to scene first
 	current_scene.add_child(_preview_mesh)
 	
@@ -175,6 +180,17 @@ func _apply_preview_transparency_to_children(node: Node) -> void:
 	
 	for child in node.get_children():
 		_apply_preview_transparency_to_children(child)
+
+func _disable_collision_on_preview(node: Node) -> void:
+	"""Disable collision on all CollisionObject3D nodes in the preview hierarchy"""
+	if node is CollisionObject3D:
+		# Disable collision detection by setting collision layer and mask to 0
+		node.collision_layer = 0
+		node.collision_mask = 0
+		PluginLogger.debug("PreviewManager", "Disabled collision on preview node: %s" % node.name)
+	
+	for child in node.get_children():
+		_disable_collision_on_preview(child)
 
 ## Preview Updates
 

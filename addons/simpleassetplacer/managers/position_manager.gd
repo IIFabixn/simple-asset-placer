@@ -37,6 +37,7 @@ const PlacementStrategyService = preload("res://addons/simpleassetplacer/placeme
 const PlacementStrategy = preload("res://addons/simpleassetplacer/placement/placement_strategy.gd")
 const IncrementCalculator = preload("res://addons/simpleassetplacer/utils/increment_calculator.gd")
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
+const TransformMath = preload("res://addons/simpleassetplacer/utils/transform_math.gd")
 
 # === SERVICE REGISTRY ===
 
@@ -111,21 +112,29 @@ func update_position_from_mouse(state: TransformState, camera: Camera3D, mouse_p
 	state.placement.last_raycast_xz = Vector2(result.position.x, result.position.z)
 	state.placement.is_initial_position = false
 	
-	# Calculate final position: base position + manual offset
+	# Apply surface offset to prevent objects from sinking into surfaces
+	# This is critical for negative normals (like -Z surfaces)
+	var surface_offset_position = _apply_surface_offset(state.values.base_position, state.values.surface_normal)
+	
+	# Calculate final position: surface offset position + manual offset
 	# Manual offset is controlled by WASD (X/Z), Q/E (Y), and potentially XYZ keys
-	state.values.target_position = state.values.base_position
+	state.values.target_position = surface_offset_position
 	
 	# Apply grid snapping if enabled (XZ or Y or both)
 	if state.snap.snap_enabled or state.snap.snap_y_enabled:
-		# In Transform mode, preserve the Y position (controlled by Q/E keys only)
-		# Only snap XZ axes for horizontal positioning
 		if state.is_in_transform_mode():
-			var preserved_y = state.values.target_position.y
-			state.values.target_position = _apply_grid_snap_xz_only(state, state.values.target_position)
-			state.values.target_position.y = preserved_y  # Restore Y position
+			# In Transform mode: snap the collision point properly with surface awareness
+			if state.snap.snap_y_enabled:
+				# Y Snap is ON: apply full grid snapping (including Y axis)
+				state.values.target_position = _apply_surface_aware_grid_snap(state, state.values.target_position, state.values.surface_normal)
+			else:
+				# Y Snap is OFF: only snap XZ axes (preserve Y for Q/E keys)
+				var preserved_y = state.values.target_position.y
+				state.values.target_position = _apply_surface_aware_grid_snap_xz_only(state, state.values.target_position, state.values.surface_normal)
+				state.values.target_position.y = preserved_y  # Restore Y position
 		else:
-			# Placement mode: snap all axes as configured
-			state.values.target_position = _apply_grid_snap(state, state.values.target_position)
+			# Placement mode: snap all axes as configured with surface awareness
+			state.values.target_position = _apply_surface_aware_grid_snap(state, state.values.target_position, state.values.surface_normal)
 	
 	# Update current position
 	# NOTE: Do NOT add manual_position_offset here!
@@ -158,21 +167,21 @@ func _apply_grid_snap(state: TransformState, pos: Vector3) -> Vector3:
 		var offset_x = state.snap.snap_offset.x
 		if state.snap.snap_center_x:
 			offset_x += effective_step_x * 0.5
-		snapped_pos.x = snappedf(pos.x - offset_x, effective_step_x) + offset_x
-	
+		snapped_pos.x = TransformMath.snap_value(pos.x, effective_step_x, offset_x)
+
 	# Apply Z-axis snapping (only if snap_enabled and valid step)
 	if state.snap.snap_enabled and state.snap.snap_step > 0:
 		var offset_z = state.snap.snap_offset.z
 		if state.snap.snap_center_z:
 			offset_z += effective_step_z * 0.5
-		snapped_pos.z = snappedf(pos.z - offset_z, effective_step_z) + offset_z
-	
+		snapped_pos.z = TransformMath.snap_value(pos.z, effective_step_z, offset_z)
+
 	# Handle Y-axis if enabled with optional center offset
 	if state.snap.snap_y_enabled and state.snap.snap_y_step > 0:
 		var offset_y = state.snap.snap_offset.y
 		if state.snap.snap_center_y:
 			offset_y += effective_step_y * 0.5
-		snapped_pos.y = snappedf(pos.y - offset_y, effective_step_y) + offset_y
+		snapped_pos.y = TransformMath.snap_value(pos.y, effective_step_y, offset_y)
 	
 	return snapped_pos
 
@@ -184,23 +193,189 @@ func _apply_grid_snap_xz_only(state: TransformState, pos: Vector3) -> Vector3:
 	var effective_step_x = state.snap.snap_step if not state.snap.use_half_step else state.snap.snap_step * 0.5
 	var effective_step_z = state.snap.snap_step if not state.snap.use_half_step else state.snap.snap_step * 0.5
 	
+	PluginLogger.debug("PositionManager", "XZ snap: pos=%v, step=%f, half_step=%s, offset=%v" % [pos, state.snap.snap_step, state.snap.use_half_step, state.snap.snap_offset])
+	
 	# Apply X-axis snapping (only if snap_enabled and valid step)
 	if state.snap.snap_enabled and state.snap.snap_step > 0:
 		var offset_x = state.snap.snap_offset.x
 		if state.snap.snap_center_x:
 			offset_x += effective_step_x * 0.5
-		snapped_pos.x = snappedf(pos.x - offset_x, effective_step_x) + offset_x
-	
+		snapped_pos.x = TransformMath.snap_value(pos.x, effective_step_x, offset_x)
+
 	# Apply Z-axis snapping (only if snap_enabled and valid step)
 	if state.snap.snap_enabled and state.snap.snap_step > 0:
 		var offset_z = state.snap.snap_offset.z
 		if state.snap.snap_center_z:
 			offset_z += effective_step_z * 0.5
-		snapped_pos.z = snappedf(pos.z - offset_z, effective_step_z) + offset_z
+		snapped_pos.z = TransformMath.snap_value(pos.z, effective_step_z, offset_z)
 	
 	# NOTE: Y-axis is NOT snapped in this function - it's controlled by Q/E keys in Transform mode
 	
 	return snapped_pos
+
+func _apply_surface_aware_grid_snap(state: TransformState, pos: Vector3, surface_normal: Vector3) -> Vector3:
+	"""Apply grid snapping with surface normal awareness
+	
+	For side surfaces, snaps away from the surface to prevent penetration.
+	For top/bottom surfaces, uses regular nearest-neighbor snapping.
+	"""
+	var snapped_pos = pos
+	
+	# Determine effective snap steps
+	var effective_step_x = state.snap.snap_step if not state.snap.use_half_step else state.snap.snap_step * 0.5
+	var effective_step_y = state.snap.snap_y_step if state.snap.snap_y_step > 0 else effective_step_x
+	var effective_step_z = state.snap.snap_step if not state.snap.use_half_step else state.snap.snap_step * 0.5
+	
+	if state.snap.use_half_step and state.snap.snap_y_step > 0:
+		effective_step_y = state.snap.snap_y_step * 0.5
+	
+	# Apply X-axis snapping
+	if state.snap.snap_enabled and state.snap.snap_step > 0:
+		var offset_x = state.snap.snap_offset.x
+		if state.snap.snap_center_x:
+			offset_x += effective_step_x * 0.5
+		
+		# Use directional snapping for X if surface normal has significant X component
+		if abs(surface_normal.x) > 0.5:
+			snapped_pos.x = _snap_directional(pos.x, effective_step_x, offset_x, surface_normal.x)
+		else:
+			snapped_pos.x = TransformMath.snap_value(pos.x, effective_step_x, offset_x)
+	
+	# Apply Y-axis snapping
+	if state.snap.snap_y_enabled and effective_step_y > 0:
+		var offset_y = state.snap.snap_offset.y
+		if state.snap.snap_center_y:
+			offset_y += effective_step_y * 0.5
+		
+		# Y-axis typically uses regular snapping (objects sit on top surfaces)
+		snapped_pos.y = TransformMath.snap_value(pos.y, effective_step_y, offset_y)
+	
+	# Apply Z-axis snapping  
+	if state.snap.snap_enabled and state.snap.snap_step > 0:
+		var offset_z = state.snap.snap_offset.z
+		if state.snap.snap_center_z:
+			offset_z += effective_step_z * 0.5
+		
+		# Use directional snapping for Z if surface normal has significant Z component
+		if abs(surface_normal.z) > 0.5:
+			snapped_pos.z = _snap_directional(pos.z, effective_step_z, offset_z, surface_normal.z)
+		else:
+			snapped_pos.z = TransformMath.snap_value(pos.z, effective_step_z, offset_z)
+	
+	return snapped_pos
+
+func _apply_surface_aware_grid_snap_xz_only(state: TransformState, pos: Vector3, surface_normal: Vector3) -> Vector3:
+	"""Apply surface-aware grid snapping only to XZ axes (for Transform mode where Y is controlled by Q/E keys)"""
+	var snapped_pos = pos
+	
+	# Determine effective snap steps
+	var effective_step_x = state.snap.snap_step if not state.snap.use_half_step else state.snap.snap_step * 0.5
+	var effective_step_z = state.snap.snap_step if not state.snap.use_half_step else state.snap.snap_step * 0.5
+	
+	# Apply X-axis snapping
+	if state.snap.snap_enabled and state.snap.snap_step > 0:
+		var offset_x = state.snap.snap_offset.x
+		if state.snap.snap_center_x:
+			offset_x += effective_step_x * 0.5
+		
+		# Use directional snapping for X if surface normal has significant X component
+		if abs(surface_normal.x) > 0.5:
+			snapped_pos.x = _snap_directional(pos.x, effective_step_x, offset_x, surface_normal.x)
+		else:
+			snapped_pos.x = TransformMath.snap_value(pos.x, effective_step_x, offset_x)
+	
+	# Apply Z-axis snapping  
+	if state.snap.snap_enabled and state.snap.snap_step > 0:
+		var offset_z = state.snap.snap_offset.z
+		if state.snap.snap_center_z:
+			offset_z += effective_step_z * 0.5
+		
+		# Use directional snapping for Z if surface normal has significant Z component
+		if abs(surface_normal.z) > 0.5:
+			snapped_pos.z = _snap_directional(pos.z, effective_step_z, offset_z, surface_normal.z)
+		else:
+			snapped_pos.z = TransformMath.snap_value(pos.z, effective_step_z, offset_z)
+	
+	return snapped_pos
+
+func _snap_directional(value: float, step: float, offset: float, normal_component: float) -> float:
+	"""Snap a value directionally based on surface normal
+	
+	For negative normals: snap towards lower values (use floor)
+	For positive normals: snap towards higher values (use ceil)
+	This prevents objects from snapping into surfaces.
+	"""
+	if step <= 0.0:
+		return value
+	
+	var adjusted = value - offset
+	var grid_pos = adjusted / step
+	
+	# Choose snapping direction based on normal
+	var snapped_grid_pos: float
+	if normal_component < 0:
+		# Surface facing negative direction: snap to lower grid values (floor)
+		snapped_grid_pos = floor(grid_pos)
+	else:
+		# Surface facing positive direction: snap to higher grid values (ceil)  
+		snapped_grid_pos = ceil(grid_pos)
+	
+	var result = snapped_grid_pos * step + offset
+	
+	PluginLogger.debug("PositionManager", "Directional snap: val=%f, step=%f, normal=%f, grid_pos=%f, snapped=%f, result=%f" % 
+		[value, step, normal_component, grid_pos, snapped_grid_pos, result])
+	
+	return result
+
+func _apply_surface_offset(hit_position: Vector3, surface_normal: Vector3) -> Vector3:
+	"""Apply surface offset to prevent objects from sinking into surfaces
+	
+	Different logic for different surface orientations:
+	- Top surfaces (+Y normal): Object sits ON surface (minimal offset)
+	- Side surfaces (±X, ±Z normals): Object placed AGAINST surface (offset by half width)
+	- Bottom surfaces (-Y normal): Object hangs FROM surface (offset by height)
+	"""
+	# Get preview bounds to determine object size
+	var bounds = AABB()
+	if _services and _services.preview_manager:
+		bounds = _services.preview_manager.get_preview_bounds()
+	
+	var offset_distance = 0.0
+	
+	# Determine surface orientation and calculate appropriate offset
+	var normal_abs = surface_normal.abs()
+	var is_top_surface = surface_normal.y > 0.8  # Pointing mostly up
+	var is_bottom_surface = surface_normal.y < -0.8  # Pointing mostly down
+	var is_side_surface = normal_abs.y < 0.5  # Mostly horizontal normal
+	
+	if bounds.size != Vector3.ZERO:
+		if is_top_surface:
+			# Top surface: object sits on surface, minimal offset to prevent z-fighting
+			offset_distance = 0.001
+		elif is_bottom_surface:
+			# Bottom surface: object hangs from surface, offset by full height
+			offset_distance = bounds.size.y
+		elif is_side_surface:
+			# Side surface: object placed against surface, offset by half size in normal direction
+			var size_along_normal = abs(bounds.size.dot(normal_abs))
+			offset_distance = size_along_normal * 0.5
+		else:
+			# Angled surface: use half size along normal
+			var size_along_normal = abs(bounds.size.dot(normal_abs))
+			offset_distance = size_along_normal * 0.5
+	else:
+		# No bounds available, use minimal offset for any surface
+		offset_distance = 0.01
+	
+	# Move position along normal by calculated offset
+	var offset_position = hit_position + surface_normal * offset_distance
+	
+	PluginLogger.debug("PositionManager", "Surface offset: hit=%v, normal=%v, type=%s, offset_dist=%f, result=%v" % 
+		[hit_position, surface_normal, 
+		 "top" if is_top_surface else ("bottom" if is_bottom_surface else ("side" if is_side_surface else "angled")),
+		 offset_distance, offset_position])
+	
+	return offset_position
 
 ## Position Offset Management (Unified System)
 

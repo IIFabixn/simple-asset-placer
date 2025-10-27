@@ -98,8 +98,8 @@ transform = Transform3D(-0.5023689, 0, 0.86465335, 0, 1, 0, -0.86465335, 0, -0.5
 [node name="battlement-half_3" type="MeshInstance3D" parent="."]
 transform = Transform3D(0.91736615, 0, -0.39804438, 0, 1, 0, 0.39804438, 0, 0.91736615, 2, 0, -5)
 
-[node name="wall_window_2_2" type="Node3D" parent="." instance=ExtResource("9_884kg")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.9795027, 0.010023945, 11.003152)
+[node name="wall_window_2_3" parent="." instance=ExtResource("9_884kg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 7, 7.5)
 
-[node name="wall_window_2_3" type="Node3D" parent="." instance=ExtResource("9_884kg")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1.03, 10.99)
+[node name="wall_window_2" type="Node3D" parent="." instance=ExtResource("9_884kg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 6, 7.5)

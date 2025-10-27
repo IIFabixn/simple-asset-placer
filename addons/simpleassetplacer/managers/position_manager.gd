@@ -113,28 +113,30 @@ func update_position_from_mouse(state: TransformState, camera: Camera3D, mouse_p
 	state.placement.is_initial_position = false
 	
 	# Apply surface offset to prevent objects from sinking into surfaces
-	# This is critical for negative normals (like -Z surfaces)
-	var surface_offset_position = _apply_surface_offset(state.values.base_position, state.values.surface_normal)
+	# This gives us a clean position where the object sits properly on the surface
+	# Pass the transform target nodes for Transform Mode, or use preview for Placement Mode
+	var target_nodes_for_bounds = exclude_nodes if state.is_in_transform_mode() else []
+	var surface_offset_position = _apply_surface_offset(state.values.base_position, state.values.surface_normal, target_nodes_for_bounds)
 	
-	# Calculate final position: surface offset position + manual offset
-	# Manual offset is controlled by WASD (X/Z), Q/E (Y), and potentially XYZ keys
+	# Set the target position (will be snapped if snapping is enabled)
 	state.values.target_position = surface_offset_position
 	
-	# Apply grid snapping if enabled (XZ or Y or both)
+	# Apply standard grid snapping to the FINAL position (collision + surface offset)
+	# This ensures objects align with the grid while still sitting properly on surfaces
 	if state.snap.snap_enabled or state.snap.snap_y_enabled:
 		if state.is_in_transform_mode():
-			# In Transform mode: snap the collision point properly with surface awareness
+			# In Transform mode: handle Y snapping separately
 			if state.snap.snap_y_enabled:
-				# Y Snap is ON: apply full grid snapping (including Y axis)
-				state.values.target_position = _apply_surface_aware_grid_snap(state, state.values.target_position, state.values.surface_normal)
+				# Y Snap is ON: apply full grid snapping (all axes)
+				state.values.target_position = _apply_grid_snap(state, state.values.target_position)
 			else:
 				# Y Snap is OFF: only snap XZ axes (preserve Y for Q/E keys)
 				var preserved_y = state.values.target_position.y
-				state.values.target_position = _apply_surface_aware_grid_snap_xz_only(state, state.values.target_position, state.values.surface_normal)
+				state.values.target_position = _apply_grid_snap_xz_only(state, state.values.target_position)
 				state.values.target_position.y = preserved_y  # Restore Y position
 		else:
-			# Placement mode: snap all axes as configured with surface awareness
-			state.values.target_position = _apply_surface_aware_grid_snap(state, state.values.target_position, state.values.surface_normal)
+			# Placement mode: apply standard grid snapping to all enabled axes
+			state.values.target_position = _apply_grid_snap(state, state.values.target_position)
 	
 	# Update current position
 	# NOTE: Do NOT add manual_position_offset here!
@@ -193,8 +195,6 @@ func _apply_grid_snap_xz_only(state: TransformState, pos: Vector3) -> Vector3:
 	var effective_step_x = state.snap.snap_step if not state.snap.use_half_step else state.snap.snap_step * 0.5
 	var effective_step_z = state.snap.snap_step if not state.snap.use_half_step else state.snap.snap_step * 0.5
 	
-	PluginLogger.debug("PositionManager", "XZ snap: pos=%v, step=%f, half_step=%s, offset=%v" % [pos, state.snap.snap_step, state.snap.use_half_step, state.snap.snap_offset])
-	
 	# Apply X-axis snapping (only if snap_enabled and valid step)
 	if state.snap.snap_enabled and state.snap.snap_step > 0:
 		var offset_x = state.snap.snap_offset.x
@@ -213,169 +213,146 @@ func _apply_grid_snap_xz_only(state: TransformState, pos: Vector3) -> Vector3:
 	
 	return snapped_pos
 
-func _apply_surface_aware_grid_snap(state: TransformState, pos: Vector3, surface_normal: Vector3) -> Vector3:
-	"""Apply grid snapping with surface normal awareness
+func _apply_surface_offset(hit_position: Vector3, surface_normal: Vector3, transform_nodes: Array = []) -> Vector3:
+	"""Apply surface offset to place objects correctly on surfaces without clipping
 	
-	For side surfaces, snaps away from the surface to prevent penetration.
-	For top/bottom surfaces, uses regular nearest-neighbor snapping.
+	Works for both Placement Mode (using preview) and Transform Mode (using actual nodes).
+	
+	Args:
+		hit_position: The raycast hit position on the surface
+		surface_normal: The normal vector of the surface
+		transform_nodes: Array of nodes being transformed (for Transform Mode), empty for Placement Mode
+	
+	ALGORITHM:
+	1. Get the node(s) to calculate bounds from (preview for placement, actual nodes for transform)
+	2. Get local AABB and current rotation/scale
+	3. Transform all 8 corners by rotation and scale
+	4. Project onto surface normal to find how far object extends against the normal
+	5. Offset by that distance to prevent clipping
 	"""
-	var snapped_pos = pos
+	var target_node = null
+	var rotation = Vector3.ZERO
+	var scale = Vector3.ONE
 	
-	# Determine effective snap steps
-	var effective_step_x = state.snap.snap_step if not state.snap.use_half_step else state.snap.snap_step * 0.5
-	var effective_step_y = state.snap.snap_y_step if state.snap.snap_y_step > 0 else effective_step_x
-	var effective_step_z = state.snap.snap_step if not state.snap.use_half_step else state.snap.snap_step * 0.5
+	# Determine which node to use for bounds calculation
+	if transform_nodes.size() > 0:
+		# Transform Mode: use the first transform target node
+		target_node = transform_nodes[0] if transform_nodes[0] is Node3D else null
+		if target_node and target_node is Node3D:
+			rotation = target_node.rotation
+			scale = target_node.scale
+	elif _services and _services.preview_manager and _services.preview_manager.has_preview():
+		# Placement Mode: use the preview node
+		target_node = _services.preview_manager.get_preview_mesh()
+		if target_node:
+			rotation = _services.preview_manager.get_preview_rotation()
+			scale = _services.preview_manager.get_preview_scale()
 	
-	if state.snap.use_half_step and state.snap.snap_y_step > 0:
-		effective_step_y = state.snap.snap_y_step * 0.5
+	# Fallback if no valid node
+	if not target_node:
+		print("[PositionManager] WARNING: No node for surface offset, using default")
+		return hit_position + surface_normal * 0.5
 	
-	# Apply X-axis snapping
-	if state.snap.snap_enabled and state.snap.snap_step > 0:
-		var offset_x = state.snap.snap_offset.x
-		if state.snap.snap_center_x:
-			offset_x += effective_step_x * 0.5
-		
-		# Use directional snapping for X if surface normal has significant X component
-		if abs(surface_normal.x) > 0.5:
-			snapped_pos.x = _snap_directional(pos.x, effective_step_x, offset_x, surface_normal.x)
-		else:
-			snapped_pos.x = TransformMath.snap_value(pos.x, effective_step_x, offset_x)
+	# Get local AABB - try multiple methods
+	var local_aabb = AABB()
 	
-	# Apply Y-axis snapping
-	if state.snap.snap_y_enabled and effective_step_y > 0:
-		var offset_y = state.snap.snap_offset.y
-		if state.snap.snap_center_y:
-			offset_y += effective_step_y * 0.5
-		
-		# Y-axis typically uses regular snapping (objects sit on top surfaces)
-		snapped_pos.y = TransformMath.snap_value(pos.y, effective_step_y, offset_y)
-	
-	# Apply Z-axis snapping  
-	if state.snap.snap_enabled and state.snap.snap_step > 0:
-		var offset_z = state.snap.snap_offset.z
-		if state.snap.snap_center_z:
-			offset_z += effective_step_z * 0.5
-		
-		# Use directional snapping for Z if surface normal has significant Z component
-		if abs(surface_normal.z) > 0.5:
-			snapped_pos.z = _snap_directional(pos.z, effective_step_z, offset_z, surface_normal.z)
-		else:
-			snapped_pos.z = TransformMath.snap_value(pos.z, effective_step_z, offset_z)
-	
-	return snapped_pos
-
-func _apply_surface_aware_grid_snap_xz_only(state: TransformState, pos: Vector3, surface_normal: Vector3) -> Vector3:
-	"""Apply surface-aware grid snapping only to XZ axes (for Transform mode where Y is controlled by Q/E keys)"""
-	var snapped_pos = pos
-	
-	# Determine effective snap steps
-	var effective_step_x = state.snap.snap_step if not state.snap.use_half_step else state.snap.snap_step * 0.5
-	var effective_step_z = state.snap.snap_step if not state.snap.use_half_step else state.snap.snap_step * 0.5
-	
-	# Apply X-axis snapping
-	if state.snap.snap_enabled and state.snap.snap_step > 0:
-		var offset_x = state.snap.snap_offset.x
-		if state.snap.snap_center_x:
-			offset_x += effective_step_x * 0.5
-		
-		# Use directional snapping for X if surface normal has significant X component
-		if abs(surface_normal.x) > 0.5:
-			snapped_pos.x = _snap_directional(pos.x, effective_step_x, offset_x, surface_normal.x)
-		else:
-			snapped_pos.x = TransformMath.snap_value(pos.x, effective_step_x, offset_x)
-	
-	# Apply Z-axis snapping  
-	if state.snap.snap_enabled and state.snap.snap_step > 0:
-		var offset_z = state.snap.snap_offset.z
-		if state.snap.snap_center_z:
-			offset_z += effective_step_z * 0.5
-		
-		# Use directional snapping for Z if surface normal has significant Z component
-		if abs(surface_normal.z) > 0.5:
-			snapped_pos.z = _snap_directional(pos.z, effective_step_z, offset_z, surface_normal.z)
-		else:
-			snapped_pos.z = TransformMath.snap_value(pos.z, effective_step_z, offset_z)
-	
-	return snapped_pos
-
-func _snap_directional(value: float, step: float, offset: float, normal_component: float) -> float:
-	"""Snap a value directionally based on surface normal
-	
-	For negative normals: snap towards lower values (use floor)
-	For positive normals: snap towards higher values (use ceil)
-	This prevents objects from snapping into surfaces.
-	"""
-	if step <= 0.0:
-		return value
-	
-	var adjusted = value - offset
-	var grid_pos = adjusted / step
-	
-	# Choose snapping direction based on normal
-	var snapped_grid_pos: float
-	if normal_component < 0:
-		# Surface facing negative direction: snap to lower grid values (floor)
-		snapped_grid_pos = floor(grid_pos)
+	# Method 1: Direct mesh access for simple MeshInstance3D
+	if target_node is MeshInstance3D and target_node.mesh:
+		local_aabb = target_node.mesh.get_aabb()
+	# Method 2: VisualInstance3D.get_aabb() for visual nodes
+	elif target_node is VisualInstance3D:
+		local_aabb = target_node.get_aabb()
+	# Method 3: Recursively combine children
 	else:
-		# Surface facing positive direction: snap to higher grid values (ceil)  
-		snapped_grid_pos = ceil(grid_pos)
+		local_aabb = _get_combined_mesh_bounds(target_node)
 	
-	var result = snapped_grid_pos * step + offset
+	# Fallback if no bounds found
+	if local_aabb.size == Vector3.ZERO:
+		print("[PositionManager] WARNING: No bounds found, using default offset")
+		return hit_position + surface_normal * 0.5
 	
-	PluginLogger.debug("PositionManager", "Directional snap: val=%f, step=%f, normal=%f, grid_pos=%f, snapped=%f, result=%f" % 
-		[value, step, normal_component, grid_pos, snapped_grid_pos, result])
+	# Create basis from rotation
+	var basis = Basis.from_euler(rotation)
 	
-	return result
+	# Get all 8 corners in local space
+	var corners_local = [
+		Vector3(local_aabb.position.x, local_aabb.position.y, local_aabb.position.z),
+		Vector3(local_aabb.end.x, local_aabb.position.y, local_aabb.position.z),
+		Vector3(local_aabb.position.x, local_aabb.end.y, local_aabb.position.z),
+		Vector3(local_aabb.end.x, local_aabb.end.y, local_aabb.position.z),
+		Vector3(local_aabb.position.x, local_aabb.position.y, local_aabb.end.z),
+		Vector3(local_aabb.end.x, local_aabb.position.y, local_aabb.end.z),
+		Vector3(local_aabb.position.x, local_aabb.end.y, local_aabb.end.z),
+		Vector3(local_aabb.end.x, local_aabb.end.y, local_aabb.end.z),
+	]
+	
+	# Transform corners to world orientation (apply scale and rotation, but not position)
+	var corners_transformed = []
+	for corner in corners_local:
+		var scaled = corner * scale
+		var rotated = basis * scaled
+		corners_transformed.append(rotated)
+	
+	# Project all corners onto the surface normal and find the most negative
+	var min_projection = INF
+	for corner in corners_transformed:
+		var proj = corner.dot(surface_normal)
+		if proj < min_projection:
+			min_projection = proj
+	
+	# The offset is the absolute value (how far the deepest point extends against the normal)
+	var offset = abs(min_projection) + 0.001
+	
+	return hit_position + surface_normal * offset
 
-func _apply_surface_offset(hit_position: Vector3, surface_normal: Vector3) -> Vector3:
-	"""Apply surface offset to prevent objects from sinking into surfaces
+func _get_combined_mesh_bounds(node: Node) -> AABB:
+	"""Get combined AABB of all visual instances in local space
 	
-	Different logic for different surface orientations:
-	- Top surfaces (+Y normal): Object sits ON surface (minimal offset)
-	- Side surfaces (±X, ±Z normals): Object placed AGAINST surface (offset by half width)
-	- Bottom surfaces (-Y normal): Object hangs FROM surface (offset by height)
+	Uses Godot's built-in get_aabb() which handles complex hierarchies automatically.
+	Returns bounds in LOCAL space (relative to the root node's pivot).
 	"""
-	# Get preview bounds to determine object size
-	var bounds = AABB()
-	if _services and _services.preview_manager:
-		bounds = _services.preview_manager.get_preview_bounds()
+	var combined = AABB()
+	var has_bounds = false
 	
-	var offset_distance = 0.0
+	# First try: if the node itself is a VisualInstance3D, use get_aabb()
+	if node is VisualInstance3D:
+		var aabb = node.get_aabb()
+		if aabb.size != Vector3.ZERO:
+			return aabb
 	
-	# Determine surface orientation and calculate appropriate offset
-	var normal_abs = surface_normal.abs()
-	var is_top_surface = surface_normal.y > 0.8  # Pointing mostly up
-	var is_bottom_surface = surface_normal.y < -0.8  # Pointing mostly down
-	var is_side_surface = normal_abs.y < 0.5  # Mostly horizontal normal
+	# Second try: if node is MeshInstance3D with a mesh
+	if node is MeshInstance3D and node.mesh:
+		return node.mesh.get_aabb()
 	
-	if bounds.size != Vector3.ZERO:
-		if is_top_surface:
-			# Top surface: object sits on surface, minimal offset to prevent z-fighting
-			offset_distance = 0.001
-		elif is_bottom_surface:
-			# Bottom surface: object hangs from surface, offset by full height
-			offset_distance = bounds.size.y
-		elif is_side_surface:
-			# Side surface: object placed against surface, offset by half size in normal direction
-			var size_along_normal = abs(bounds.size.dot(normal_abs))
-			offset_distance = size_along_normal * 0.5
-		else:
-			# Angled surface: use half size along normal
-			var size_along_normal = abs(bounds.size.dot(normal_abs))
-			offset_distance = size_along_normal * 0.5
-	else:
-		# No bounds available, use minimal offset for any surface
-		offset_distance = 0.01
+	# Third try: recursively combine all VisualInstance3D children
+	for child in node.get_children():
+		if child is VisualInstance3D:
+			var child_aabb = child.get_aabb()
+			if child_aabb.size != Vector3.ZERO:
+				# Transform child AABB by its local transform
+				if child is Node3D and child.transform != Transform3D.IDENTITY:
+					child_aabb = child_aabb.transformed(child.transform)
+				
+				if not has_bounds:
+					combined = child_aabb
+					has_bounds = true
+				else:
+					combined = combined.merge(child_aabb)
+		elif child is Node3D:
+			# Recurse into non-visual nodes
+			var child_bounds = _get_combined_mesh_bounds(child)
+			if child_bounds.size != Vector3.ZERO:
+				# Transform by child's local transform
+				if child.transform != Transform3D.IDENTITY:
+					child_bounds = child_bounds.transformed(child.transform)
+				
+				if not has_bounds:
+					combined = child_bounds
+					has_bounds = true
+				else:
+					combined = combined.merge(child_bounds)
 	
-	# Move position along normal by calculated offset
-	var offset_position = hit_position + surface_normal * offset_distance
-	
-	PluginLogger.debug("PositionManager", "Surface offset: hit=%v, normal=%v, type=%s, offset_dist=%f, result=%v" % 
-		[hit_position, surface_normal, 
-		 "top" if is_top_surface else ("bottom" if is_bottom_surface else ("side" if is_side_surface else "angled")),
-		 offset_distance, offset_position])
-	
-	return offset_position
+	return combined
 
 ## Position Offset Management (Unified System)
 
@@ -608,8 +585,7 @@ func apply_position_delta(state: TransformState, delta: Vector3) -> void:
 		delta: Position delta to apply (in world space)
 	"""
 	state.values.manual_position_offset += delta
-	PluginLogger.debug("PositionManager", "Applied position delta %s, new offset: %s" % [delta, state.values.manual_position_offset])
-
+	
 func rotate_manual_offset(state: TransformState, axis: String, angle_degrees: float) -> void:
 	"""Rotate the manual position offset around the specified axis
 	This is called when the preview mesh rotates so the offset rotates with it"""
@@ -767,7 +743,6 @@ func update_smooth_position(state: TransformState, delta: float) -> void:
 
 func configure(state: TransformState, config: Dictionary) -> void:
 	"""Configure position manager settings and placement strategies"""
-	PluginLogger.debug("PositionManager", "configure() called with snap_enabled in config: %s, value: %s" % [config.has("snap_enabled"), config.get("snap_enabled", "N/A")])
 	
 	# Configure instance-scoped flags
 	_collision_mask = config.get("collision_mask", _collision_mask)

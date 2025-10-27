@@ -395,9 +395,6 @@ static func generate_mesh_thumbnail(asset_path: String) -> ImageTexture:
 		# Log AABB calculation stats
 		if _nodes_processed > 0:
 			var reached_limit = _nodes_processed > MAX_NODES_PER_AABB
-			var limit_msg = " (limit reached)" if reached_limit else ""
-			PluginLogger.debug(PluginConstants.COMPONENT_THUMBNAIL, 
-				"AABB calculated from %d nodes%s" % [_nodes_processed, limit_msg])
 		
 		# Position camera to view the entire scene
 		if scene_aabb.has_volume():

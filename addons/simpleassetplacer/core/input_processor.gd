@@ -107,6 +107,11 @@ func handle_navigation(nav_input, ui_locked: bool, focus_owner: Control, state: 
 
 func _handle_placement_mouse_motion(camera: Camera3D, mouse_position: Vector2, state: TransformState) -> void:
 	"""Update position from mouse in placement mode"""
+	# Skip position updates during camera fly mode (right mouse button held)
+	# This prevents unwanted position changes while navigating the viewport
+	if _services.input_handler and _services.input_handler.is_mouse_button_pressed("right"):
+		return
+	
 	# Get preview mesh to exclude from raycast (prevents self-collision)
 	var exclude_nodes = []
 	if _services.preview_manager and _services.preview_manager.has_preview():
@@ -118,6 +123,11 @@ func _handle_placement_mouse_motion(camera: Camera3D, mouse_position: Vector2, s
 
 func _handle_transform_mouse_motion(camera: Camera3D, mouse_position: Vector2, state: TransformState) -> void:
 	"""Update position from mouse in transform mode"""
+	# Skip position updates during camera fly mode (right mouse button held)
+	# This prevents unwanted position changes while navigating the viewport
+	if _services.input_handler and _services.input_handler.is_mouse_button_pressed("right"):
+		return
+	
 	var target_nodes = state.session.transform_data.get("target_nodes", [])
 	var current_center = state.session.transform_data.get("center_position", Vector3.ZERO)
 	
@@ -152,10 +162,7 @@ func _handle_transform_mouse_motion(camera: Camera3D, mouse_position: Vector2, s
 		# This ensures mouse motion only moves along the plane, not perpendicular to it
 		var new_normal_component = current_center.dot(plane_normal)
 		current_center += plane_normal * (preserved_normal_offset - new_normal_component)
-		PluginLogger.debug("InputProcessor", "Transform mode: preserving plane constraint (plane strategy)")
-	else:
-		PluginLogger.debug("InputProcessor", "Transform mode: allowing surface snapping (collision strategy)")
-	
+		
 	state.session.transform_data["center_position"] = current_center
 
 ## Mouse Wheel Handlers

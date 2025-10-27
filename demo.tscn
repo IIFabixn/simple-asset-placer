@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3 uid="uid://repnqsnpqatg"]
+[gd_scene load_steps=11 format=3 uid="uid://repnqsnpqatg"]
 
 [ext_resource type="PackedScene" uid="uid://bi526m4rgyylo" path="res://sample/building_a.tscn" id="1_m0rpm"]
 [ext_resource type="PackedScene" uid="uid://bs7orqq2mvo0n" path="res://sample/building_b.tscn" id="2_c6xj6"]
@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" uid="uid://bl5wvbh8ofgd2" path="res://sample/assets/kenny_retro-medival-kit/tower-top.glb" id="4_c6xj6"]
 [ext_resource type="Texture2D" uid="uid://14lix33xubj1" path="res://sample/textures/rocky_terrain/rocky_terrain_02_diff_1k.jpg" id="5_6bw2v"]
 [ext_resource type="PackedScene" uid="uid://c14fvskvwnirm" path="res://sample/building_d.tscn" id="6_kem5a"]
+[ext_resource type="PackedScene" uid="uid://mrvagk173i6e" path="res://sample/collider_test/wall_window_2.tscn" id="9_884kg"]
 [ext_resource type="PackedScene" uid="uid://b6c0q5frrklx6" path="res://barrels_2.tscn" id="10_d4o4o"]
 [ext_resource type="PackedScene" uid="uid://c2hol86kdgqxl" path="res://sample/assets/kenny_retro-medival-kit/tree-large.glb" id="10_svejp"]
 
@@ -38,10 +39,10 @@ transform = Transform3D(-0.9685939, 0, -0.24864638, 0, 1, 0, 0.24864638, 0, -0.9
 transform = Transform3D(0.69229835, 5.2571067e-09, 0.72161096, 0, 1, -7.285232e-09, -0.72161096, 5.043557e-09, 0.69229835, 2.3408487, 0, -1.4599462)
 
 [node name="building_c" parent="." instance=ExtResource("3_6bw2v")]
-transform = Transform3D(-0.25766695, 0, -0.9662329, 0, 1, 0, 0.9662329, 0, -0.25766695, 0.39836997, -0.039298557, 2.2232072)
+transform = Transform3D(-0.25881904, 0, -0.9659258, 0, 1, 0, 0.9659258, 0, -0.25881904, 2.4, -0.04, -4.78)
 
 [node name="tower-top" parent="." instance=ExtResource("4_c6xj6")]
-transform = Transform3D(-5.1579438e-08, 0, 1.18, 0, 1.18, 0, -1.18, 0, -5.1579438e-08, 0, -0.1, -3)
+transform = Transform3D(-5.1579438e-08, 0, 1.18, 0, 1.18, 0, -1.18, 0, -5.1579438e-08, 0, 0, -3)
 
 [node name="building_d" parent="." instance=ExtResource("6_kem5a")]
 transform = Transform3D(-1, 0, -3.8941437e-07, 0, 1, 0, 3.8941437e-07, 0, -1, -4, -0.039298296, -2)
@@ -96,3 +97,9 @@ transform = Transform3D(-0.5023689, 0, 0.86465335, 0, 1, 0, -0.86465335, 0, -0.5
 
 [node name="battlement-half_3" type="MeshInstance3D" parent="."]
 transform = Transform3D(0.91736615, 0, -0.39804438, 0, 1, 0, 0.39804438, 0, 0.91736615, 2, 0, -5)
+
+[node name="wall_window_2_3" parent="." instance=ExtResource("9_884kg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 7, 7.5)
+
+[node name="wall_window_2" type="Node3D" parent="." instance=ExtResource("9_884kg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 6, 7.5)

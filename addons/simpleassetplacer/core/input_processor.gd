@@ -107,10 +107,27 @@ func handle_navigation(nav_input, ui_locked: bool, focus_owner: Control, state: 
 
 func _handle_placement_mouse_motion(camera: Camera3D, mouse_position: Vector2, state: TransformState) -> void:
 	"""Update position from mouse in placement mode"""
-	_services.position_manager.update_position_from_mouse(state, camera, mouse_position)
+	# Skip position updates during camera fly mode (right mouse button held)
+	# This prevents unwanted position changes while navigating the viewport
+	if _services.input_handler and _services.input_handler.is_mouse_button_pressed("right"):
+		return
+	
+	# Get preview mesh to exclude from raycast (prevents self-collision)
+	var exclude_nodes = []
+	if _services.preview_manager and _services.preview_manager.has_preview():
+		var preview_mesh = _services.preview_manager.get_preview_mesh()
+		if preview_mesh:
+			exclude_nodes.append(preview_mesh)
+	
+	_services.position_manager.update_position_from_mouse(state, camera, mouse_position, 1, false, exclude_nodes)
 
 func _handle_transform_mouse_motion(camera: Camera3D, mouse_position: Vector2, state: TransformState) -> void:
 	"""Update position from mouse in transform mode"""
+	# Skip position updates during camera fly mode (right mouse button held)
+	# This prevents unwanted position changes while navigating the viewport
+	if _services.input_handler and _services.input_handler.is_mouse_button_pressed("right"):
+		return
+	
 	var target_nodes = state.session.transform_data.get("target_nodes", [])
 	var current_center = state.session.transform_data.get("center_position", Vector3.ZERO)
 	
@@ -134,11 +151,18 @@ func _handle_transform_mouse_motion(camera: Camera3D, mouse_position: Vector2, s
 	# Apply the position delta to center
 	current_center += position_delta
 	
-	# Restore the component along the plane normal (preserve height offset from Q/E keys)
-	# This ensures mouse motion only moves along the plane, not perpendicular to it
-	var new_normal_component = current_center.dot(plane_normal)
-	current_center += plane_normal * (preserved_normal_offset - new_normal_component)
+	# Check if we're using collision placement strategy - if so, allow surface snapping
+	var settings = _get_current_settings()
+	var placement_strategy = settings.get("placement_strategy", "collision")
 	
+	# Only restore plane normal component if using plane placement strategy
+	# With collision strategy, allow objects to snap to surfaces below
+	if placement_strategy == "plane":
+		# Restore the component along the plane normal (preserve height offset from Q/E keys)
+		# This ensures mouse motion only moves along the plane, not perpendicular to it
+		var new_normal_component = current_center.dot(plane_normal)
+		current_center += plane_normal * (preserved_normal_offset - new_normal_component)
+		
 	state.session.transform_data["center_position"] = current_center
 
 ## Mouse Wheel Handlers
@@ -391,6 +415,30 @@ func _is_3d_context_focused() -> bool:
 	
 	return true
 
+func _apply_transform_mode_grid_snap(state: TransformState, pos: Vector3) -> Vector3:
+	"""Apply grid snapping for transform mode (similar to position_manager logic)"""
+	if not state.snap.snap_enabled and not state.snap.snap_y_enabled:
+		return pos
+	
+	# Use position manager's grid snapping logic
+	if _services.position_manager:
+		# Temporarily update target position and apply grid snap
+		var original_target = state.values.target_position
+		state.values.target_position = pos
+		
+		if state.snap.snap_y_enabled:
+			# Apply full grid snap (XYZ)
+			state.values.target_position = _services.position_manager._apply_grid_snap(state, state.values.target_position)
+		else:
+			# Apply XZ-only grid snap (preserve Y from collision detection)
+			state.values.target_position = _services.position_manager._apply_grid_snap_xz_only(state, state.values.target_position)
+		
+		var snapped_pos = state.values.target_position
+		state.values.target_position = original_target  # Restore original
+		return snapped_pos
+	
+	return pos
+
 func _get_current_settings() -> Dictionary:
 	"""Get current settings"""
 	return _services.settings_manager.get_combined_settings()
@@ -410,5 +458,12 @@ func _update_position_after_asset_cycle(state: TransformState) -> void:
 	if not camera:
 		return
 	
+	# Get preview mesh to exclude from raycast (prevents self-collision)
+	var exclude_nodes = []
+	if _services.preview_manager and _services.preview_manager.has_preview():
+		var preview_mesh = _services.preview_manager.get_preview_mesh()
+		if preview_mesh:
+			exclude_nodes.append(preview_mesh)
+	
 	# Update position from current mouse location
-	_services.position_manager.update_position_from_mouse(state, camera, mouse_pos)
+	_services.position_manager.update_position_from_mouse(state, camera, mouse_pos, 1, false, exclude_nodes)

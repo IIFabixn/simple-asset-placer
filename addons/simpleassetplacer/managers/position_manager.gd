@@ -37,6 +37,7 @@ const PlacementStrategyService = preload("res://addons/simpleassetplacer/placeme
 const PlacementStrategy = preload("res://addons/simpleassetplacer/placement/placement_strategy.gd")
 const IncrementCalculator = preload("res://addons/simpleassetplacer/utils/increment_calculator.gd")
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
+const TransformMath = preload("res://addons/simpleassetplacer/utils/transform_math.gd")
 
 # === SERVICE REGISTRY ===
 
@@ -111,20 +112,30 @@ func update_position_from_mouse(state: TransformState, camera: Camera3D, mouse_p
 	state.placement.last_raycast_xz = Vector2(result.position.x, result.position.z)
 	state.placement.is_initial_position = false
 	
-	# Calculate final position: base position + manual offset
-	# Manual offset is controlled by WASD (X/Z), Q/E (Y), and potentially XYZ keys
-	state.values.target_position = state.values.base_position
+	# Apply surface offset to prevent objects from sinking into surfaces
+	# This gives us a clean position where the object sits properly on the surface
+	# Pass the transform target nodes for Transform Mode, or use preview for Placement Mode
+	var target_nodes_for_bounds = exclude_nodes if state.is_in_transform_mode() else []
+	var surface_offset_position = _apply_surface_offset(state.values.base_position, state.values.surface_normal, target_nodes_for_bounds)
 	
-	# Apply grid snapping if enabled (XZ or Y or both)
+	# Set the target position (will be snapped if snapping is enabled)
+	state.values.target_position = surface_offset_position
+	
+	# Apply standard grid snapping to the FINAL position (collision + surface offset)
+	# This ensures objects align with the grid while still sitting properly on surfaces
 	if state.snap.snap_enabled or state.snap.snap_y_enabled:
-		# In Transform mode, preserve the Y position (controlled by Q/E keys only)
-		# Only snap XZ axes for horizontal positioning
 		if state.is_in_transform_mode():
-			var preserved_y = state.values.target_position.y
-			state.values.target_position = _apply_grid_snap_xz_only(state, state.values.target_position)
-			state.values.target_position.y = preserved_y  # Restore Y position
+			# In Transform mode: handle Y snapping separately
+			if state.snap.snap_y_enabled:
+				# Y Snap is ON: apply full grid snapping (all axes)
+				state.values.target_position = _apply_grid_snap(state, state.values.target_position)
+			else:
+				# Y Snap is OFF: only snap XZ axes (preserve Y for Q/E keys)
+				var preserved_y = state.values.target_position.y
+				state.values.target_position = _apply_grid_snap_xz_only(state, state.values.target_position)
+				state.values.target_position.y = preserved_y  # Restore Y position
 		else:
-			# Placement mode: snap all axes as configured
+			# Placement mode: apply standard grid snapping to all enabled axes
 			state.values.target_position = _apply_grid_snap(state, state.values.target_position)
 	
 	# Update current position
@@ -158,21 +169,21 @@ func _apply_grid_snap(state: TransformState, pos: Vector3) -> Vector3:
 		var offset_x = state.snap.snap_offset.x
 		if state.snap.snap_center_x:
 			offset_x += effective_step_x * 0.5
-		snapped_pos.x = snappedf(pos.x - offset_x, effective_step_x) + offset_x
-	
+		snapped_pos.x = TransformMath.snap_value(pos.x, effective_step_x, offset_x)
+
 	# Apply Z-axis snapping (only if snap_enabled and valid step)
 	if state.snap.snap_enabled and state.snap.snap_step > 0:
 		var offset_z = state.snap.snap_offset.z
 		if state.snap.snap_center_z:
 			offset_z += effective_step_z * 0.5
-		snapped_pos.z = snappedf(pos.z - offset_z, effective_step_z) + offset_z
-	
+		snapped_pos.z = TransformMath.snap_value(pos.z, effective_step_z, offset_z)
+
 	# Handle Y-axis if enabled with optional center offset
 	if state.snap.snap_y_enabled and state.snap.snap_y_step > 0:
 		var offset_y = state.snap.snap_offset.y
 		if state.snap.snap_center_y:
 			offset_y += effective_step_y * 0.5
-		snapped_pos.y = snappedf(pos.y - offset_y, effective_step_y) + offset_y
+		snapped_pos.y = TransformMath.snap_value(pos.y, effective_step_y, offset_y)
 	
 	return snapped_pos
 
@@ -189,18 +200,159 @@ func _apply_grid_snap_xz_only(state: TransformState, pos: Vector3) -> Vector3:
 		var offset_x = state.snap.snap_offset.x
 		if state.snap.snap_center_x:
 			offset_x += effective_step_x * 0.5
-		snapped_pos.x = snappedf(pos.x - offset_x, effective_step_x) + offset_x
-	
+		snapped_pos.x = TransformMath.snap_value(pos.x, effective_step_x, offset_x)
+
 	# Apply Z-axis snapping (only if snap_enabled and valid step)
 	if state.snap.snap_enabled and state.snap.snap_step > 0:
 		var offset_z = state.snap.snap_offset.z
 		if state.snap.snap_center_z:
 			offset_z += effective_step_z * 0.5
-		snapped_pos.z = snappedf(pos.z - offset_z, effective_step_z) + offset_z
+		snapped_pos.z = TransformMath.snap_value(pos.z, effective_step_z, offset_z)
 	
 	# NOTE: Y-axis is NOT snapped in this function - it's controlled by Q/E keys in Transform mode
 	
 	return snapped_pos
+
+func _apply_surface_offset(hit_position: Vector3, surface_normal: Vector3, transform_nodes: Array = []) -> Vector3:
+	"""Apply surface offset to place objects correctly on surfaces without clipping
+	
+	Works for both Placement Mode (using preview) and Transform Mode (using actual nodes).
+	
+	Args:
+		hit_position: The raycast hit position on the surface
+		surface_normal: The normal vector of the surface
+		transform_nodes: Array of nodes being transformed (for Transform Mode), empty for Placement Mode
+	
+	ALGORITHM:
+	1. Get the node(s) to calculate bounds from (preview for placement, actual nodes for transform)
+	2. Get local AABB and current rotation/scale
+	3. Transform all 8 corners by rotation and scale
+	4. Project onto surface normal to find how far object extends against the normal
+	5. Offset by that distance to prevent clipping
+	"""
+	var target_node = null
+	var rotation = Vector3.ZERO
+	var scale = Vector3.ONE
+	
+	# Determine which node to use for bounds calculation
+	if transform_nodes.size() > 0:
+		# Transform Mode: use the first transform target node
+		target_node = transform_nodes[0] if transform_nodes[0] is Node3D else null
+		if target_node and target_node is Node3D:
+			rotation = target_node.rotation
+			scale = target_node.scale
+	elif _services and _services.preview_manager and _services.preview_manager.has_preview():
+		# Placement Mode: use the preview node
+		target_node = _services.preview_manager.get_preview_mesh()
+		if target_node:
+			rotation = _services.preview_manager.get_preview_rotation()
+			scale = _services.preview_manager.get_preview_scale()
+	
+	# Fallback if no valid node
+	if not target_node:
+		print("[PositionManager] WARNING: No node for surface offset, using default")
+		return hit_position + surface_normal * 0.5
+	
+	# Get local AABB - try multiple methods
+	var local_aabb = AABB()
+	
+	# Method 1: Direct mesh access for simple MeshInstance3D
+	if target_node is MeshInstance3D and target_node.mesh:
+		local_aabb = target_node.mesh.get_aabb()
+	# Method 2: VisualInstance3D.get_aabb() for visual nodes
+	elif target_node is VisualInstance3D:
+		local_aabb = target_node.get_aabb()
+	# Method 3: Recursively combine children
+	else:
+		local_aabb = _get_combined_mesh_bounds(target_node)
+	
+	# Fallback if no bounds found
+	if local_aabb.size == Vector3.ZERO:
+		print("[PositionManager] WARNING: No bounds found, using default offset")
+		return hit_position + surface_normal * 0.5
+	
+	# Create basis from rotation
+	var basis = Basis.from_euler(rotation)
+	
+	# Get all 8 corners in local space
+	var corners_local = [
+		Vector3(local_aabb.position.x, local_aabb.position.y, local_aabb.position.z),
+		Vector3(local_aabb.end.x, local_aabb.position.y, local_aabb.position.z),
+		Vector3(local_aabb.position.x, local_aabb.end.y, local_aabb.position.z),
+		Vector3(local_aabb.end.x, local_aabb.end.y, local_aabb.position.z),
+		Vector3(local_aabb.position.x, local_aabb.position.y, local_aabb.end.z),
+		Vector3(local_aabb.end.x, local_aabb.position.y, local_aabb.end.z),
+		Vector3(local_aabb.position.x, local_aabb.end.y, local_aabb.end.z),
+		Vector3(local_aabb.end.x, local_aabb.end.y, local_aabb.end.z),
+	]
+	
+	# Transform corners to world orientation (apply scale and rotation, but not position)
+	var corners_transformed = []
+	for corner in corners_local:
+		var scaled = corner * scale
+		var rotated = basis * scaled
+		corners_transformed.append(rotated)
+	
+	# Project all corners onto the surface normal and find the most negative
+	var min_projection = INF
+	for corner in corners_transformed:
+		var proj = corner.dot(surface_normal)
+		if proj < min_projection:
+			min_projection = proj
+	
+	# The offset is the absolute value (how far the deepest point extends against the normal)
+	var offset = abs(min_projection) + 0.001
+	
+	return hit_position + surface_normal * offset
+
+func _get_combined_mesh_bounds(node: Node) -> AABB:
+	"""Get combined AABB of all visual instances in local space
+	
+	Uses Godot's built-in get_aabb() which handles complex hierarchies automatically.
+	Returns bounds in LOCAL space (relative to the root node's pivot).
+	"""
+	var combined = AABB()
+	var has_bounds = false
+	
+	# First try: if the node itself is a VisualInstance3D, use get_aabb()
+	if node is VisualInstance3D:
+		var aabb = node.get_aabb()
+		if aabb.size != Vector3.ZERO:
+			return aabb
+	
+	# Second try: if node is MeshInstance3D with a mesh
+	if node is MeshInstance3D and node.mesh:
+		return node.mesh.get_aabb()
+	
+	# Third try: recursively combine all VisualInstance3D children
+	for child in node.get_children():
+		if child is VisualInstance3D:
+			var child_aabb = child.get_aabb()
+			if child_aabb.size != Vector3.ZERO:
+				# Transform child AABB by its local transform
+				if child is Node3D and child.transform != Transform3D.IDENTITY:
+					child_aabb = child_aabb.transformed(child.transform)
+				
+				if not has_bounds:
+					combined = child_aabb
+					has_bounds = true
+				else:
+					combined = combined.merge(child_aabb)
+		elif child is Node3D:
+			# Recurse into non-visual nodes
+			var child_bounds = _get_combined_mesh_bounds(child)
+			if child_bounds.size != Vector3.ZERO:
+				# Transform by child's local transform
+				if child.transform != Transform3D.IDENTITY:
+					child_bounds = child_bounds.transformed(child.transform)
+				
+				if not has_bounds:
+					combined = child_bounds
+					has_bounds = true
+				else:
+					combined = combined.merge(child_bounds)
+	
+	return combined
 
 ## Position Offset Management (Unified System)
 
@@ -433,8 +585,7 @@ func apply_position_delta(state: TransformState, delta: Vector3) -> void:
 		delta: Position delta to apply (in world space)
 	"""
 	state.values.manual_position_offset += delta
-	PluginLogger.debug("PositionManager", "Applied position delta %s, new offset: %s" % [delta, state.values.manual_position_offset])
-
+	
 func rotate_manual_offset(state: TransformState, axis: String, angle_degrees: float) -> void:
 	"""Rotate the manual position offset around the specified axis
 	This is called when the preview mesh rotates so the offset rotates with it"""
@@ -592,7 +743,6 @@ func update_smooth_position(state: TransformState, delta: float) -> void:
 
 func configure(state: TransformState, config: Dictionary) -> void:
 	"""Configure position manager settings and placement strategies"""
-	PluginLogger.debug("PositionManager", "configure() called with snap_enabled in config: %s, value: %s" % [config.has("snap_enabled"), config.get("snap_enabled", "N/A")])
 	
 	# Configure instance-scoped flags
 	_collision_mask = config.get("collision_mask", _collision_mask)

@@ -1,5 +1,43 @@
 # Changelog
 
+## [2.0.1] - 2025-10-27
+
+### 🐛 Bug Fixes
+
+#### Collision-Based Placement System Overhaul
+
+- **Fixed surface offset calculation for all orientations**
+  - Completely rewrote `_apply_surface_offset()` to properly account for pivot points, rotation, and scale
+  - Objects now correctly sit ON floors (+Y), attach to walls (±X, ±Z), and hang from ceilings (-Y)
+  - Calculates all 8 bounding box corners, transforms them by rotation/scale, and projects onto surface normal
+  - Handles both simple meshes and complex PackedScenes with multiple children
+  - Fixes issues where objects would clip through surfaces at different angles
+
+- **Fixed Transform Mode surface collision**
+  - Surface offset now works correctly in Transform Mode by using actual scene nodes instead of preview
+  - Gets bounds and transforms from the transform target node directly
+  - No more clipping when moving existing objects in the scene
+
+- **Prevented position updates during camera navigation**
+  - Added right mouse button detection in `input_processor.gd`
+  - Position no longer jumps or changes when right-clicking to fly around the viewport
+  - Manual position offsets are preserved correctly during camera movement
+
+- **Removed broken directional snapping system**
+  - Eliminated 235+ lines of flawed "directional snapping" logic that caused unpredictable placement
+  - Replaced with standard grid snapping applied to final position (collision point + surface offset)
+  - Objects now align predictably with grid lines on all surface orientations
+  - Grid snapping respects both surface contact AND grid alignment
+
+### 🎯 Improvements
+
+- **Enhanced bounds calculation for complex hierarchies**
+  - New recursive bounds gathering for PackedScenes with multiple MeshInstance3D children
+  - Uses Godot's built-in `VisualInstance3D.get_aabb()` for reliable bounds detection
+  - Properly accumulates transforms through node hierarchy
+
+---
+
 ## [2.0.0] - 2025-10-26
 
 ### 🏗️ Major Architecture Refactor

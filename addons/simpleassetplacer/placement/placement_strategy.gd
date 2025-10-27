@@ -106,6 +106,11 @@ static func get_world_space_state_static(world_root: Node) -> PhysicsDirectSpace
 	if not world_root:
 		return null
 	
+	# Check if world_root is a Node3D (has get_world_3d method)
+	if not world_root is Node3D:
+		push_warning("[PlacementStrategy] World root must be a Node3D. Got: %s" % world_root.get_class())
+		return null
+	
 	var world_3d = world_root.get_world_3d()
 	if not world_3d:
 		return null

@@ -307,7 +307,32 @@ func get_preview_bounds() -> AABB:
 	if has_preview() and _preview_mesh.mesh:
 		var aabb = _preview_mesh.mesh.get_aabb()
 		# Transform AABB by the preview's transform
-		return aabb.transformed(_preview_mesh.transform)
+		# In Godot 4.x, we need to manually transform all corners
+		if _preview_mesh.transform != Transform3D.IDENTITY:
+			# Get all 8 corners
+			var corners = [
+				aabb.position,
+				aabb.position + Vector3(aabb.size.x, 0, 0),
+				aabb.position + Vector3(0, aabb.size.y, 0),
+				aabb.position + Vector3(0, 0, aabb.size.z),
+				aabb.position + Vector3(aabb.size.x, aabb.size.y, 0),
+				aabb.position + Vector3(aabb.size.x, 0, aabb.size.z),
+				aabb.position + Vector3(0, aabb.size.y, aabb.size.z),
+				aabb.position + aabb.size
+			]
+			
+			# Transform all corners
+			var transformed_corners = []
+			for corner in corners:
+				transformed_corners.append(_preview_mesh.transform * corner)
+			
+			# Create new AABB from transformed corners
+			var result = AABB(transformed_corners[0], Vector3.ZERO)
+			for i in range(1, transformed_corners.size()):
+				result = result.expand(transformed_corners[i])
+			
+			return result
+		return aabb
 	return AABB()
 
 func is_preview_in_camera_view(camera: Camera3D) -> bool:

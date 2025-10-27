@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.0.2] - 2025-10-27
+
+### 🐛 Bug Fixes
+
+#### Critical Godot 4.x Compatibility Fixes
+
+- **Fixed crash with non-Node3D scene roots**
+  - Added type check in `placement_strategy.gd` before calling `get_world_3d()`
+  - Now shows clear warning message instead of crashing when scene root is not a Node3D
+  - Prevents "Nonexistent function 'get_world_3d'" errors
+
+- **Fixed AABB transformation errors**
+  - Replaced deprecated `AABB.transformed()` method calls with Godot 4.x compatible implementation
+  - Added `_transform_aabb()` helper function that manually transforms all 8 corners
+  - Fixed "Nonexistent function 'transformed' in base 'AABB'" errors in `position_manager.gd` and `preview_manager.gd`
+
+- **Improved error messages**
+  - Physics space state warnings now provide clearer context
+  - Better handling of edge cases with unusual scene structures
+
 ## [2.0.1] - 2025-10-27
 
 ### 🐛 Bug Fixes

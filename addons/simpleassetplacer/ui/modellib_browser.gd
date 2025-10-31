@@ -773,6 +773,3 @@ func _scroll_to_item(item: AssetThumbnailItem):
 		# Item is below visible area - scroll down
 		scroll_container.scroll_vertical = item_bottom - scroll_rect.size.y
 
-
-
-

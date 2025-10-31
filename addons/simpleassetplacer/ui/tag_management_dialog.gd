@@ -844,8 +844,3 @@ func _show_error(message: String) -> void:
 	dialog.size = Vector2i(400, 100)
 	add_child(dialog)
 	dialog.popup_centered()
-
-
-
-
-

@@ -456,8 +456,3 @@ func stop_lerping(node: Node3D):
 	var smooth_data = _smooth_data.get(node_id)
 	if smooth_data:
 		smooth_data.is_lerping = false
-
-
-
-
-

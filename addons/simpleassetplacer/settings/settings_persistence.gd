@@ -161,6 +161,3 @@ func read_ui_to_settings(ui_controls: Dictionary, owner_node: Node) -> void:
 				if control is Button:
 					owner_node.set(setting.id, control.text)
 
-
-
-

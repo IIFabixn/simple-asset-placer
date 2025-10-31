@@ -358,8 +358,3 @@ static func get_setting_meta(id: String) -> SettingMeta:
 		if setting.id == id:
 			return setting
 	return null
-
-
-
-
-

@@ -405,8 +405,3 @@ func place_mesh_in_scene(
 		return null
 	
 	return place_direct_mesh(mesh, position, Vector3.ZERO, transform_state, settings)
-
-
-
-
-

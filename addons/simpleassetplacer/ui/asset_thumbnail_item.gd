@@ -451,6 +451,3 @@ func update_thumbnail_size(new_size: int):
 	if thumbnail_rect:
 		thumbnail_rect.custom_minimum_size = Vector2(thumbnail_size, thumbnail_size)
 
-
-
-

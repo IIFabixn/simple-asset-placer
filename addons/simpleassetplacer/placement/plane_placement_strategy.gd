@@ -551,8 +551,3 @@ func get_plane_data() -> Dictionary:
 		"axis_v": plane_data.axis_v,
 		"axis_index": plane_data.axis_index
 	}
-
-
-
-
-

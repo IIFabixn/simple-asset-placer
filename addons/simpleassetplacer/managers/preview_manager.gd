@@ -368,8 +368,3 @@ func get_preview_info() -> Dictionary:
 		"color": _preview_color,
 		"bounds": get_preview_bounds() if has_preview() else AABB()
 	}
-
-
-
-
-

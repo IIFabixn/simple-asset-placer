@@ -780,13 +780,12 @@ static func _position_camera_simple(mesh: Mesh):
 		# Use a more dramatic angle to better show shape differences
 		# Position camera at a 3/4 view that emphasizes the top and sides
 		var cam_x = distance * 0.8  # Strong side angle
-		var cam_y = distance * 0.9  # High angle to see the top
+		var cam_y = distance * 0.9  # High angle to see the top 
 		var cam_z = distance * 0.6  # Moderate front view
 		
 		camera.position = Vector3(cam_x, cam_y, cam_z)
 		camera.look_at(Vector3.ZERO, Vector3.UP)
-
-
+		
 static func _collect_all_meshes_from_node(node: Node, collection: Array):
 	# Check if this node is a MeshInstance3D with a mesh
 	if node is MeshInstance3D:
@@ -978,8 +977,3 @@ static func generate_meshlib_thumbnail(meshlib: MeshLibrary, item_id: int = -1) 
 	texture.set_image(image)
 	
 	return texture
-
-
-
-
-

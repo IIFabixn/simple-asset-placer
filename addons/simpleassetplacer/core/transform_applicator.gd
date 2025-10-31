@@ -268,6 +268,3 @@ static func apply_position_to_multiple_nodes(
 		var offset = node_offsets.get(node, Vector3.ZERO)
 		node.global_position = final_center + offset
 
-
-
-

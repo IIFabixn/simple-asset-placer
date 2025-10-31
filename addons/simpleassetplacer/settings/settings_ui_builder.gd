@@ -521,8 +521,3 @@ static func _build_utility_section(container: Control, owner_node: Node, ui_cont
 	clear_cache_button.set_meta("action", "clear_cache")
 	utility_vbox.add_child(clear_cache_button)
 	ui_controls["clear_cache"] = clear_cache_button
-
-
-
-
-

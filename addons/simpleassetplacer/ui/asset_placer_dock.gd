@@ -456,6 +456,3 @@ func cycle_previous_asset() -> bool:
 	
 	return false
 
-
-
-

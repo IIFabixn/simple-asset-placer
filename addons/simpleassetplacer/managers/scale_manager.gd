@@ -278,8 +278,3 @@ func get_scale_info(state: TransformState) -> Dictionary:
 		"is_default": is_scale_at_default(state),
 		"display_text": get_scale_display_text(state)
 	}
-
-
-
-
-

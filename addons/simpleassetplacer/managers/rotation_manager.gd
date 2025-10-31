@@ -296,8 +296,3 @@ func get_rotation_info(state: TransformState) -> Dictionary:
 		"magnitude": get_rotation_magnitude(state),
 		"is_zero": is_rotation_zero(state)
 	}
-
-
-
-
-

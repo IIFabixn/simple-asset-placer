@@ -892,5 +892,3 @@ func get_position_info(state: TransformState) -> Dictionary:
 	}
 
 ## Property accessors for half-step mode
-
-

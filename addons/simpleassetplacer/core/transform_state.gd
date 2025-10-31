@@ -156,8 +156,3 @@ func from_dictionary(data: Dictionary) -> void:
 		session.from_dictionary(data["session"])
 	if data.has("placement"):
 		placement.from_dictionary(data["placement"])
-
-
-
-
-

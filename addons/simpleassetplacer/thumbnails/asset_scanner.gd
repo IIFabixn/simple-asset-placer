@@ -297,8 +297,3 @@ static func get_asset_by_path(assets: Array, path: String) -> Dictionary:
 		if asset.path == path:
 			return asset
 	return {}
-
-
-
-
-

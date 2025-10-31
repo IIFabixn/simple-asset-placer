@@ -173,8 +173,3 @@ static func is_resource_extension(extension: String) -> bool:
 static func is_meshlib_extension(extension: String) -> bool:
 	"""Check if extension is a MeshLibrary format"""
 	return extension.to_lower() in SUPPORTED_MESHLIB_EXTENSIONS
-
-
-
-
-

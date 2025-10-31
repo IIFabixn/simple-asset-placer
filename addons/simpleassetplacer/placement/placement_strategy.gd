@@ -219,8 +219,3 @@ static func project_to_yz_plane(from: Vector3, direction: Vector3, plane_distanc
     
 	# If no intersection, return position at plane distance
 	return Vector3(plane_distance, from.y, from.z)
-
-
-
-
-

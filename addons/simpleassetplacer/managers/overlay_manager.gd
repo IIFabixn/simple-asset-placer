@@ -531,6 +531,3 @@ func debug_print_overlay_state():
 	PluginLogger.debug("OverlayManager", "  Grid Overlay Valid: " + str(NodeUtils.is_valid(_grid_overlay)))
 	PluginLogger.debug("OverlayManager", "  Half-Step Grid Overlay Valid: " + str(NodeUtils.is_valid(_half_step_grid_overlay)))
 
-
-
-

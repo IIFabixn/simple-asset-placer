@@ -182,8 +182,3 @@ static func log_cleanup(component: String) -> void:
 static func log_cleanup_complete(component: String) -> void:
 	"""Log successful cleanup"""
 	info(component, "Cleanup complete")
-
-
-
-
-

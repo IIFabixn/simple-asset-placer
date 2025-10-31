@@ -733,8 +733,3 @@ func build_category_tree(assets: Array) -> Dictionary:
 				current_node = current_node[category]
 	
 	return tree
-
-
-
-
-

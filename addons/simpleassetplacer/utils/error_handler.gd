@@ -376,8 +376,3 @@ static func get_error_handler_status() -> Dictionary:
 		"initialized": _editor_interface != null,
 		"can_show_dialogs": _editor_interface != null
 	}
-
-
-
-
-

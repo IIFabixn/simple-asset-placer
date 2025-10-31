@@ -152,8 +152,3 @@ func _gather_collision_rids_recursive(node: Node, rids: Array) -> void:
 	# Recursively process all children to catch nested structures
 	for child in node.get_children():
 		_gather_collision_rids_recursive(child, rids)
-
-
-
-
-

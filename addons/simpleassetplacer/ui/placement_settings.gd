@@ -525,8 +525,3 @@ func _get_service() -> PlacementStrategyService:
 		_placement_service = PlacementStrategyService.new()
 		_placement_service.initialize()
 	return _placement_service
-
-
-
-
-

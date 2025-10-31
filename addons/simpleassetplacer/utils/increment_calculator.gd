@@ -201,8 +201,3 @@ static func get_step_info(base_step: float, modifiers: Dictionary) -> Dictionary
 		},
 		"configuration": get_configuration()
 	}
-
-
-
-
-

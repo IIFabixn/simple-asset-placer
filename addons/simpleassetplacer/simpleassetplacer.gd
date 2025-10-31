@@ -613,8 +613,3 @@ func debug_print_status():
 	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "System Status:")
 	for key in status:
 		PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "  " + key + ": " + str(status[key]))
-
-
-
-
-

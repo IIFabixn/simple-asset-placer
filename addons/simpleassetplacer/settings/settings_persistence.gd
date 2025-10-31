@@ -15,10 +15,11 @@ ARCHITECTURE: Pure instance-based (no static methods)
 - All methods are instance methods
 
 USED BY: PlacementSettings UI component
-DEPENDS ON: SettingsDefinition
+DEPENDS ON: SettingsDefinition, SettingsUIBuilder
 """
 
 const SettingsDefinition = preload("res://addons/simpleassetplacer/settings/settings_definition.gd")
+const SettingsUIBuilder = preload("res://addons/simpleassetplacer/settings/settings_ui_builder.gd")
 
 ## Initialization
 
@@ -97,6 +98,9 @@ func update_ui_from_settings(ui_controls: Dictionary, owner_node: Node) -> void:
 			SettingsDefinition.SettingType.FLOAT:
 				if control is SpinBox and value != null:
 					control.value = value
+			SettingsDefinition.SettingType.STRING:
+				if control is LineEdit and value != null:
+					control.text = str(value)
 			SettingsDefinition.SettingType.KEY_BINDING:
 				if control is Button and value != null:
 					control.text = str(value)
@@ -105,6 +109,18 @@ func update_ui_from_settings(ui_controls: Dictionary, owner_node: Node) -> void:
 					var selected_index = setting.options.find(value)
 					if selected_index >= 0:
 						control.selected = selected_index
+						# Trigger visibility update for dependent controls
+						# Find the root container (traverse up to VBoxContainer or ScrollContainer)
+						var root_container = control
+						while root_container.get_parent():
+							root_container = root_container.get_parent()
+							if root_container is ScrollContainer:
+								# Get the actual content container inside ScrollContainer
+								if root_container.get_child_count() > 0:
+									root_container = root_container.get_child(0)
+								break
+						
+						SettingsUIBuilder._update_dependent_visibility(root_container, setting.id, value)
 
 func read_ui_to_settings(ui_controls: Dictionary, owner_node: Node) -> void:
 	"""Read settings from UI controls back to properties"""
@@ -133,6 +149,9 @@ func read_ui_to_settings(ui_controls: Dictionary, owner_node: Node) -> void:
 			SettingsDefinition.SettingType.FLOAT:
 				if control is SpinBox:
 					owner_node.set(setting.id, control.value)
+			SettingsDefinition.SettingType.STRING:
+				if control is LineEdit:
+					owner_node.set(setting.id, control.text)
 			SettingsDefinition.SettingType.OPTION:
 				if control is OptionButton:
 					var selected_index = control.selected

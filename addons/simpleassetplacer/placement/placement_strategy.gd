@@ -102,20 +102,54 @@ func get_world_space_state() -> PhysicsDirectSpaceState3D:
 	return null  # Subclasses should override or get from config
 
 static func get_world_space_state_static(world_root: Node) -> PhysicsDirectSpaceState3D:
-	"""Static helper to get world space state from a given world root"""
+	"""Static helper to get world space state from any node in the scene tree
+	
+	This function accepts any Node type and will:
+	1. If it's a Node3D, use it directly
+	2. Otherwise, search for a Node3D in the hierarchy
+	3. Fall back to viewport's World3D if available
+	"""
 	if not world_root:
 		return null
 	
-	# Check if world_root is a Node3D (has get_world_3d method)
-	if not world_root is Node3D:
-		push_warning("[PlacementStrategy] World root must be a Node3D. Got: %s" % world_root.get_class())
+	if not world_root.is_inside_tree():
 		return null
 	
-	var world_3d = world_root.get_world_3d()
-	if not world_3d:
-		return null
+	var node_3d: Node3D = null
 	
-	return world_3d.direct_space_state
+	# If world_root is already a Node3D, use it
+	if world_root is Node3D:
+		node_3d = world_root
+	else:
+		# Search for any Node3D in the scene hierarchy
+		node_3d = _find_node_3d_recursive(world_root)
+	
+	# Try to get World3D from Node3D
+	if node_3d:
+		var world_3d = node_3d.get_world_3d()
+		if world_3d:
+			return world_3d.direct_space_state
+	
+	# Fallback: try viewport directly (works if 3D scene is open in editor)
+	var viewport = world_root.get_viewport()
+	if viewport:
+		var world_3d = viewport.get_world_3d()
+		if world_3d:
+			return world_3d.direct_space_state
+	
+	return null
+
+static func _find_node_3d_recursive(node: Node) -> Node3D:
+	"""Recursively find the first Node3D in the hierarchy"""
+	if node is Node3D:
+		return node
+	
+	for child in node.get_children():
+		var found = _find_node_3d_recursive(child)
+		if found:
+			return found
+	
+	return null
 
 static func project_to_horizontal_plane(from: Vector3, direction: Vector3, plane_height: float, fallback: Vector3 = Vector3.ZERO, use_fallback: bool = false) -> Vector3:
 	"""Helper to project a ray onto a horizontal plane at given height (XZ plane)

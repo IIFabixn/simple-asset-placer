@@ -224,6 +224,30 @@ func set_dock_reference(dock_instance) -> void:
 func update_settings(new_settings: Dictionary) -> void:
 	_state().settings = new_settings.duplicate(true)
 
+func refresh_settings_from_current() -> void:
+	"""Refresh all settings in active transform state from current settings
+	
+	This should be called when settings are changed via toolbar/UI during
+	an active placement or transform mode session. It updates all cached
+	settings in the transform state to match the current persistent settings.
+	"""
+	if not is_any_mode_active():
+		return
+	
+	var state = _state()
+	var combined_settings = _services.settings_manager.get_combined_settings()
+	
+	# Update all configuration from current settings
+	state.snap.configure_from_settings(combined_settings)
+	state.placement.configure_from_settings(combined_settings)
+	
+	# Update the cached settings dictionary
+	state.settings = combined_settings.duplicate(true)
+	
+	# Log the update for debugging
+	PluginLogger.debug(PluginConstants.COMPONENT_TRANSFORM, 
+		"Refreshed all settings during active mode")
+
 ## Public API - Cleanup
 
 func cleanup_all() -> void:

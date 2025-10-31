@@ -1,12 +1,12 @@
 [gd_scene load_steps=11 format=3 uid="uid://repnqsnpqatg"]
 
+[ext_resource type="PackedScene" uid="uid://b4iki8vmw48j3" path="res://sample/assets/kenny_retro-medival-kit/detail-barrel.glb" id="1_884kg"]
 [ext_resource type="PackedScene" uid="uid://bi526m4rgyylo" path="res://sample/building_a.tscn" id="1_m0rpm"]
 [ext_resource type="PackedScene" uid="uid://bs7orqq2mvo0n" path="res://sample/building_b.tscn" id="2_c6xj6"]
 [ext_resource type="PackedScene" uid="uid://b2u5e78en3vxj" path="res://sample/building_c.tscn" id="3_6bw2v"]
 [ext_resource type="PackedScene" uid="uid://bl5wvbh8ofgd2" path="res://sample/assets/kenny_retro-medival-kit/tower-top.glb" id="4_c6xj6"]
 [ext_resource type="Texture2D" uid="uid://14lix33xubj1" path="res://sample/textures/rocky_terrain/rocky_terrain_02_diff_1k.jpg" id="5_6bw2v"]
 [ext_resource type="PackedScene" uid="uid://c14fvskvwnirm" path="res://sample/building_d.tscn" id="6_kem5a"]
-[ext_resource type="PackedScene" uid="uid://mrvagk173i6e" path="res://sample/collider_test/wall_window_2.tscn" id="9_884kg"]
 [ext_resource type="PackedScene" uid="uid://b6c0q5frrklx6" path="res://barrels_2.tscn" id="10_d4o4o"]
 [ext_resource type="PackedScene" uid="uid://c2hol86kdgqxl" path="res://sample/assets/kenny_retro-medival-kit/tree-large.glb" id="10_svejp"]
 
@@ -15,6 +15,20 @@ albedo_texture = ExtResource("5_6bw2v")
 uv1_scale = Vector3(10, 10, 10)
 
 [node name="Node3D" type="Node3D"]
+
+[node name="AssetRoot" type="Node3D" parent="."]
+
+[node name="detail-barrel" type="Node3D" parent="AssetRoot" instance=ExtResource("1_884kg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.04, -0.5)
+
+[node name="detail-barrel_2" type="Node3D" parent="AssetRoot" instance=ExtResource("1_884kg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, -0.04, -0.5)
+
+[node name="detail-barrel_3" type="Node3D" parent="AssetRoot" instance=ExtResource("1_884kg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, -0.04, 0.5)
+
+[node name="detail-barrel_4" type="Node3D" parent="AssetRoot" instance=ExtResource("1_884kg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.04, 0.5)
 
 [node name="CSGCombiner3D" type="CSGCombiner3D" parent="."]
 use_collision = true
@@ -33,7 +47,7 @@ operation = 2
 transform = Transform3D(4.3312562e-07, 0, -0.99999964, 0, 1, 0, 0.99999964, 0, 4.3312562e-07, -4.4034243, -0.06889253, -7.9194717)
 
 [node name="building_a_2" parent="." instance=ExtResource("1_m0rpm")]
-transform = Transform3D(-0.9685939, 0, -0.24864638, 0, 1, 0, 0.24864638, 0, -0.9685939, 1.2087587, 0.22140877, -10.841575)
+transform = Transform3D(-0.96592563, 0, -0.2588181, 0, 1, 0, 0.2588181, 0, -0.96592563, 3.3819323, -0.039999902, -10.737915)
 
 [node name="building_b" parent="." instance=ExtResource("2_c6xj6")]
 transform = Transform3D(0.69229835, 5.2571067e-09, 0.72161096, 0, 1, -7.285232e-09, -0.72161096, 5.043557e-09, 0.69229835, 2.3408487, 0, -1.4599462)
@@ -60,46 +74,4 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0, -4)
 transform = Transform3D(1.099999, -2.9802322e-08, -2.6552354e-07, 2.9802322e-08, 1.0999992, 8.8763684e-08, 7.450581e-09, 0, 1.0999986, 423469.75, 0, -9)
 
 [node name="building_a_3" parent="." instance=ExtResource("1_m0rpm")]
-transform = Transform3D(-3.9531724e-08, -0.04126196, 0.9034401, 0, 0.9034395, 0.041261986, -0.90438044, 1.8036175e-09, -3.9490622e-08, 0, 0, 0)
-
-[node name="fence-wood" type="MeshInstance3D" parent="."]
-transform = Transform3D(0.9834206, 0, -0.18133922, 0, 1, 0, 0.18133922, 0, 0.9834206, -13, 0, -6)
-
-[node name="fence-wood_2" type="MeshInstance3D" parent="."]
-transform = Transform3D(-0.40960053, 0, -0.912265, 0, 1, 0, 0.912265, 0, -0.40960053, -13, 0, -4)
-
-[node name="floor-stairs-corner-inner" type="MeshInstance3D" parent="."]
-transform = Transform3D(-0.99976116, 0, 0.021853527, 0, 1, 0, -0.021853527, 0, -0.99976116, -12, 0, -7)
-
-[node name="column-paint" type="MeshInstance3D" parent="."]
-transform = Transform3D(-0.76943576, 0, 0.6387242, 0, 1, 0, -0.6387242, 0, -0.76943576, -14, 0, -4)
-
-[node name="column-paint_2" type="MeshInstance3D" parent="."]
-transform = Transform3D(-0.016544823, 0, 0.99986315, 0, 1, 0, -0.99986315, 0, -0.016544823, -15, 0, 0)
-
-[node name="column-paint_3" type="MeshInstance3D" parent="."]
-transform = Transform3D(-0.8606154, 0, 0.5092555, 0, 1, 0, -0.5092555, 0, -0.8606154, -13, 0, -6)
-
-[node name="column-paint_4" type="MeshInstance3D" parent="."]
-transform = Transform3D(0.39714935, 0, -0.917754, 0, 1, 0, 0.917754, 0, 0.39714935, -16, 0, -6)
-
-[node name="column-paint_5" type="MeshInstance3D" parent="."]
-transform = Transform3D(-0.6256428, 0, 0.7801097, 0, 1, 0, -0.7801097, 0, -0.6256428, -13, 0, -4)
-
-[node name="column-paint_6" type="MeshInstance3D" parent="."]
-transform = Transform3D(0.9985454, 0, 0.053916935, 0, 1, 0, -0.053916935, 0, 0.9985454, -15, 0, -6)
-
-[node name="battlement-half" type="MeshInstance3D" parent="."]
-transform = Transform3D(-0.9032429, 0, -0.42912966, 0, 1, 0, 0.42912966, 0, -0.9032429, 3, 0, -6)
-
-[node name="battlement-half_2" type="MeshInstance3D" parent="."]
-transform = Transform3D(-0.5023689, 0, 0.86465335, 0, 1, 0, -0.86465335, 0, -0.5023689, 4, 0, -4)
-
-[node name="battlement-half_3" type="MeshInstance3D" parent="."]
-transform = Transform3D(0.91736615, 0, -0.39804438, 0, 1, 0, 0.39804438, 0, 0.91736615, 2, 0, -5)
-
-[node name="wall_window_2_3" parent="." instance=ExtResource("9_884kg")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 7, 7.5)
-
-[node name="wall_window_2" parent="." instance=ExtResource("9_884kg")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 6, 7.5)
+transform = Transform3D(-3.934025e-08, 0, 0.9, 0, 0.9, 0, -0.9, 0, -3.934025e-08, 1, 0, 1)

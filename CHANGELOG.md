@@ -1,5 +1,92 @@
 # Changelog
 
+## [2.1.0] - 2025-10-31
+
+### ✨ New Features
+
+#### Parent Placement Control System
+
+- **Flexible Parent Node Placement**
+  - New parent placement modes: `root`, `selected`, `custom`, and `auto`
+  - `root` mode: Place assets as children of scene root (default behavior)
+  - `selected` mode: Place assets as children of currently selected node
+  - `custom` mode: Place assets at a custom node path (e.g., `World/Objects`)
+  - `auto` mode: Automatically create/reuse a container node for organized asset management
+  - Setting: `parent_placement_mode` in Basic settings section
+  - File: `utils/plugin_constants.gd`, `settings/settings_definition.gd`
+
+- **Scene Tree Context Menu Integration**
+  - Right-click any node in the Scene Tree to set it as the target parent for asset placement
+  - "Set as Asset Placement Parent" context menu option
+  - Visual feedback when parent is set
+  - Automatically updates placement settings to use selected mode
+  - File: `context_menu/scene_tree_context_menu.gd`
+
+- **Conditional Settings UI**
+  - Settings can now depend on other settings for visibility
+  - `custom_parent_path` field only shown when parent mode is set to `custom`
+  - `auto_parent_name` field only shown when parent mode is set to `auto`
+  - Improved UX by hiding irrelevant settings
+  - Enhanced `SettingMeta` class with `depends_on` and `depends_on_value` properties
+  - Files: `settings/settings_definition.gd`, `settings/settings_ui_builder.gd`
+
+- **Node Path Browser for Custom Parent**
+  - Browse button (`...`) next to custom parent path field
+  - Select any node from scene tree to set as custom parent
+  - Real-time validation with visual feedback (✓ valid / ⚠ not found)
+  - Tooltips show current validation status
+  - File: `settings/settings_ui_builder.gd`
+
+### 🎯 Improvements
+
+#### Enhanced Placement System
+
+- **Consistent Parent Node Handling**
+  - Placement mode now determines and stores target parent node upfront
+  - Eliminates inconsistencies during batch placement operations
+  - Parent node cached for entire placement session
+  - Applies to both asset and MeshLibrary placement
+  - Files: `core/placement_mode_controller.gd`, `managers/utility_manager.gd`
+
+- **Improved Utility Manager API**
+  - New `get_target_parent_node()` method for retrieving parent based on settings
+  - New `get_selected_scene_node()` method for getting selected node from editor
+  - Enhanced `place_asset_in_scene()` and `place_from_meshlib()` with `stored_parent` parameter
+  - Better documentation with comprehensive docstrings
+  - File: `managers/utility_manager.gd`
+
+- **Robust Physics Space State Retrieval**
+  - Enhanced `get_world_space_state_static()` to work with any node type
+  - Automatically searches for Node3D in hierarchy if needed
+  - Falls back to viewport's World3D when direct access unavailable
+  - Better handling of 2D root nodes and complex scene structures
+  - New `_find_node_3d_recursive()` helper for Node3D discovery
+  - File: `placement/placement_strategy.gd`
+
+- **Settings Persistence Improvements**
+  - Added support for `STRING` type settings in UI update/read operations
+  - Dynamic visibility updates when parent option button changes
+  - Better integration between settings definitions and UI
+  - Files: `settings/settings_persistence.gd`, `settings/settings_ui_builder.gd`
+
+- **Toolbar Settings Refresh**
+  - New `_refresh_active_mode_settings()` method for immediate settings updates
+  - Toolbar button changes now instantly update active placement/transform mode
+  - Grid snap, random rotation, surface align, smooth transforms, and cursor warp all refresh immediately
+  - Better user feedback when toggling settings during active operations
+  - File: `ui/toolbar_buttons.gd`
+
+### 🐛 Bug Fixes
+
+- **Fixed Node Validation**
+  - `NodeUtils.is_valid()` now handles freed object references gracefully
+  - Parameter changed to untyped to avoid errors with freed objects
+  - Added proper instance validity check before type checking
+  - Prevents crashes when validating nodes that have been freed
+  - File: `utils/node_utils.gd`
+
+---
+
 ## [2.0.2] - 2025-10-27
 
 ### 🐛 Bug Fixes

@@ -186,15 +186,48 @@ static func _build_basic_section(container: Control, settings: Array, owner_node
 				label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 				hbox.add_child(label)
 				
-				var line_edit = LineEdit.new()
-				line_edit.text = settings_data.get(setting.id, setting.default_value)
-				line_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-				line_edit.tooltip_text = setting.ui_tooltip
-				line_edit.placeholder_text = "Enter path..."
-				hbox.add_child(line_edit)
+				# Check if this is a node path setting that needs special handling
+				var is_node_path = setting.id == "custom_parent_path"
+				
+				if is_node_path:
+					# Create input container with browse button
+					var input_container = HBoxContainer.new()
+					input_container.add_theme_constant_override("separation", 4)
+					input_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+					
+					var line_edit = LineEdit.new()
+					line_edit.text = settings_data.get(setting.id, setting.default_value)
+					line_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+					line_edit.placeholder_text = "e.g., World/Objects"
+					input_container.add_child(line_edit)
+					
+					# Browse button
+					var browse_btn = Button.new()
+					browse_btn.text = "..."
+					browse_btn.custom_minimum_size.x = 32
+					browse_btn.tooltip_text = "Select node from scene tree"
+					browse_btn.pressed.connect(_on_browse_node_path.bind(line_edit))
+					input_container.add_child(browse_btn)
+					
+					# Connect validation on text change (updates tooltip only)
+					line_edit.text_changed.connect(_validate_node_path_tooltip.bind(line_edit))
+					
+					# Initial validation
+					_validate_node_path_tooltip(line_edit.text, line_edit)
+					
+					hbox.add_child(input_container)
+					ui_controls[setting.id] = line_edit
+				else:
+					# Standard string input
+					var line_edit = LineEdit.new()
+					line_edit.text = settings_data.get(setting.id, setting.default_value)
+					line_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+					line_edit.tooltip_text = setting.ui_tooltip
+					line_edit.placeholder_text = "Enter text..."
+					hbox.add_child(line_edit)
+					ui_controls[setting.id] = line_edit
 				
 				container.add_child(hbox)
-				ui_controls[setting.id] = line_edit
 				control_container = hbox
 		
 		# Handle conditional visibility
@@ -220,9 +253,16 @@ static func _build_basic_section(container: Control, settings: Array, owner_node
 				)
 
 static func _update_dependent_visibility(parent_container: Control, parent_id: String, parent_value) -> void:
-	"""Update visibility of controls that depend on a parent setting"""
-	for child in parent_container.get_children():
+	"""Update visibility of controls that depend on a parent setting (searches recursively)"""
+	_update_dependent_visibility_recursive(parent_container, parent_id, parent_value)
+
+static func _update_dependent_visibility_recursive(node: Node, parent_id: String, parent_value) -> int:
+	"""Recursively search for dependent controls and return count found"""
+	var found_count = 0
+	
+	for child in node.get_children():
 		if child.has_meta("depends_on") and child.get_meta("depends_on") == parent_id:
+			found_count += 1
 			var depends_on_value = child.get_meta("depends_on_value")
 			var should_show = false
 			
@@ -233,6 +273,12 @@ static func _update_dependent_visibility(parent_container: Control, parent_id: S
 				should_show = parent_value == depends_on_value
 			
 			child.visible = should_show
+		
+		# Recursively search children
+		if child.get_child_count() > 0:
+			found_count += _update_dependent_visibility_recursive(child, parent_id, parent_value)
+	
+	return found_count
 
 static func _build_checkbox_section(container: Control, settings: Array, owner_node: Node, settings_data: Dictionary, ui_controls: Dictionary):
 	for setting in settings:
@@ -369,6 +415,46 @@ static func _build_grid_section(container: Control, settings: Array, owner_node:
 					spinbox_z.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 					grid.add_child(spinbox_z)
 					ui_controls["grid_offset_z"] = spinbox_z
+
+static func _validate_node_path_tooltip(path_text: String, line_edit: LineEdit) -> void:
+	"""Validate node path and update tooltip with feedback"""
+	if path_text.is_empty():
+		line_edit.tooltip_text = "Empty = uses scene root"
+		return
+	
+	var scene_root = EditorInterface.get_edited_scene_root()
+	if not scene_root:
+		line_edit.tooltip_text = "No scene currently open"
+		return
+	
+	# Check if path exists
+	if scene_root.has_node(NodePath(path_text)):
+		var target_node = scene_root.get_node(NodePath(path_text))
+		line_edit.tooltip_text = "✓ Valid - Node: " + target_node.name
+	else:
+		line_edit.tooltip_text = "⚠ Path not found (will use scene root as fallback)"
+
+static func _on_browse_node_path(line_edit: LineEdit) -> void:
+	"""Open a simple prompt to select from scene tree or use current selection"""
+	var scene_root = EditorInterface.get_edited_scene_root()
+	if not scene_root:
+		push_warning("No scene is currently open")
+		return
+	
+	# Check if user has a node selected in the scene tree
+	var selection = EditorInterface.get_selection()
+	var selected_nodes = selection.get_selected_nodes()
+	
+	if selected_nodes.size() > 0:
+		var selected_node = selected_nodes[0]
+		# Get path relative to scene root
+		var relative_path = scene_root.get_path_to(selected_node)
+		line_edit.text = str(relative_path)
+		line_edit.text_changed.emit(line_edit.text)
+	else:
+		# No selection - show info to user
+		push_warning("Please select a node in the scene tree first, then click the browse button")
+		# Could alternatively open a custom tree dialog here
 
 static func _format_option_label(option: String) -> String:
 	var cleaned := option.replace("_", " ")

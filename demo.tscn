@@ -1,5 +1,6 @@
-[gd_scene load_steps=11 format=3 uid="uid://repnqsnpqatg"]
+[gd_scene load_steps=12 format=3 uid="uid://repnqsnpqatg"]
 
+[ext_resource type="PackedScene" uid="uid://umuuejkyganm" path="res://sample/assets/kenny_retro-medival-kit/bricks.glb" id="1_d4o4o"]
 [ext_resource type="PackedScene" uid="uid://bi526m4rgyylo" path="res://sample/building_a.tscn" id="1_m0rpm"]
 [ext_resource type="PackedScene" uid="uid://bs7orqq2mvo0n" path="res://sample/building_b.tscn" id="2_c6xj6"]
 [ext_resource type="PackedScene" uid="uid://b2u5e78en3vxj" path="res://sample/building_c.tscn" id="3_6bw2v"]
@@ -15,6 +16,14 @@ albedo_texture = ExtResource("5_6bw2v")
 uv1_scale = Vector3(10, 10, 10)
 
 [node name="Node3D" type="Node3D"]
+
+[node name="AssetRoot" type="Node3D" parent="."]
+
+[node name="bricks" type="Node3D" parent="AssetRoot" instance=ExtResource("1_d4o4o")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.15, -0.04, -10.66)
+
+[node name="bricks_2" type="Node3D" parent="AssetRoot" instance=ExtResource("1_d4o4o")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.52, -0.04, -10.51)
 
 [node name="CSGCombiner3D" type="CSGCombiner3D" parent="."]
 use_collision = true
@@ -33,7 +42,7 @@ operation = 2
 transform = Transform3D(4.3312562e-07, 0, -0.99999964, 0, 1, 0, 0.99999964, 0, 4.3312562e-07, -4.4034243, -0.06889253, -7.9194717)
 
 [node name="building_a_2" parent="." instance=ExtResource("1_m0rpm")]
-transform = Transform3D(-0.9685939, 0, -0.24864638, 0, 1, 0, 0.24864638, 0, -0.9685939, 1.2087587, 0.22140877, -10.841575)
+transform = Transform3D(-0.96592563, 0, -0.2588181, 0, 1, 0, 0.2588181, 0, -0.96592563, 3.3819323, -0.039999902, -10.737915)
 
 [node name="building_b" parent="." instance=ExtResource("2_c6xj6")]
 transform = Transform3D(0.69229835, 5.2571067e-09, 0.72161096, 0, 1, -7.285232e-09, -0.72161096, 5.043557e-09, 0.69229835, 2.3408487, 0, -1.4599462)
@@ -103,3 +112,5 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 7, 7.5)
 
 [node name="wall_window_2" parent="." instance=ExtResource("9_884kg")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 6, 7.5)
+
+[node name="Node3D" type="Node3D" parent="."]

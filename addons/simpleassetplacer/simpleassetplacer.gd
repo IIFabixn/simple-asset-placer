@@ -18,10 +18,14 @@ const ThumbnailGenerator = preload("res://addons/simpleassetplacer/thumbnails/th
 const AssetPlacerDock = preload("res://addons/simpleassetplacer/ui/asset_placer_dock.gd")
 const ToolbarButtonsScene = preload("res://addons/simpleassetplacer/ui/toolbar_buttons.tscn")
 
+# Import context menu
+const SceneTreeContextMenu = preload("res://addons/simpleassetplacer/context_menu/scene_tree_context_menu.gd")
+
 # Plugin state
 var dock: AssetPlacerDock
 var toolbar_buttons: Control = null
 var filesystem_dock: Control = null
+var scene_tree_context_menu: SceneTreeContextMenu = null
 
 const ABOUT_TAB_SEEN_KEY := "simpleassetplacer/ui/about_tab_seen"
 
@@ -44,6 +48,7 @@ func _enter_tree() -> void:
 	_setup_dock()
 	_setup_toolbar()
 	_setup_filesystem_context_menu()
+	_setup_scene_tree_context_menu()
 	
 	# Enable input forwarding for reliable input handling
 	set_input_event_forwarding_always_enabled()
@@ -56,6 +61,7 @@ func _exit_tree() -> void:
 	# Clean up in reverse order
 	_cleanup_systems()
 	_cleanup_toolbar()
+	_cleanup_scene_tree_context_menu()
 	_cleanup_filesystem_context_menu()
 	_cleanup_dock()
 	
@@ -273,6 +279,31 @@ func _setup_filesystem_context_menu():
 func _cleanup_filesystem_context_menu():
 	"""Clean up FileSystem dock context menu integration"""
 	filesystem_dock = null
+
+func _setup_scene_tree_context_menu():
+	"""Set up Scene Tree dock context menu integration"""
+	scene_tree_context_menu = SceneTreeContextMenu.new()
+	
+	# Inject settings manager dependency
+	if service_registry and service_registry.settings_manager:
+		scene_tree_context_menu.set_settings_manager(service_registry.settings_manager)
+	else:
+		PluginLogger.warning(PluginConstants.COMPONENT_MAIN, "Settings manager not available for context menu")
+	
+	# Inject dock reference (needs to be deferred since dock is set up before context menu)
+	if dock:
+		scene_tree_context_menu.set_dock_reference(dock)
+	
+	# Register the context menu plugin with the editor
+	add_context_menu_plugin(EditorContextMenuPlugin.ContextMenuSlot.CONTEXT_SLOT_SCENE_TREE, scene_tree_context_menu)
+	
+	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Scene tree context menu setup complete")
+
+func _cleanup_scene_tree_context_menu():
+	"""Clean up Scene Tree dock context menu integration"""
+	if scene_tree_context_menu:
+		remove_context_menu_plugin(scene_tree_context_menu)
+		scene_tree_context_menu = null
 
 ## Core Processing Loop
 

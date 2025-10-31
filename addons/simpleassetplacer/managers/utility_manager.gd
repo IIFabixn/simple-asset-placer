@@ -54,6 +54,82 @@ func generate_unique_name(base_name: String, parent: Node) -> String:
 	
 	return unique_name
 
+func get_target_parent_node(settings: Dictionary) -> Node:
+	"""Get the target parent node based on parent placement mode settings
+	
+	Args:
+		settings: Dictionary containing placement settings
+	
+	Returns:
+		Node to use as parent, or null if scene root not available
+	"""
+	const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
+	
+	var scene_root = _services.editor_facade.get_edited_scene_root()
+	if not scene_root:
+		PluginLogger.error("UtilityManager", "No scene root available")
+		return null
+	
+	var parent_mode = settings.get("parent_placement_mode", PluginConstants.DEFAULT_PARENT_MODE)
+	
+	match parent_mode:
+		PluginConstants.PARENT_MODE_ROOT:
+			# Default behavior - place at scene root
+			return scene_root
+		
+		PluginConstants.PARENT_MODE_SELECTED:
+			# Place as child of currently selected node
+			var selection = EditorInterface.get_selection()
+			if selection:
+				var selected_nodes = selection.get_selected_nodes()
+				if selected_nodes.size() > 0:
+					var selected_node = selected_nodes[0]
+					PluginLogger.info("UtilityManager", "Placing under selected node: " + selected_node.name)
+					return selected_node
+			
+			# Fallback to root if nothing selected
+			PluginLogger.warning("UtilityManager", "No node selected, falling back to scene root")
+			return scene_root
+		
+		PluginConstants.PARENT_MODE_CUSTOM:
+			# Place at custom node path
+			var custom_path = settings.get("custom_parent_path", "")
+			if custom_path.is_empty():
+				PluginLogger.warning("UtilityManager", "Custom parent path is empty, using scene root")
+				return scene_root
+			
+			# Try to get the node at the custom path
+			var target_node = scene_root.get_node_or_null(NodePath(custom_path))
+			if target_node:
+				PluginLogger.info("UtilityManager", "Placing under custom parent: " + target_node.name)
+				return target_node
+			else:
+				PluginLogger.warning("UtilityManager", "Custom parent path '%s' not found, falling back to scene root" % custom_path)
+				return scene_root
+		
+		PluginConstants.PARENT_MODE_AUTO:
+			# Auto-create or reuse container node
+			var container_name = settings.get("auto_parent_name", PluginConstants.DEFAULT_AUTO_PARENT_NAME)
+			
+			# Check if container already exists as direct child of root
+			if scene_root.has_node(NodePath(container_name)):
+				var container = scene_root.get_node(NodePath(container_name))
+				PluginLogger.info("UtilityManager", "Using existing container: " + container_name)
+				return container
+			else:
+				# Create new container node
+				var container = Node3D.new()
+				container.name = container_name
+				scene_root.add_child(container)
+				container.owner = scene_root
+				PluginLogger.info("UtilityManager", "Created new container: " + container_name)
+				return container
+		
+		_:
+			# Unknown mode, fallback to root
+			PluginLogger.warning("UtilityManager", "Unknown parent placement mode '%s', using scene root" % parent_mode)
+			return scene_root
+
 func add_node_to_scene(node: Node, parent: Node) -> void:
 	"""Add a node to the scene
 	
@@ -120,45 +196,46 @@ func place_asset_in_scene(asset_path: String, position: Vector3 = Vector3.ZERO, 
 		PluginLogger.error("UtilityManager", "Failed to instantiate asset: " + asset_path)
 		return null
 	
-	# Generate unique name and add to scene first
-	var current_scene = _services.editor_facade.get_edited_scene_root()
-	if current_scene:
-		var base_name = asset_path.get_file().get_basename()
-		var unique_name = generate_unique_name(base_name, current_scene)
-		scene_instance.name = unique_name
-		
-		# Add to scene (undo/redo handled by TransformationCoordinator)
-		add_node_to_scene(scene_instance, current_scene)
-		
-		# Now apply transforms (after node is in tree)
-		# Calculate final rotation
-		var final_rotation = Vector3.ZERO
-		if transform_state:
-			# Get rotation from transform state (includes surface alignment + manual offset)
-			var surface_transform = Transform3D(Basis.from_euler(transform_state.values.surface_alignment_rotation), Vector3.ZERO)
-			var manual_transform = Transform3D(Basis.from_euler(transform_state.values.manual_rotation_offset), Vector3.ZERO)
-			var combined_transform = surface_transform * manual_transform
-			final_rotation = combined_transform.basis.get_euler()
-		
-		# Apply random Y rotation if enabled
-		if settings.get("random_rotation", false):
-			var random_y_rotation = randf_range(0.0, TAU)  # Full 360 degrees in radians
-			final_rotation.y += random_y_rotation
-		
-		# Apply scale (assume uniform scale from scale_manager)
-		var scale_multiplier = _services.scale_manager.get_scale(transform_state) if transform_state else 1.0
-		PluginLogger.info("UtilityManager", "Applying scale multiplier: " + str(scale_multiplier) + " (transform_state: " + ("present" if transform_state else "null") + ")")
-		var final_scale = scene_instance.scale * scale_multiplier
-		
-		# Apply all transforms immediately without smooth transitions (newly placed objects should snap to final state)
-		_services.smooth_transform_manager.apply_transform_immediately(scene_instance, position, final_rotation, final_scale)
-		
-		PluginLogger.info("UtilityManager", "Successfully placed asset as: " + unique_name + " with final scale: " + str(scene_instance.scale))
-		return scene_instance
-	else:
-		PluginLogger.error("UtilityManager", "No current scene root found")
+	# Get target parent node based on settings
+	var target_parent = get_target_parent_node(settings)
+	if not target_parent:
+		PluginLogger.error("UtilityManager", "No valid parent node available")
 		scene_instance.queue_free()
 		return null
+	
+	# Generate unique name based on target parent
+	var base_name = asset_path.get_file().get_basename()
+	var unique_name = generate_unique_name(base_name, target_parent)
+	scene_instance.name = unique_name
+	
+	# Add to scene (undo/redo handled by TransformationCoordinator)
+	add_node_to_scene(scene_instance, target_parent)
+	
+	# Now apply transforms (after node is in tree)
+	# Calculate final rotation
+	var final_rotation = Vector3.ZERO
+	if transform_state:
+		# Get rotation from transform state (includes surface alignment + manual offset)
+		var surface_transform = Transform3D(Basis.from_euler(transform_state.values.surface_alignment_rotation), Vector3.ZERO)
+		var manual_transform = Transform3D(Basis.from_euler(transform_state.values.manual_rotation_offset), Vector3.ZERO)
+		var combined_transform = surface_transform * manual_transform
+		final_rotation = combined_transform.basis.get_euler()
+	
+	# Apply random Y rotation if enabled
+	if settings.get("random_rotation", false):
+		var random_y_rotation = randf_range(0.0, TAU)  # Full 360 degrees in radians
+		final_rotation.y += random_y_rotation
+	
+	# Apply scale (assume uniform scale from scale_manager)
+	var scale_multiplier = _services.scale_manager.get_scale(transform_state) if transform_state else 1.0
+	PluginLogger.info("UtilityManager", "Applying scale multiplier: " + str(scale_multiplier) + " (transform_state: " + ("present" if transform_state else "null") + ")")
+	var final_scale = scene_instance.scale * scale_multiplier
+	
+	# Apply all transforms immediately without smooth transitions (newly placed objects should snap to final state)
+	_services.smooth_transform_manager.apply_transform_immediately(scene_instance, position, final_rotation, final_scale)
+	
+	PluginLogger.info("UtilityManager", "Successfully placed asset as: " + unique_name + " with final scale: " + str(scene_instance.scale))
+	return scene_instance
 
 func place_from_meshlib(
 	mesh: Mesh,
@@ -173,15 +250,20 @@ func place_from_meshlib(
 	var mesh_instance = MeshInstance3D.new()
 	mesh_instance.mesh = mesh
 	
-	# Generate unique name and add to scene first
-	var current_scene = _services.editor_facade.get_edited_scene_root()
-	if current_scene:
-		var base_name = meshlib.get_item_name(item_id)
-		var unique_name = generate_unique_name(base_name, current_scene)
-		mesh_instance.name = unique_name
-		
-		# Add to scene (undo/redo handled by TransformationCoordinator)
-		add_node_to_scene(mesh_instance, current_scene)
+	# Get target parent node based on settings
+	var target_parent = get_target_parent_node(settings)
+	if not target_parent:
+		PluginLogger.error("UtilityManager", "No valid parent node available")
+		mesh_instance.queue_free()
+		return null
+	
+	# Generate unique name based on target parent
+	var base_name = meshlib.get_item_name(item_id)
+	var unique_name = generate_unique_name(base_name, target_parent)
+	mesh_instance.name = unique_name
+	
+	# Add to scene (undo/redo handled by TransformationCoordinator)
+	add_node_to_scene(mesh_instance, target_parent)
 	
 	# Get base rotation from MeshLibrary
 	var base_rotation = _services.rotation_manager.get_current_rotation(transform_state)

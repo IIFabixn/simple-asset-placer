@@ -97,6 +97,9 @@ func update_ui_from_settings(ui_controls: Dictionary, owner_node: Node) -> void:
 			SettingsDefinition.SettingType.FLOAT:
 				if control is SpinBox and value != null:
 					control.value = value
+			SettingsDefinition.SettingType.STRING:
+				if control is LineEdit and value != null:
+					control.text = str(value)
 			SettingsDefinition.SettingType.KEY_BINDING:
 				if control is Button and value != null:
 					control.text = str(value)
@@ -133,6 +136,9 @@ func read_ui_to_settings(ui_controls: Dictionary, owner_node: Node) -> void:
 			SettingsDefinition.SettingType.FLOAT:
 				if control is SpinBox:
 					owner_node.set(setting.id, control.value)
+			SettingsDefinition.SettingType.STRING:
+				if control is LineEdit:
+					owner_node.set(setting.id, control.text)
 			SettingsDefinition.SettingType.OPTION:
 				if control is OptionButton:
 					var selected_index = control.selected

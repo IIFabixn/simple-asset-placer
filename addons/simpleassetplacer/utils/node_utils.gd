@@ -28,7 +28,7 @@ const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_con
 
 ## Core Validation
 
-static func is_valid(node: Node) -> bool:
+static func is_valid(node) -> bool:
 	"""
 	Check if node is valid and not queued for deletion.
 	
@@ -36,12 +36,20 @@ static func is_valid(node: Node) -> bool:
 	Replaces: if node and is_instance_valid(node)
 	
 	Args:
-		node: Node to validate
+		node: Node to validate (untyped to handle freed references)
 	
 	Returns:
 		True if node exists and is valid, False otherwise
+	
+	Note: Parameter is untyped to avoid errors when passed a freed object reference
 	"""
-	return node != null and is_instance_valid(node)
+	if node == null:
+		return false
+	# Check instance validity first (handles freed objects)
+	if not is_instance_valid(node):
+		return false
+	# Finally check if it's actually a Node
+	return node is Node
 
 static func is_valid_and_ready(node: Node) -> bool:
 	"""

@@ -28,6 +28,8 @@ class SettingMeta:
 	var step: float = 0.01
 	var section: String = ""  # UI section grouping
 	var options: Array = []  # For OPTION type: array of strings for dropdown
+	var depends_on: String = ""  # ID of setting this depends on (for conditional visibility)
+	var depends_on_value = null  # Value the parent setting must have for this to be visible (can be String or Array for multiple values)
 	
 	func _init(p_id: String, p_editor_key: String, p_default, p_type: SettingType, p_label: String = ""):
 		id = p_id
@@ -35,6 +37,20 @@ class SettingMeta:
 		default_value = p_default
 		type = p_type
 		ui_label = p_label if p_label else p_id.capitalize()
+	
+	func should_be_visible(parent_value) -> bool:
+		"""Check if this setting should be visible based on parent setting value"""
+		if depends_on.is_empty():
+			return true  # No dependency, always visible
+		
+		if depends_on_value == null:
+			return true  # No specific value required, always visible
+		
+		# Check if parent value matches required value(s)
+		if depends_on_value is Array:
+			return parent_value in depends_on_value
+		else:
+			return parent_value == depends_on_value
 
 # All settings definitions
 static func get_all_settings() -> Array:
@@ -121,6 +137,27 @@ static func get_all_settings() -> Array:
 	cursor_warp_enabled.section = "basic"
 	cursor_warp_enabled.ui_tooltip = "Warp the mouse back toward the viewport center when it nears the edge during mouse-based transforms. Disable if you prefer no cursor repositioning."
 	settings.append(cursor_warp_enabled)
+	
+	# Parent Placement Settings
+	var parent_placement_mode = SettingMeta.new("parent_placement_mode", "simple_asset_placer/parent_placement_mode", PluginConstants.DEFAULT_PARENT_MODE, SettingType.OPTION, "Parent Placement Mode")
+	parent_placement_mode.section = "basic"
+	parent_placement_mode.options = [PluginConstants.PARENT_MODE_ROOT, PluginConstants.PARENT_MODE_SELECTED, PluginConstants.PARENT_MODE_CUSTOM, PluginConstants.PARENT_MODE_AUTO]
+	parent_placement_mode.ui_tooltip = "Where to place assets: 'root' = Scene Root | 'selected' = Selected Node | 'custom' = Custom Path | 'auto' = Auto-Created Container"
+	settings.append(parent_placement_mode)
+	
+	var custom_parent_path = SettingMeta.new("custom_parent_path", "simple_asset_placer/custom_parent_path", "", SettingType.STRING, "Custom Parent Path")
+	custom_parent_path.section = "basic"
+	custom_parent_path.depends_on = "parent_placement_mode"
+	custom_parent_path.depends_on_value = PluginConstants.PARENT_MODE_CUSTOM
+	custom_parent_path.ui_tooltip = "Node path for 'custom' mode (e.g., 'World/Objects'). Used only when Parent Placement Mode is set to 'custom'."
+	settings.append(custom_parent_path)
+	
+	var auto_parent_name = SettingMeta.new("auto_parent_name", "simple_asset_placer/auto_parent_name", PluginConstants.DEFAULT_AUTO_PARENT_NAME, SettingType.STRING, "Auto-Created Parent Name")
+	auto_parent_name.section = "basic"
+	auto_parent_name.depends_on = "parent_placement_mode"
+	auto_parent_name.depends_on_value = PluginConstants.PARENT_MODE_AUTO
+	auto_parent_name.ui_tooltip = "Name for auto-created parent container. Used only when Parent Placement Mode is set to 'auto'."
+	settings.append(auto_parent_name)
 	
 	# Increment modifiers for keyboard-based transforms
 	var fine_sensitivity_multiplier = SettingMeta.new("fine_sensitivity_multiplier", "simple_asset_placer/fine_sensitivity_multiplier", PluginConstants.FINE_SENSITIVITY_MULTIPLIER, SettingType.FLOAT, "Fine Increment Multiplier")

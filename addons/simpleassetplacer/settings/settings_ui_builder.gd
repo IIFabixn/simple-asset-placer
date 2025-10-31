@@ -111,7 +111,10 @@ static func build_settings_ui(container: Control, owner_node: Node, settings_dat
 	return ui_controls
 
 static func _build_basic_section(container: Control, settings: Array, owner_node: Node, settings_data: Dictionary, ui_controls: Dictionary):
+	# First pass: build all controls
 	for setting in settings:
+		var control_container = null  # Container to show/hide for dependent settings
+		
 		match setting.type:
 			SettingsDefinition.SettingType.BOOL:
 				var checkbox = CheckBox.new()
@@ -120,6 +123,7 @@ static func _build_basic_section(container: Control, settings: Array, owner_node
 				checkbox.tooltip_text = setting.ui_tooltip
 				container.add_child(checkbox)
 				ui_controls[setting.id] = checkbox
+				control_container = checkbox
 			
 			SettingsDefinition.SettingType.OPTION:
 				var hbox = HBoxContainer.new()
@@ -147,6 +151,7 @@ static func _build_basic_section(container: Control, settings: Array, owner_node
 				hbox.add_child(option_button)
 				container.add_child(hbox)
 				ui_controls[setting.id] = option_button
+				control_container = hbox
 			
 			SettingsDefinition.SettingType.FLOAT:
 				var hbox = HBoxContainer.new()
@@ -170,6 +175,64 @@ static func _build_basic_section(container: Control, settings: Array, owner_node
 				
 				container.add_child(hbox)
 				ui_controls[setting.id] = spinbox
+				control_container = hbox
+			
+			SettingsDefinition.SettingType.STRING:
+				var hbox = HBoxContainer.new()
+				hbox.add_theme_constant_override("separation", 8)
+				
+				var label = Label.new()
+				label.text = setting.ui_label + ":"
+				label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				hbox.add_child(label)
+				
+				var line_edit = LineEdit.new()
+				line_edit.text = settings_data.get(setting.id, setting.default_value)
+				line_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				line_edit.tooltip_text = setting.ui_tooltip
+				line_edit.placeholder_text = "Enter path..."
+				hbox.add_child(line_edit)
+				
+				container.add_child(hbox)
+				ui_controls[setting.id] = line_edit
+				control_container = hbox
+		
+		# Handle conditional visibility
+		if not setting.depends_on.is_empty() and control_container:
+			# Store metadata for visibility updates
+			control_container.set_meta("setting_id", setting.id)
+			control_container.set_meta("depends_on", setting.depends_on)
+			control_container.set_meta("depends_on_value", setting.depends_on_value)
+			
+			# Set initial visibility based on parent setting value
+			var parent_value = settings_data.get(setting.depends_on, null)
+			control_container.visible = setting.should_be_visible(parent_value)
+	
+	# Second pass: connect signals for dynamic visibility updates
+	for setting in settings:
+		if setting.type == SettingsDefinition.SettingType.OPTION and ui_controls.has(setting.id):
+			var option_button = ui_controls[setting.id] as OptionButton
+			if option_button:
+				# Connect to update dependent controls when this option changes
+				option_button.item_selected.connect(func(index: int):
+					var selected_value = setting.options[index] if index < setting.options.size() else ""
+					_update_dependent_visibility(container, setting.id, selected_value)
+				)
+
+static func _update_dependent_visibility(parent_container: Control, parent_id: String, parent_value) -> void:
+	"""Update visibility of controls that depend on a parent setting"""
+	for child in parent_container.get_children():
+		if child.has_meta("depends_on") and child.get_meta("depends_on") == parent_id:
+			var depends_on_value = child.get_meta("depends_on_value")
+			var should_show = false
+			
+			# Check if parent value matches required value(s)
+			if depends_on_value is Array:
+				should_show = parent_value in depends_on_value
+			else:
+				should_show = parent_value == depends_on_value
+			
+			child.visible = should_show
 
 static func _build_checkbox_section(container: Control, settings: Array, owner_node: Node, settings_data: Dictionary, ui_controls: Dictionary):
 	for setting in settings:
@@ -253,6 +316,20 @@ static func _build_grid_section(container: Control, settings: Array, owner_node:
 
 				grid.add_child(option_button)
 				ui_controls[setting.id] = option_button
+			
+			SettingsDefinition.SettingType.STRING:
+				var label = Label.new()
+				label.text = setting.ui_label + ":"
+				label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				grid.add_child(label)
+				
+				var line_edit = LineEdit.new()
+				line_edit.text = settings_data.get(setting.id, setting.default_value)
+				line_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				line_edit.tooltip_text = setting.ui_tooltip
+				line_edit.placeholder_text = "Enter path..."
+				grid.add_child(line_edit)
+				ui_controls[setting.id] = line_edit
 			
 			SettingsDefinition.SettingType.VECTOR3:
 				# Handle Vector3 separately (for snap_offset with X/Z spinboxes)

@@ -114,6 +114,14 @@ const DEFAULT_KEY_LARGE_INCREMENT_MODIFIER: String = "ALT"
 const DEFAULT_COLLISION_MASK: int = 1
 const DEFAULT_RAYCAST_DISTANCE: float = 1000.0
 
+## Parent Placement Modes
+const PARENT_MODE_ROOT: String = "root"  # Place as child of scene root
+const PARENT_MODE_SELECTED: String = "selected"  # Place as child of selected node
+const PARENT_MODE_CUSTOM: String = "custom"  # Place at custom node path
+const PARENT_MODE_AUTO: String = "auto"  # Auto-create/reuse container node
+const DEFAULT_PARENT_MODE: String = PARENT_MODE_ROOT
+const DEFAULT_AUTO_PARENT_NAME: String = "PlacedAssets"
+
 ## Status Messages
 const STATUS_MESSAGE_DURATION_SHORT: float = 2.0
 const STATUS_MESSAGE_DURATION_MEDIUM: float = 3.0

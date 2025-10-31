@@ -72,6 +72,11 @@ var continuous_placement_enabled: bool = true
 var auto_select_placed: bool = true
 var cursor_warp_enabled: bool = true
 
+# Parent Placement Settings
+var parent_placement_mode: String = "root"
+var custom_parent_path: String = ""
+var auto_parent_name: String = "PlacedAssets"
+
 # Advanced Grid Settings
 var snap_offset: Vector3 = Vector3.ZERO
 var snap_y_enabled: bool = false
@@ -206,6 +211,8 @@ func _connect_all_signals():
 			control.toggled.connect(_on_setting_changed)
 		elif control is SpinBox:
 			control.value_changed.connect(_on_setting_changed)
+		elif control is LineEdit:
+			control.text_changed.connect(_on_setting_changed)
 		elif control is OptionButton:
 			control.item_selected.connect(_on_option_selected.bind(control_id))
 		elif control is Button:

@@ -22,7 +22,7 @@ ARCHITECTURE POSITION: Pure utility class with static-like functions
 - Reusable across all transform managers
 - Eliminates code duplication
 
-USED BY: PositionManager, RotationManager, ScaleManager, TransformOperations facade
+USED BY: PositionManager, RotationManager, ScaleManager
 DEPENDS ON: Godot math functions only
 """
 

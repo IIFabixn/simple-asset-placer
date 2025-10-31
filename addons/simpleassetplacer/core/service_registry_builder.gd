@@ -31,7 +31,6 @@ USAGE:
 """
 
 const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_registry.gd")
-const EditorFacade = preload("res://addons/simpleassetplacer/core/editor_facade.gd")
 const SettingsManager = preload("res://addons/simpleassetplacer/settings/settings_manager.gd")
 const SettingsPersistence = preload("res://addons/simpleassetplacer/settings/settings_persistence.gd")
 const PlacementStrategyService = preload("res://addons/simpleassetplacer/placement/placement_strategy_service.gd")
@@ -44,7 +43,6 @@ const RotationManager = preload("res://addons/simpleassetplacer/managers/rotatio
 const ScaleManager = preload("res://addons/simpleassetplacer/managers/scale_manager.gd")
 const SmoothTransformManager = preload("res://addons/simpleassetplacer/managers/smooth_transform_manager.gd")
 const GridManager = preload("res://addons/simpleassetplacer/managers/grid_manager.gd")
-const TransformOperations = preload("res://addons/simpleassetplacer/core/transform_operations.gd")
 const ModeStateMachine = preload("res://addons/simpleassetplacer/core/mode_state_machine.gd")
 const ControlModeState = preload("res://addons/simpleassetplacer/core/control_mode_state.gd")
 const TransformActionRouter = preload("res://addons/simpleassetplacer/core/transform_action_router.gd")
@@ -79,10 +77,10 @@ func with_placement_strategies() -> ServiceRegistryBuilder:
 	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "ServiceRegistry: Placement strategies registered")
 	return self
 
-func with_editor_facade() -> ServiceRegistryBuilder:
-	"""Initialize editor interface facade"""
-	_registry.editor_facade = EditorFacade.new(_editor_interface)
-	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "ServiceRegistry: Editor facade registered")
+func with_editor_interface() -> ServiceRegistryBuilder:
+	"""Store editor interface directly"""
+	_registry.editor_interface = _editor_interface
+	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "ServiceRegistry: Editor interface registered")
 	return self
 
 func with_input_systems() -> ServiceRegistryBuilder:
@@ -99,7 +97,6 @@ func with_transform_managers() -> ServiceRegistryBuilder:
 	_registry.rotation_manager = RotationManager.new(_registry)
 	_registry.scale_manager = ScaleManager.new(_registry)
 	_registry.smooth_transform_manager = SmoothTransformManager.new(_registry)
-	_registry.transform_operations = TransformOperations.new(_registry)
 	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "ServiceRegistry: Transform managers registered")
 	return self
 
@@ -143,8 +140,8 @@ func validate() -> bool:
 	var missing := []
 	
 	# Check critical services
-	if not _registry.editor_facade:
-		missing.append("editor_facade")
+	if not _registry.editor_interface:
+		missing.append("editor_interface")
 		valid = false
 	
 	if not _registry.settings_manager:
@@ -203,7 +200,7 @@ static func create_full_registry(editor_interface: EditorInterface) -> ServiceRe
 	"""
 	return ServiceRegistryBuilder.new(editor_interface) \
 		.with_settings() \
-		.with_editor_facade() \
+		.with_editor_interface() \
 		.with_placement_strategies() \
 		.with_input_systems() \
 		.with_transform_managers() \
@@ -220,7 +217,7 @@ static func create_minimal_registry(editor_interface: EditorInterface) -> Servic
 	"""
 	return ServiceRegistryBuilder.new(editor_interface) \
 		.with_settings() \
-		.with_editor_facade() \
+		.with_editor_interface() \
 		.with_placement_strategies() \
 		.with_transform_managers() \
 		.build()

@@ -333,9 +333,9 @@ func _is_plugin_ready() -> bool:
 
 func _get_current_camera() -> Camera3D:
 	"""Get the current 3D viewport camera"""
-	if not service_registry or not service_registry.editor_facade:
+	if not service_registry or not service_registry.editor_interface:
 		return null
-	var viewport_3d = service_registry.editor_facade.get_editor_viewport_3d(0)
+	var viewport_3d = service_registry.editor_interface.get_editor_viewport_3d(0)
 	if viewport_3d:
 		return viewport_3d.get_camera_3d()
 	return null
@@ -380,9 +380,9 @@ func _input(event: InputEvent) -> void:
 		var transform_key = service_registry.settings_manager.get_setting("transform_mode_key", "TAB")
 		if key_string == transform_key or full_key_string == transform_key:
 			# Only handle if we have a selected Node3D
-			if not service_registry or not service_registry.editor_facade:
+			if not service_registry or not service_registry.editor_interface:
 				return
-			var selection = service_registry.editor_facade.get_selection()
+			var selection = service_registry.editor_interface.get_selection()
 			var selected_nodes = selection.get_selected_nodes()
 			
 			# Check if we have a valid Node3D selected

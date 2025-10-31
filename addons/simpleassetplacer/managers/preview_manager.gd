@@ -76,7 +76,7 @@ func start_preview_mesh(mesh: Mesh, settings: Dictionary = {}) -> void:
 	
 	cleanup_preview()
 	
-	var current_scene = _services.editor_facade.get_edited_scene_root()
+	var current_scene = _services.editor_interface.get_edited_scene_root() if _services.editor_interface else null
 	if not current_scene or not is_instance_valid(current_scene):
 		PluginLogger.error("PreviewManager", "No valid scene available for preview")
 		return
@@ -123,7 +123,7 @@ func start_preview_asset(asset_path: String, settings: Dictionary = {}) -> void:
 	
 	cleanup_preview()
 	
-	var current_scene = _services.editor_facade.get_edited_scene_root()
+	var current_scene = _services.editor_interface.get_edited_scene_root() if _services.editor_interface else null
 	if not current_scene or not is_instance_valid(current_scene):
 		PluginLogger.error("PreviewManager", "No valid scene available for preview")
 		return

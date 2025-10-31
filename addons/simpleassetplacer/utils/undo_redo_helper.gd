@@ -62,7 +62,7 @@ func is_scene_valid() -> bool:
 	Returns:
 		bool: True if scene exists and is valid
 	"""
-	var scene = _services.editor_facade.get_edited_scene_root()
+	var scene = _services.editor_interface.get_edited_scene_root() if _services.editor_interface else null
 	if not scene:
 		return false
 	if not is_instance_valid(scene):
@@ -125,7 +125,7 @@ func create_placement_undo(
 		action_name = "Place " + placed_node.name
 	
 	# Store the scene root
-	var scene_root = _services.editor_facade.get_edited_scene_root()
+	var scene_root = _services.editor_interface.get_edited_scene_root() if _services.editor_interface else null
 	
 	# IMPORTANT: The node is already in the scene. We need to remove it and re-add via undo/redo
 	# to make it properly recognized by the editor.

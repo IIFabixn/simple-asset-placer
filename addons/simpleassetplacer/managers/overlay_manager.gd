@@ -88,11 +88,10 @@ func _create_main_overlay():
 	_main_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	
 	# Add to editor viewport
-	var editor_viewport = _services.editor_facade.get_editor_main_screen()
-	if editor_viewport:
-		editor_viewport.add_child(_main_overlay)
-	
-	# Load status overlay from scene
+	var editor_viewport = _services.editor_interface.get_editor_main_screen() if _services.editor_interface else null
+	if not editor_viewport:
+		PluginLogger.error("OverlayManager", "Failed to get editor viewport")
+		return	# Load status overlay from scene
 	_load_status_overlay_scene()
 
 ## Status Overlay
@@ -110,7 +109,7 @@ func _load_status_overlay_scene():
 		_status_overlay.set_services(_services)
 	
 	# Add to the 3D viewport specifically so it's positioned relative to viewport, not entire editor
-	var viewport_3d = _services.editor_facade.get_editor_viewport_3d(0)
+	var viewport_3d = _services.editor_interface.get_editor_viewport_3d(0) if _services.editor_interface else null
 	if viewport_3d:
 		viewport_3d.add_child(_status_overlay)
 	
@@ -313,7 +312,7 @@ func create_grid_overlay(center: Vector3, grid_size: float, grid_extent: int = 1
 	remove_grid_overlay()
 	
 	# Get the 3D editor viewport
-	var editor_root = _services.editor_facade.get_edited_scene_root()
+	var editor_root = _services.editor_interface.get_edited_scene_root() if _services.editor_interface else null
 	if not editor_root:
 		return
 	

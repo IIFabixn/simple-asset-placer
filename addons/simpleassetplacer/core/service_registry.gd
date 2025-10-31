@@ -26,8 +26,8 @@ USED BY: SimpleAssetPlacer, all managers
 # Note: All type hints reference global class_name declarations, not local preloads
 # This avoids shadowing class names with GDScript resource references
 
-# Core facade
-var editor_facade
+# Core editor interface
+var editor_interface: EditorInterface
 
 # Settings and configuration
 var settings_manager
@@ -50,7 +50,6 @@ var input_handler
 # Transform managers
 var smooth_transform_manager
 var transform_applicator
-var transform_operations  # NEW: Facade for unified transform operations
 # transform_accumulator removed - TransformState is used as single source of truth
 
 # Placement system
@@ -89,8 +88,8 @@ func validate() -> bool:
 	"""
 	var valid = true
 	
-	if not editor_facade:
-		push_error("ServiceRegistry: editor_facade is not registered")
+	if not editor_interface:
+		push_error("ServiceRegistry: editor_interface is not registered")
 		valid = false
 	
 	if not transformation_coordinator:
@@ -115,7 +114,7 @@ func validate() -> bool:
 
 func cleanup() -> void:
 	"""Clear all references"""
-	editor_facade = null
+	editor_interface = null
 	settings_manager = null
 	settings_persistence = null
 	transformation_coordinator = null
@@ -130,7 +129,6 @@ func cleanup() -> void:
 	input_handler = null
 	smooth_transform_manager = null
 	transform_applicator = null
-	# transform_accumulator removed - nothing to clear here
 	placement_strategy_service = null
 	transform_action_router = null
 	utility_manager = null

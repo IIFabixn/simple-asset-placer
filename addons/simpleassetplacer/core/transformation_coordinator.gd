@@ -95,7 +95,7 @@ func process_frame_input(camera: Camera3D, input_settings: Dictionary = {}, delt
 		state.settings = input_settings.duplicate(true)
 	
 	# Get viewport for input handling
-	var viewport_3d = _services.editor_facade.get_editor_viewport_3d(0)
+	var viewport_3d = _services.editor_interface.get_editor_viewport_3d(0) if _services.editor_interface else null
 	if not viewport_3d:
 		return
 	
@@ -320,8 +320,8 @@ func _state() -> TransformState:
 
 func _ensure_undo_redo() -> void:
 	"""Ensure undo/redo manager is available"""
-	if not _services.undo_redo:
-		_services.undo_redo = _services.editor_facade.get_editor_interface().get_editor_undo_redo()
+	if not _services.undo_redo and _services.editor_interface:
+		_services.undo_redo = _services.editor_interface.get_editor_undo_redo()
 
 func _configure_smooth_transforms(settings: Dictionary) -> void:
 	"""Configure smooth transform system"""
@@ -380,11 +380,14 @@ func _grab_3d_viewport_focus() -> void:
 	if _should_lock_input_to_ui(focus_owner):
 		return
 	
-	var viewport_3d = _services.editor_facade.get_editor_viewport_3d(0)
+	if not _services.editor_interface:
+		return
+	
+	var viewport_3d = _services.editor_interface.get_editor_viewport_3d(0)
 	if not viewport_3d:
 		return
 	
-	var base_control = _services.editor_facade.get_editor_interface().get_base_control()
+	var base_control = _services.editor_interface.get_base_control()
 	if not base_control:
 		return
 	
@@ -409,20 +412,19 @@ func _find_spatial_editor(node: Node) -> Control:
 	return null
 
 func _get_current_focus_owner() -> Control:
-	"""Get the currently focused control"""
-	var editor_interface = _services.editor_facade.get_editor_interface()
-	if not editor_interface:
+	"""Get the current control with focus"""
+	if not _services.editor_interface:
 		return null
 	
-	var base_control = editor_interface.get_base_control()
+	var viewport_3d = _services.editor_interface.get_editor_viewport_3d(0)
+	if not viewport_3d:
+		return null
+	
+	var base_control = _services.editor_interface.get_base_control()
 	if not base_control:
 		return null
 	
-	var viewport = base_control.get_viewport()
-	if not viewport:
-		return null
-	
-	return viewport.gui_get_focus_owner()
+	return base_control.get_viewport().gui_get_focus_owner()
 
 func _should_lock_input_to_ui(focus_owner: Control) -> bool:
 	"""Check if input should be locked to UI (text editing, etc.)"""

@@ -99,26 +99,12 @@ func configure(smooth_enabled_or_settings, smooth_speed: float = 8.0):
 	if was_enabled and not enabled:
 		force_update_to_targets()
 
-func load_from_editor_settings():
-	"""Load settings from Godot's EditorSettings"""
-	if not Engine.is_editor_hint():
-		return
+func get_editor_settings() -> EditorSettings:
+	"""Get EditorSettings through the service registry"""
+	if not _services or not _services.editor_interface:
+		return null
 		
-	var editor_settings = _services.editor_facade.get_editor_settings()
-	if not editor_settings:
-		return
-	
-	# Load smooth transforms settings
-	var smooth_enabled = true  # Default
-	var smooth_speed = 8.0     # Default
-	
-	if editor_settings.has_setting("simple_asset_placer/smooth_transforms"):
-		smooth_enabled = editor_settings.get_setting("simple_asset_placer/smooth_transforms")
-	
-	if editor_settings.has_setting("simple_asset_placer/smooth_transform_speed"):
-		smooth_speed = editor_settings.get_setting("simple_asset_placer/smooth_transform_speed")
-	
-	configure(smooth_enabled, smooth_speed)
+	return _services.editor_interface.get_editor_settings()
 
 ## OBJECT REGISTRATION
 

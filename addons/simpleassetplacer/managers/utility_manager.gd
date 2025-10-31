@@ -71,7 +71,7 @@ func get_target_parent_node(settings: Dictionary, stored_parent: Node = null) ->
 		PluginLogger.debug("UtilityManager", "Using stored parent node: " + stored_parent.name)
 		return stored_parent
 	
-	var scene_root = _services.editor_facade.get_edited_scene_root()
+	var scene_root = _services.editor_interface.get_edited_scene_root() if _services.editor_interface else null
 	if not scene_root:
 		PluginLogger.error("UtilityManager", "No scene root available")
 		return null
@@ -145,8 +145,8 @@ func add_node_to_scene(node: Node, parent: Node) -> void:
 	"""
 	# Save original selection before adding node
 	# (adding node might change selection, especially with undo/redo)
-	var scene_root = _services.editor_facade.get_edited_scene_root()
-	var selection = EditorInterface.get_selection()
+	var scene_root = _services.editor_interface.get_edited_scene_root() if _services.editor_interface else null
+	var selection = _services.editor_interface.get_selection() if _services.editor_interface else null
 	var original_selection = []
 	if selection:
 		original_selection = selection.get_selected_nodes().duplicate()
@@ -346,7 +346,7 @@ func place_direct_mesh(
 	mesh_instance.mesh = mesh
 	
 	# Generate unique name and add to scene first
-	var current_scene = _services.editor_facade.get_edited_scene_root()
+	var current_scene = _services.editor_interface.get_edited_scene_root() if _services.editor_interface else null
 	if current_scene:
 		var base_name = "Mesh"
 		var unique_name = generate_unique_name(base_name, current_scene)

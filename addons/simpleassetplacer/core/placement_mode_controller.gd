@@ -328,7 +328,7 @@ func _determine_target_parent(settings: Dictionary) -> Node:
 	Returns:
 		Node to use as parent for all placements in this session
 	"""
-	var scene_root = _services.editor_facade.get_edited_scene_root()
+	var scene_root = _services.editor_interface.get_edited_scene_root() if _services.editor_interface else null
 	if not scene_root:
 		PluginLogger.error(PluginConstants.COMPONENT_TRANSFORM, "No scene root available")
 		return null
@@ -409,7 +409,8 @@ func _find_first_node3d_in_scene(root: Node) -> Node3D:
 	Returns:
 		First Node3D found, or null if none exists
 	"""
-	if root is Node3D and root != _services.editor_facade.get_edited_scene_root():
+	var scene_root = _services.editor_interface.get_edited_scene_root() if _services.editor_interface else null
+	if root is Node3D and root != scene_root:
 		return root
 	
 	for child in root.get_children():

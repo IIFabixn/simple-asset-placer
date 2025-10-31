@@ -350,7 +350,9 @@ func _handle_tab_activation(state: TransformState, ignore_focus_lock: bool) -> v
 	if not ignore_focus_lock and not _is_3d_context_focused():
 		return
 	
-	var selection = _services.editor_facade.get_selection()
+	var selection = _services.editor_interface.get_selection() if _services.editor_interface else null
+	if not selection:
+		return
 	var selected_nodes = selection.get_selected_nodes()
 	if selected_nodes.is_empty():
 		return
@@ -366,7 +368,7 @@ func _handle_tab_activation(state: TransformState, ignore_focus_lock: bool) -> v
 	
 	# Start transform mode
 	var first_node = target_nodes[0]
-	var current_scene = _services.editor_facade.get_edited_scene_root()
+	var current_scene = _services.editor_interface.get_edited_scene_root() if _services.editor_interface else null
 	
 	if current_scene and (first_node.is_ancestor_of(current_scene) or current_scene == first_node or first_node.is_inside_tree()):
 		_services.transformation_coordinator.start_transform_mode(target_nodes, state.dock_reference)
@@ -401,11 +403,14 @@ func _is_focus_in_plugin_ui(focus_owner: Control, state: TransformState) -> bool
 
 func _is_3d_context_focused() -> bool:
 	"""Check if 3D editor context is focused"""
-	var edited_scene = _services.editor_facade.get_edited_scene_root()
+	if not _services.editor_interface:
+		return false
+	
+	var edited_scene = _services.editor_interface.get_edited_scene_root()
 	if not edited_scene:
 		return false
 	
-	var viewport_3d = _services.editor_facade.get_editor_viewport_3d(0)
+	var viewport_3d = _services.editor_interface.get_editor_viewport_3d(0)
 	if not viewport_3d:
 		return false
 	
@@ -445,7 +450,9 @@ func _get_current_settings() -> Dictionary:
 
 func _get_current_camera() -> Camera3D:
 	"""Get current editor camera"""
-	var viewport = _services.editor_facade.get_editor_viewport_3d(0)
+	if not _services.editor_interface:
+		return null
+	var viewport = _services.editor_interface.get_editor_viewport_3d(0)
 	return viewport.get_camera_3d() if viewport else null
 
 func _update_position_after_asset_cycle(state: TransformState) -> void:

@@ -106,7 +106,7 @@ func start(target_nodes: Variant, dock_instance, state: TransformState) -> void:
 	state.values.manual_position_offset = Vector3.ZERO
 	state.values.manual_rotation_offset = Vector3.ZERO
 	state.values.surface_alignment_rotation = Vector3.ZERO
-	_services.transform_operations.reset_scale(state)
+	_services.scale_manager.reset_scale(state)
 	
 	# Store transform data
 	state.session.transform_data = {

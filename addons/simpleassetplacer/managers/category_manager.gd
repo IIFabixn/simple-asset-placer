@@ -54,7 +54,7 @@ func _init(services: ServiceRegistry):
 ## Load favorites and recent assets from EditorSettings
 func load_editor_settings():
 	if Engine.is_editor_hint():
-		var editor_settings = _services.editor_facade.get_editor_settings()
+		var editor_settings = _services.editor_interface.get_editor_settings() if _services.editor_interface else null
 		if editor_settings:
 			# Load favorites
 			if editor_settings.has_setting(EDITOR_SETTINGS_FAVORITES_KEY):
@@ -93,7 +93,7 @@ func load_editor_settings():
 ## Save favorites and recent assets to EditorSettings
 func save_editor_settings():
 	if Engine.is_editor_hint():
-		var editor_settings = _services.editor_facade.get_editor_settings()
+		var editor_settings = _services.editor_interface.get_editor_settings() if _services.editor_interface else null
 		if editor_settings:
 			editor_settings.set_setting(EDITOR_SETTINGS_FAVORITES_KEY, favorites)
 			editor_settings.set_setting(EDITOR_SETTINGS_RECENT_KEY, recent_assets)

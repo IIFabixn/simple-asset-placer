@@ -11,7 +11,6 @@ const RotationInputState = preload("res://addons/simpleassetplacer/managers/inpu
 const ScaleInputState = preload("res://addons/simpleassetplacer/managers/input/scale_input_state.gd")
 const PositionInputState = preload("res://addons/simpleassetplacer/managers/input/position_input_state.gd")
 const NavigationInputState = preload("res://addons/simpleassetplacer/managers/input/navigation_input_state.gd")
-const ControlModeInputState = preload("res://addons/simpleassetplacer/managers/input/control_mode_input_state.gd")
 
 """
 CENTRALIZED INPUT FACADE
@@ -44,7 +43,6 @@ var _rotation_input_cache: RotationInputState = null
 var _scale_input_cache: ScaleInputState = null
 var _position_input_cache: PositionInputState = null
 var _navigation_input_cache: NavigationInputState = null
-var _control_mode_input_cache: ControlModeInputState = null
 
 func _init(services: ServiceRegistry) -> void:
 	_services = services
@@ -81,11 +79,6 @@ func get_navigation_input() -> NavigationInputState:
 	if _navigation_input_cache == null:
 		_navigation_input_cache = NavigationInputState.new(_snapshot)
 	return _navigation_input_cache
-
-func get_control_mode_input() -> ControlModeInputState:
-	if _control_mode_input_cache == null:
-		_control_mode_input_cache = ControlModeInputState.new(_snapshot)
-	return _control_mode_input_cache
 
 func is_key_pressed(key_name: String) -> bool:
 	return _snapshot.is_key_pressed(key_name)
@@ -278,4 +271,3 @@ func _clear_cached_views() -> void:
 	_scale_input_cache = null
 	_position_input_cache = null
 	_navigation_input_cache = null
-	_control_mode_input_cache = null

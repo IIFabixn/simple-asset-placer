@@ -18,16 +18,16 @@ uv1_scale = Vector3(10, 10, 10)
 
 [node name="AssetRoot" type="Node3D" parent="."]
 
-[node name="detail-barrel" type="Node3D" parent="AssetRoot" instance=ExtResource("1_884kg")]
+[node name="detail-barrel" parent="AssetRoot" instance=ExtResource("1_884kg")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.04, -0.5)
 
-[node name="detail-barrel_2" type="Node3D" parent="AssetRoot" instance=ExtResource("1_884kg")]
+[node name="detail-barrel_2" parent="AssetRoot" instance=ExtResource("1_884kg")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, -0.04, -0.5)
 
-[node name="detail-barrel_3" type="Node3D" parent="AssetRoot" instance=ExtResource("1_884kg")]
+[node name="detail-barrel_3" parent="AssetRoot" instance=ExtResource("1_884kg")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, -0.04, 0.5)
 
-[node name="detail-barrel_4" type="Node3D" parent="AssetRoot" instance=ExtResource("1_884kg")]
+[node name="detail-barrel_4" parent="AssetRoot" instance=ExtResource("1_884kg")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.04, 0.5)
 
 [node name="CSGCombiner3D" type="CSGCombiner3D" parent="."]

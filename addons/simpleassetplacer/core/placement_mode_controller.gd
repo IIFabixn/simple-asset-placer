@@ -53,6 +53,10 @@ func start(mesh: Mesh, meshlib, item_id: int, asset_path: String, settings: Dict
 	state.begin_session(ModeStateMachine.Mode.PLACEMENT, settings)
 	state.dock_reference = dock_instance
 	
+	# Determine and store the target parent node at the start of placement mode
+	# This ensures the parent stays consistent throughout continuous placement
+	var target_parent = _determine_target_parent(settings)
+	
 	# Store placement data
 	state.session.placement_data = {
 		"mesh": mesh,
@@ -61,7 +65,8 @@ func start(mesh: Mesh, meshlib, item_id: int, asset_path: String, settings: Dict
 		"asset_path": asset_path,
 		"settings": settings,
 		"dock_reference": dock_instance,
-		"undo_redo": _services.undo_redo
+		"undo_redo": _services.undo_redo,
+		"target_parent": target_parent  # Store the parent node for this placement session
 	}
 	
 	# Initialize overlays
@@ -236,6 +241,9 @@ func _place_asset(state: TransformState) -> void:
 	var final_position = state.values.position + state.values.manual_position_offset
 	var settings = placement_data.get("settings", {})
 	
+	# Get the stored parent node from placement data
+	var stored_parent = placement_data.get("target_parent", null)
+	
 	var placed_node = null
 	
 	# Check if this is a MeshLibrary item or an asset file
@@ -254,7 +262,8 @@ func _place_asset(state: TransformState) -> void:
 			final_position,
 			rotation_offset,
 			state,
-			settings
+			settings,
+			stored_parent  # Pass the stored parent
 		)
 	else:
 		# Place from asset file
@@ -267,7 +276,8 @@ func _place_asset(state: TransformState) -> void:
 			asset_path,
 			final_position,
 			settings,
-			state
+			state,
+			stored_parent  # Pass the stored parent
 		)
 	
 	if placed_node:
@@ -305,3 +315,108 @@ func _reset_for_next_placement(state: TransformState) -> void:
 	
 	# Reset focus grab for viewport
 	state.session.focus_grab_frames = PluginConstants.FOCUS_GRAB_FRAMES
+
+func _determine_target_parent(settings: Dictionary) -> Node:
+	"""Determine the target parent node when entering placement mode
+	
+	This captures the parent node at placement mode start, ensuring it stays
+	consistent throughout continuous placement even if the selection changes.
+	
+	Args:
+		settings: Dictionary containing placement settings
+	
+	Returns:
+		Node to use as parent for all placements in this session
+	"""
+	var scene_root = _services.editor_facade.get_edited_scene_root()
+	if not scene_root:
+		PluginLogger.error(PluginConstants.COMPONENT_TRANSFORM, "No scene root available")
+		return null
+	
+	var parent_mode = settings.get("parent_placement_mode", PluginConstants.DEFAULT_PARENT_MODE)
+	
+	match parent_mode:
+		PluginConstants.PARENT_MODE_ROOT:
+			# Default behavior - place at scene root
+			PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Parent mode: scene root")
+			return scene_root
+		
+		PluginConstants.PARENT_MODE_SELECTED:
+			# Place as child of currently selected node (captured at mode start)
+			var selection = EditorInterface.get_selection()
+			if selection:
+				var selected_nodes = selection.get_selected_nodes()
+				if selected_nodes.size() > 0:
+					var selected_node = selected_nodes[0]
+					PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Parent mode: selected node '" + selected_node.name + "'")
+					return selected_node
+			
+			# Fallback: try to find first Node3D in scene if nothing selected
+			var first_node3d = _find_first_node3d_in_scene(scene_root)
+			if first_node3d:
+				PluginLogger.warning(PluginConstants.COMPONENT_TRANSFORM, "No node selected, using first Node3D: " + first_node3d.name)
+				return first_node3d
+			
+			# Final fallback to root if no Node3D found
+			PluginLogger.warning(PluginConstants.COMPONENT_TRANSFORM, "No node selected and no Node3D found, falling back to scene root")
+			return scene_root
+		
+		PluginConstants.PARENT_MODE_CUSTOM:
+			# Place at custom node path
+			var custom_path = settings.get("custom_parent_path", "")
+			if custom_path.is_empty():
+				PluginLogger.warning(PluginConstants.COMPONENT_TRANSFORM, "Custom parent path is empty, using scene root")
+				return scene_root
+			
+			# Try to get the node at the custom path
+			var target_node = scene_root.get_node_or_null(NodePath(custom_path))
+			if target_node:
+				PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Parent mode: custom path '" + target_node.name + "'")
+				return target_node
+			else:
+				PluginLogger.warning(PluginConstants.COMPONENT_TRANSFORM, "Custom parent path '%s' not found, falling back to scene root" % custom_path)
+				return scene_root
+		
+		PluginConstants.PARENT_MODE_AUTO:
+			# Auto-create or reuse container node
+			var container_name = settings.get("auto_parent_name", PluginConstants.DEFAULT_AUTO_PARENT_NAME)
+			
+			# Check if container already exists as direct child of root
+			if scene_root.has_node(NodePath(container_name)):
+				var container = scene_root.get_node(NodePath(container_name))
+				PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Parent mode: using existing container '" + container_name + "'")
+				return container
+			else:
+				# Create new container node
+				var container = Node3D.new()
+				container.name = container_name
+				scene_root.add_child(container)
+				container.owner = scene_root
+				PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Parent mode: created new container '" + container_name + "'")
+				return container
+		
+		_:
+			# Unknown mode, fallback to root
+			PluginLogger.warning(PluginConstants.COMPONENT_TRANSFORM, "Unknown parent placement mode '%s', using scene root" % parent_mode)
+			return scene_root
+
+func _find_first_node3d_in_scene(root: Node) -> Node3D:
+	"""Recursively find the first Node3D in the scene tree
+	
+	Args:
+		root: Starting node for the search
+	
+	Returns:
+		First Node3D found, or null if none exists
+	"""
+	if root is Node3D and root != _services.editor_facade.get_edited_scene_root():
+		return root
+	
+	for child in root.get_children():
+		if child is Node3D:
+			return child
+		var result = _find_first_node3d_in_scene(child)
+		if result:
+			return result
+	
+	return null

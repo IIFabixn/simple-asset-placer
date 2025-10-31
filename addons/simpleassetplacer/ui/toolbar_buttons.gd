@@ -79,16 +79,14 @@ func _on_grid_snap_toggled(toggled_on: bool) -> void:
 	if placement_settings_ref:
 		placement_settings_ref.toggle_grid_snap(toggled_on)
 	
-	# Refresh overlay to show updated state
-	if _coordinator:
-		_coordinator.refresh_overlay()
+	# Update active mode with new settings
+	_refresh_active_mode_settings()
 	
-	# Show feedback message if not in active mode
+	# Show feedback message
 	if _services and _services.overlay_manager:
-		if not _coordinator or not _coordinator.is_any_mode_active():
-			var status := "Grid snap %s" % ("enabled" if toggled_on else "disabled")
-			var color := Color(0.4, 0.85, 0.4) if toggled_on else Color(0.9, 0.45, 0.45)
-			_services.overlay_manager.show_status_message(status, color, 1.5)
+		var status := "Grid snap %s" % ("enabled" if toggled_on else "disabled")
+		var color := Color(0.4, 0.85, 0.4) if toggled_on else Color(0.9, 0.45, 0.45)
+		_services.overlay_manager.show_status_message(status, color, 1.5)
 		_services.overlay_manager.refresh_overlay_buttons()
 
 func _on_grid_overlay_toggled(toggled_on: bool) -> void:
@@ -110,9 +108,8 @@ func _on_random_rotation_toggled(toggled_on: bool) -> void:
 	if placement_settings_ref:
 		placement_settings_ref.toggle_random_rotation(toggled_on)
 	
-	# Refresh overlay to show updated state
-	if _coordinator:
-		_coordinator.refresh_overlay()
+	# Update active mode with new settings
+	_refresh_active_mode_settings()
 	
 	# Show feedback message if not in active mode
 	if _services and _services.overlay_manager:
@@ -467,9 +464,8 @@ func _on_surface_align_toggled(toggled_on: bool) -> void:
 			_services.settings_manager.set_dock_setting("align_with_normal", toggled_on)
 			_services.settings_manager.set_plugin_setting("align_with_normal", toggled_on)
 	
-	# Refresh overlay to show updated state
-	if _coordinator:
-		_coordinator.refresh_overlay()
+	# Update active mode with new settings
+	_refresh_active_mode_settings()
 	
 	# Show feedback message if not in active mode
 	if _services and _services.overlay_manager:
@@ -488,9 +484,8 @@ func _on_smooth_transforms_toggled(toggled_on: bool) -> void:
 			_services.settings_manager.set_dock_setting("smooth_transforms", toggled_on)
 			_services.settings_manager.set_plugin_setting("smooth_transforms", toggled_on)
 	
-	# Refresh overlay to show updated state
-	if _coordinator:
-		_coordinator.refresh_overlay()
+	# Update active mode with new settings
+	_refresh_active_mode_settings()
 	
 	# Show feedback message if not in active mode
 	if _services and _services.overlay_manager:
@@ -509,9 +504,8 @@ func _on_cursor_warp_toggled(toggled_on: bool) -> void:
 			_services.settings_manager.set_dock_setting("cursor_warp_enabled", toggled_on)
 			_services.settings_manager.set_plugin_setting("cursor_warp_enabled", toggled_on)
 	
-	# Refresh overlay to show updated state
-	if _coordinator:
-		_coordinator.refresh_overlay()
+	# Update active mode with new settings
+	_refresh_active_mode_settings()
 	
 	if _services and _services.overlay_manager:
 		var status := "Cursor warp %s" % ("enabled" if toggled_on else "disabled")
@@ -554,3 +548,17 @@ func _apply_toggle_button_style(button: Button, active: bool) -> void:
 	
 	# Also update modulate for visual feedback
 	button.modulate = Color(1, 1, 1, 1) if active else Color(0.85, 0.85, 0.85, 0.85)
+
+func _refresh_active_mode_settings() -> void:
+	"""Refresh settings in active mode and update overlays
+	
+	Call this after any toolbar setting change to ensure the active
+	placement/transform mode uses the updated settings immediately.
+	"""
+	# Update settings in active transform state
+	if _coordinator and _coordinator.is_any_mode_active():
+		_coordinator.refresh_settings_from_current()
+	
+	# Refresh overlay to show updated state
+	if _coordinator:
+		_coordinator.refresh_overlay()

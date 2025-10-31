@@ -54,16 +54,22 @@ func generate_unique_name(base_name: String, parent: Node) -> String:
 	
 	return unique_name
 
-func get_target_parent_node(settings: Dictionary) -> Node:
+func get_target_parent_node(settings: Dictionary, stored_parent: Node = null) -> Node:
 	"""Get the target parent node based on parent placement mode settings
 	
 	Args:
 		settings: Dictionary containing placement settings
+		stored_parent: Optional pre-determined parent node (used during placement mode)
 	
 	Returns:
 		Node to use as parent, or null if scene root not available
 	"""
 	const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
+	
+	# If a stored parent is provided, use it (placement mode session parent)
+	if stored_parent and is_instance_valid(stored_parent):
+		PluginLogger.debug("UtilityManager", "Using stored parent node: " + stored_parent.name)
+		return stored_parent
 	
 	var scene_root = _services.editor_facade.get_edited_scene_root()
 	if not scene_root:
@@ -137,14 +143,36 @@ func add_node_to_scene(node: Node, parent: Node) -> void:
 	TransformationCoordinator using UndoRedoHelper after the node is placed.
 	This separation allows the coordinator to capture the full transform state.
 	"""
+	# Save original selection before adding node
+	# (adding node might change selection, especially with undo/redo)
+	var scene_root = _services.editor_facade.get_edited_scene_root()
+	var selection = EditorInterface.get_selection()
+	var original_selection = []
+	if selection:
+		original_selection = selection.get_selected_nodes().duplicate()
+	
 	parent.add_child(node)
-	node.owner = _services.editor_facade.get_edited_scene_root()
+	node.owner = scene_root
+	
+	# Restore original selection if it was non-empty
+	# This preserves the parent for "selected" mode during continuous placement
+	if original_selection.size() > 0 and selection:
+		# Defer the selection restoration to avoid conflicts with undo/redo
+		call_deferred("_restore_selection", selection, original_selection)
 	
 	# Verify node was added
 	if node.is_inside_tree():
 		PluginLogger.debug("UtilityManager", "Node added to scene: " + node.name + " (parent: " + parent.name + ", owner: " + str(node.owner) + ")")
 	else:
 		PluginLogger.error("UtilityManager", "Node failed to be added to scene tree: " + node.name)
+
+func _restore_selection(selection: EditorSelection, nodes: Array) -> void:
+	"""Restore a previous selection (deferred helper)"""
+	if selection and nodes.size() > 0:
+		selection.clear()
+		for node_ref in nodes:
+			if node_ref and is_instance_valid(node_ref):
+				selection.add_node(node_ref)
 
 func extract_mesh_from_node3d(node: Node3D) -> Mesh:
 	"""Extract a mesh from a Node3D (MeshInstance3D, CSG nodes, etc.)"""
@@ -170,8 +198,16 @@ func extract_mesh_from_children(node: Node3D) -> Mesh:
 				return child_mesh
 	return null
 
-func place_asset_in_scene(asset_path: String, position: Vector3 = Vector3.ZERO, settings: Dictionary = {}, transform_state: TransformState = null) -> Node:
-	"""Place an asset file in the scene with applied transformations"""
+func place_asset_in_scene(asset_path: String, position: Vector3 = Vector3.ZERO, settings: Dictionary = {}, transform_state: TransformState = null, stored_parent: Node = null) -> Node:
+	"""Place an asset file in the scene with applied transformations
+	
+	Args:
+		asset_path: Path to the asset file
+		position: World position for the asset
+		settings: Dictionary containing placement settings
+		transform_state: Current transform state
+		stored_parent: Optional pre-determined parent node (used during placement mode)
+	"""
 	PluginLogger.info("UtilityManager", "Placing asset: " + asset_path + " at position: " + str(position))
 	
 	# Load the asset
@@ -196,8 +232,8 @@ func place_asset_in_scene(asset_path: String, position: Vector3 = Vector3.ZERO, 
 		PluginLogger.error("UtilityManager", "Failed to instantiate asset: " + asset_path)
 		return null
 	
-	# Get target parent node based on settings
-	var target_parent = get_target_parent_node(settings)
+	# Get target parent node based on settings (use stored parent if provided)
+	var target_parent = get_target_parent_node(settings, stored_parent)
 	if not target_parent:
 		PluginLogger.error("UtilityManager", "No valid parent node available")
 		scene_instance.queue_free()
@@ -244,14 +280,26 @@ func place_from_meshlib(
 	position: Vector3,
 	rotation_offset: Vector3,
 	transform_state: TransformState,
-	settings: Dictionary = {}
+	settings: Dictionary = {},
+	stored_parent: Node = null
 ) -> Node3D:
-	"""Place a mesh from MeshLibrary"""
+	"""Place a mesh from MeshLibrary
+	
+	Args:
+		mesh: The mesh to place
+		meshlib: The MeshLibrary containing the mesh
+		item_id: ID of the item in the MeshLibrary
+		position: World position for the mesh
+		rotation_offset: Rotation offset to apply
+		transform_state: Current transform state
+		settings: Dictionary containing placement settings
+		stored_parent: Optional pre-determined parent node (used during placement mode)
+	"""
 	var mesh_instance = MeshInstance3D.new()
 	mesh_instance.mesh = mesh
 	
-	# Get target parent node based on settings
-	var target_parent = get_target_parent_node(settings)
+	# Get target parent node based on settings (use stored parent if provided)
+	var target_parent = get_target_parent_node(settings, stored_parent)
 	if not target_parent:
 		PluginLogger.error("UtilityManager", "No valid parent node available")
 		mesh_instance.queue_free()
@@ -334,7 +382,8 @@ func place_meshlib_item_in_scene(
 	item_id: int,
 	position: Vector3,
 	settings: Dictionary = {},
-	transform_state: TransformState = null
+	transform_state: TransformState = null,
+	stored_parent: Node = null
 ) -> Node3D:
 	"""Wrapper for placing MeshLibrary items (called by TransformationCoordinator)"""
 	var mesh = meshlib.get_item_mesh(item_id)
@@ -342,7 +391,7 @@ func place_meshlib_item_in_scene(
 		PluginLogger.error("UtilityManager", "Failed to get mesh for item_id: " + str(item_id))
 		return null
 	
-	return place_from_meshlib(mesh, meshlib, item_id, position, Vector3.ZERO, transform_state, settings)
+	return place_from_meshlib(mesh, meshlib, item_id, position, Vector3.ZERO, transform_state, settings, stored_parent)
 
 func place_mesh_in_scene(
 	mesh: Mesh,

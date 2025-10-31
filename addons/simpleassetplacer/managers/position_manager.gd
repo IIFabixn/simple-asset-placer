@@ -773,7 +773,6 @@ func update_smooth_position(state: TransformState, delta: float) -> void:
 
 ## Configuration
 
-
 func configure(state: TransformState, config: Dictionary) -> void:
 	"""Configure position manager settings and placement strategies"""
 	
@@ -893,6 +892,5 @@ func get_position_info(state: TransformState) -> Dictionary:
 	}
 
 ## Property accessors for half-step mode
-
 
 

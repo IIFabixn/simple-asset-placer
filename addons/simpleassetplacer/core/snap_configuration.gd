@@ -76,7 +76,6 @@ func configure_from_settings(settings: Dictionary) -> void:
 				snap_scale_enabled, snap_scale_step, use_half_step
 			])
 
-
 func reset() -> void:
 	"""Reset all snap settings to defaults"""
 	snap_enabled = false
@@ -92,7 +91,6 @@ func reset() -> void:
 	snap_rotation_step = 15.0
 	snap_scale_enabled = false
 	snap_scale_step = 0.1
-
 
 ## SERIALIZATION
 
@@ -113,7 +111,6 @@ func to_dictionary() -> Dictionary:
 		"snap_scale_enabled": snap_scale_enabled,
 		"snap_scale_step": snap_scale_step,
 	}
-
 
 func from_dictionary(data: Dictionary) -> void:
 	"""Deserialize snap configuration from dictionary"""

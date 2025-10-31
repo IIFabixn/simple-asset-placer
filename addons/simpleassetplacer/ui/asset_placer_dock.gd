@@ -422,7 +422,6 @@ func update_placement_strategy_ui(strategy: String):
 	
 	PluginLogger.warning(PluginConstants.COMPONENT_DOCK, "Could not find placement_strategy setting definition")
 
-
 func show_about_tab() -> void:
 	"""Switch the tab container to the About documentation panel"""
 	if not tab_container or not about_tab:
@@ -456,8 +455,6 @@ func cycle_previous_asset() -> bool:
 		return meshlib_browser.cycle_to_previous_item()
 	
 	return false
-
-
 
 
 

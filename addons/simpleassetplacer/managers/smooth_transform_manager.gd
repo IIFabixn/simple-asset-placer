@@ -461,5 +461,3 @@ func stop_lerping(node: Node3D):
 
 
 
-
-

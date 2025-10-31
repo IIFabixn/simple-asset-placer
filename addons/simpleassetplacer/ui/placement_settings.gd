@@ -530,5 +530,3 @@ func _get_service() -> PlacementStrategyService:
 
 
 
-
-

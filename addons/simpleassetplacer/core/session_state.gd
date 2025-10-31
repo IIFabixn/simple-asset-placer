@@ -58,16 +58,13 @@ func is_active() -> bool:
 	"""Check if a session is currently active"""
 	return mode != 0  # ModeStateMachine.Mode.NONE
 
-
 func is_in_placement_mode() -> bool:
 	"""Check if in placement mode"""
 	return mode == 1  # ModeStateMachine.Mode.PLACEMENT
 
-
 func is_in_transform_mode() -> bool:
 	"""Check if in transform mode"""
 	return mode == 2  # ModeStateMachine.Mode.TRANSFORM
-
 
 ## SESSION LIFECYCLE
 
@@ -88,7 +85,6 @@ func begin_session(mode_type: int, initial_settings: Dictionary = {}) -> void:
 	ui_focus_locked = false
 	frames_since_mode_start = 0
 
-
 func end_session() -> void:
 	"""Clean up session data"""
 	mode = 0
@@ -102,11 +98,9 @@ func end_session() -> void:
 	placement_end_callback = Callable()
 	mesh_placed_callback = Callable()
 
-
 func reset() -> void:
 	"""Alias for end_session"""
 	end_session()
-
 
 ## SERIALIZATION
 
@@ -118,7 +112,6 @@ func to_dictionary() -> Dictionary:
 		"focus_grab_frames": focus_grab_frames,
 		"ui_focus_locked": ui_focus_locked,
 	}
-
 
 func from_dictionary(data: Dictionary) -> void:
 	"""Deserialize session state from dictionary"""

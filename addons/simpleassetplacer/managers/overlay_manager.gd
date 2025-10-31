@@ -534,5 +534,3 @@ func debug_print_overlay_state():
 
 
 
-
-

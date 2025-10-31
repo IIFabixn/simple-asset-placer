@@ -301,5 +301,3 @@ func get_rotation_info(state: TransformState) -> Dictionary:
 
 
 
-
-

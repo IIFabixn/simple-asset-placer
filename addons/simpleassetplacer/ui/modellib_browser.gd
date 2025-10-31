@@ -776,5 +776,3 @@ func _scroll_to_item(item: AssetThumbnailItem):
 
 
 
-
-

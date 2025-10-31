@@ -47,11 +47,9 @@ var ignored_folders: Array = []  # Array of ignored folder paths
 var config_file_path: String = ""
 var recently_used_tags: Array = []  # Last used tags for quick access
 
-
 func _init(services: ServiceRegistry):
 	_services = services
 	load_editor_settings()
-
 
 ## Load favorites and recent assets from EditorSettings
 func load_editor_settings():
@@ -92,7 +90,6 @@ func load_editor_settings():
 				ignored_folders.append("res://addons")
 				editor_settings.set_setting(EDITOR_SETTINGS_IGNORED_FOLDERS_KEY, ignored_folders)
 
-
 ## Save favorites and recent assets to EditorSettings
 func save_editor_settings():
 	if Engine.is_editor_hint():
@@ -102,7 +99,6 @@ func save_editor_settings():
 			editor_settings.set_setting(EDITOR_SETTINGS_RECENT_KEY, recent_assets)
 			editor_settings.set_setting(EDITOR_SETTINGS_IGNORED_KEY, ignored_assets)
 			editor_settings.set_setting(EDITOR_SETTINGS_IGNORED_FOLDERS_KEY, ignored_folders)
-
 
 ## Extract folder-based categories from an asset path
 ## Returns array of category strings: ["props", "outdoor", "barrels"]
@@ -137,12 +133,10 @@ func extract_folder_categories(asset_path: String) -> Array:
 	
 	return categories
 
-
 ## Get the full hierarchical category path
 ## e.g., "assets > props > outdoor"
 func get_category_hierarchy_string(categories: Array) -> String:
 	return " > ".join(categories)
-
 
 ## Load .assetcategories JSON file from the project
 func load_config_file(search_path: String = "res://") -> bool:
@@ -198,7 +192,6 @@ func load_config_file(search_path: String = "res://") -> bool:
 	categories_updated.emit()
 	return true
 
-
 ## Find .assetcategories file in the project
 func find_config_file(search_path: String) -> String:
 	# Check root first
@@ -214,7 +207,6 @@ func find_config_file(search_path: String) -> String:
 			return full_path
 	
 	return ""
-
 
 ## Save current tags and settings to .assetcategories file
 func save_config_file() -> bool:
@@ -240,7 +232,6 @@ func save_config_file() -> bool:
 	
 	return true
 
-
 ## Recalculate tag usage statistics from current tags
 func _recalculate_tag_usage():
 	tag_usage.clear()
@@ -253,7 +244,6 @@ func _recalculate_tag_usage():
 					tag_usage[tag] += 1
 				else:
 					tag_usage[tag] = 1
-
 
 ## Clean up tags for assets that no longer exist
 func cleanup_orphaned_tags(valid_asset_paths: Array) -> Dictionary:
@@ -317,7 +307,6 @@ func cleanup_orphaned_tags(valid_asset_paths: Array) -> Dictionary:
 		"assets_cleaned": cleaned_asset_keys
 	}
 
-
 ## Validate and clean favorites list (remove non-existent assets)
 func cleanup_favorites(valid_asset_paths: Array) -> int:
 	"""
@@ -347,7 +336,6 @@ func cleanup_favorites(valid_asset_paths: Array) -> int:
 		push_warning("CategoryManager: Cleaned up %d orphaned favorites" % favorites_to_remove.size())
 	
 	return favorites_to_remove.size()
-
 
 ## Validate and clean recent assets list (remove non-existent assets)
 func cleanup_recent_assets(valid_asset_paths: Array) -> int:
@@ -379,7 +367,6 @@ func cleanup_recent_assets(valid_asset_paths: Array) -> int:
 	
 	return recent_to_remove.size()
 
-
 ## Perform full cleanup of all orphaned data
 func cleanup_all_orphaned_data(valid_asset_paths: Array) -> Dictionary:
 	"""
@@ -402,7 +389,6 @@ func cleanup_all_orphaned_data(valid_asset_paths: Array) -> Dictionary:
 		"total_items_cleaned": tag_results["removed_assets"] + favorites_removed + recent_removed
 	}
 
-
 ## Get all custom tags for an asset (by name or path)
 func get_custom_tags(asset_path: String) -> Array:
 	var asset_name = asset_path.get_file().get_basename()
@@ -417,7 +403,6 @@ func get_custom_tags(asset_path: String) -> Array:
 	
 	return []
 
-
 ## Get all categories (folder + custom tags) for an asset
 func get_all_categories(asset_path: String) -> Dictionary:
 	return {
@@ -426,7 +411,6 @@ func get_all_categories(asset_path: String) -> Dictionary:
 		"is_favorite": is_favorite(asset_path),
 		"is_recent": is_recent(asset_path)
 	}
-
 
 ## Check if asset has a specific tag (custom or folder-based)
 func has_category(asset_path: String, category: String) -> bool:
@@ -441,7 +425,6 @@ func has_category(asset_path: String, category: String) -> bool:
 		return true
 	
 	return false
-
 
 ## Add custom tag to an asset
 func add_tag(asset_path: String, tag: String) -> bool:
@@ -475,7 +458,6 @@ func add_tag(asset_path: String, tag: String) -> bool:
 	
 	return false
 
-
 ## Remove custom tag from an asset
 func remove_tag(asset_path: String, tag: String) -> bool:
 	var asset_key = asset_path.get_file().get_basename()
@@ -500,7 +482,6 @@ func remove_tag(asset_path: String, tag: String) -> bool:
 	
 	return false
 
-
 ## Get all unique custom tag names
 func get_all_custom_tags() -> Array:
 	var all_tags = {}
@@ -515,11 +496,9 @@ func get_all_custom_tags() -> Array:
 	result.sort()
 	return result
 
-
 ## Get recently used tags (limited to last N)
 func get_recently_used_tags(limit: int = 5) -> Array:
 	return recently_used_tags.slice(0, min(limit, recently_used_tags.size()))
-
 
 ## Get most frequently used tags
 func get_most_used_tags(limit: int = 5) -> Array:
@@ -537,14 +516,12 @@ func get_most_used_tags(limit: int = 5) -> Array:
 	
 	return result
 
-
 ## Add asset to favorites
 func add_to_favorites(asset_path: String):
 	if asset_path not in favorites:
 		favorites.append(asset_path)
 		save_editor_settings()
 		categories_updated.emit()
-
 
 ## Remove asset from favorites
 func remove_from_favorites(asset_path: String):
@@ -553,7 +530,6 @@ func remove_from_favorites(asset_path: String):
 		save_editor_settings()
 		categories_updated.emit()
 
-
 ## Toggle favorite status
 func toggle_favorite(asset_path: String):
 	if is_favorite(asset_path):
@@ -561,16 +537,13 @@ func toggle_favorite(asset_path: String):
 	else:
 		add_to_favorites(asset_path)
 
-
 ## Check if asset is in favorites
 func is_favorite(asset_path: String) -> bool:
 	return asset_path in favorites
 
-
 ## Get all favorite assets
 func get_favorites() -> Array:
 	return favorites.duplicate()
-
 
 ## Add asset to ignored list
 func add_to_ignored(asset_path: String):
@@ -579,7 +552,6 @@ func add_to_ignored(asset_path: String):
 		save_editor_settings()
 		categories_updated.emit()
 
-
 ## Remove asset from ignored list
 func remove_from_ignored(asset_path: String):
 	if asset_path in ignored_assets:
@@ -587,14 +559,12 @@ func remove_from_ignored(asset_path: String):
 		save_editor_settings()
 		categories_updated.emit()
 
-
 ## Toggle ignored status
 func toggle_ignored(asset_path: String):
 	if is_ignored(asset_path):
 		remove_from_ignored(asset_path)
 	else:
 		add_to_ignored(asset_path)
-
 
 ## Check if asset is ignored
 func is_ignored(asset_path: String) -> bool:
@@ -605,11 +575,9 @@ func is_ignored(asset_path: String) -> bool:
 	# Check if the asset is within an ignored folder
 	return is_in_ignored_folder(asset_path)
 
-
 ## Get all ignored assets
 func get_ignored_assets() -> Array:
 	return ignored_assets.duplicate()
-
 
 ## Add folder to ignored list
 func add_folder_to_ignored(folder_path: String):
@@ -621,7 +589,6 @@ func add_folder_to_ignored(folder_path: String):
 		save_editor_settings()
 		categories_updated.emit()
 
-
 ## Remove folder from ignored list
 func remove_folder_from_ignored(folder_path: String):
 	var normalized_path = _normalize_folder_path(folder_path)
@@ -631,7 +598,6 @@ func remove_folder_from_ignored(folder_path: String):
 		save_editor_settings()
 		categories_updated.emit()
 
-
 ## Toggle ignored status for a folder
 func toggle_folder_ignored(folder_path: String):
 	if is_folder_ignored(folder_path):
@@ -639,12 +605,10 @@ func toggle_folder_ignored(folder_path: String):
 	else:
 		add_folder_to_ignored(folder_path)
 
-
 ## Check if a folder is directly ignored
 func is_folder_ignored(folder_path: String) -> bool:
 	var normalized_path = _normalize_folder_path(folder_path)
 	return normalized_path in ignored_folders
-
 
 ## Check if an asset path is within an ignored folder
 func is_in_ignored_folder(asset_path: String) -> bool:
@@ -659,11 +623,9 @@ func is_in_ignored_folder(asset_path: String) -> bool:
 	
 	return false
 
-
 ## Get all ignored folders
 func get_ignored_folders() -> Array:
 	return ignored_folders.duplicate()
-
 
 ## Get the parent folder of an asset path
 func get_asset_folder(asset_path: String) -> String:
@@ -672,7 +634,6 @@ func get_asset_folder(asset_path: String) -> String:
 		normalized_path = "res://" + normalized_path
 	
 	return normalized_path.get_base_dir()
-
 
 ## Normalize folder path for consistent comparison
 func _normalize_folder_path(folder_path: String) -> String:
@@ -687,7 +648,6 @@ func _normalize_folder_path(folder_path: String) -> String:
 		normalized = normalized.substr(0, normalized.length() - 1)
 	
 	return normalized
-
 
 ## Add asset to recent list (called when asset is placed/used)
 func mark_as_used(asset_path: String):
@@ -705,16 +665,13 @@ func mark_as_used(asset_path: String):
 	save_editor_settings()
 	categories_updated.emit()
 
-
 ## Check if asset is in recent list
 func is_recent(asset_path: String) -> bool:
 	return asset_path in recent_assets
 
-
 ## Get recent assets
 func get_recent_assets(limit: int = MAX_RECENT_ASSETS) -> Array:
 	return recent_assets.slice(0, min(limit, recent_assets.size()))
-
 
 ## Get all unique folder categories from discovered assets
 func get_all_folder_categories(assets: Array) -> Array:
@@ -729,7 +686,6 @@ func get_all_folder_categories(assets: Array) -> Array:
 	var result = categories_set.keys()
 	result.sort()
 	return result
-
 
 ## Get all unique folder category paths with full hierarchy
 ## Returns array of dictionaries with "display" (full path) and "match" (leaf folder name)
@@ -761,7 +717,6 @@ func get_all_folder_category_paths(assets: Array) -> Array:
 	
 	return result
 
-
 ## Build hierarchical category tree for display
 ## Returns nested dictionary structure
 func build_category_tree(assets: Array) -> Dictionary:
@@ -778,9 +733,6 @@ func build_category_tree(assets: Array) -> Dictionary:
 				current_node = current_node[category]
 	
 	return tree
-
-
-
 
 
 

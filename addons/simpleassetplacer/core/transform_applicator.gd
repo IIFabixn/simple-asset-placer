@@ -271,5 +271,3 @@ static func apply_position_to_multiple_nodes(
 
 
 
-
-

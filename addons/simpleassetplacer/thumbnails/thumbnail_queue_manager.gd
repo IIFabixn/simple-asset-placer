@@ -193,4 +193,3 @@ func cleanup():
 	"""Clean up queue and resources"""
 	clear_queue()
 
-

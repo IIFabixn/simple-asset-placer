@@ -29,7 +29,6 @@ static var _max_nodes_warning_logged: bool = false  # Track if we've logged the 
 static func _cleanup_generation():
 	generation_mutex.unlock()
 
-
 static func initialize():
 	# Only initialize if not already set up
 	if viewport and is_instance_valid(viewport) and mesh_instance and is_instance_valid(mesh_instance):
@@ -600,7 +599,6 @@ static func _get_node_aabb_recursive(node: Node) -> AABB:
 	
 	return combined_aabb
 
-
 static func _get_node_aabb_recursive_async(node: Node, depth: int = 0) -> AABB:
 	"""
 	Asynchronously calculate the combined AABB of a node and all its children.
@@ -787,7 +785,6 @@ static func _position_camera_simple(mesh: Mesh):
 		
 		camera.position = Vector3(cam_x, cam_y, cam_z)
 		camera.look_at(Vector3.ZERO, Vector3.UP)
-
 
 
 static func _collect_all_meshes_from_node(node: Node, collection: Array):
@@ -981,8 +978,6 @@ static func generate_meshlib_thumbnail(meshlib: MeshLibrary, item_id: int = -1) 
 	texture.set_image(image)
 	
 	return texture
-
-
 
 
 

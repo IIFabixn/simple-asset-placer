@@ -224,5 +224,3 @@ static func project_to_yz_plane(from: Vector3, direction: Vector3, plane_distanc
 
 
 
-
-

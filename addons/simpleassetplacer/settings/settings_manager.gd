@@ -64,7 +64,6 @@ func get_combined_settings() -> Dictionary:
 		_rebuild_cache()
 	return _combined_cache.duplicate()
 
-
 func get_setting(key: String, default_value = null):
 	"""Get a specific setting value
 	

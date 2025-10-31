@@ -157,5 +157,3 @@ func _gather_collision_rids_recursive(node: Node, rids: Array) -> void:
 
 
 
-
-

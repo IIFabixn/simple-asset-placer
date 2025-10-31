@@ -283,5 +283,3 @@ func get_scale_info(state: TransformState) -> Dictionary:
 
 
 
-
-

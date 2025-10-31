@@ -63,7 +63,6 @@ func _init(editor_interface: EditorInterface) -> void:
 	_editor_interface = editor_interface
 	_registry = ServiceRegistry.new()
 
-
 ## Fluent Builder Methods
 
 func with_settings() -> ServiceRegistryBuilder:
@@ -73,7 +72,6 @@ func with_settings() -> ServiceRegistryBuilder:
 	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "ServiceRegistry: Settings managers registered")
 	return self
 
-
 func with_placement_strategies() -> ServiceRegistryBuilder:
 	"""Initialize placement strategy system"""
 	_registry.placement_strategy_service = PlacementStrategyService.new()
@@ -81,13 +79,11 @@ func with_placement_strategies() -> ServiceRegistryBuilder:
 	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "ServiceRegistry: Placement strategies registered")
 	return self
 
-
 func with_editor_facade() -> ServiceRegistryBuilder:
 	"""Initialize editor interface facade"""
 	_registry.editor_facade = EditorFacade.new(_editor_interface)
 	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "ServiceRegistry: Editor facade registered")
 	return self
-
 
 func with_input_systems() -> ServiceRegistryBuilder:
 	"""Initialize input handling systems"""
@@ -96,7 +92,6 @@ func with_input_systems() -> ServiceRegistryBuilder:
 	_registry.input_handler.update_input_state({})  # Initialize with empty settings
 	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "ServiceRegistry: Input systems registered")
 	return self
-
 
 func with_transform_managers() -> ServiceRegistryBuilder:
 	"""Initialize transform calculation managers (position, rotation, scale)"""
@@ -108,7 +103,6 @@ func with_transform_managers() -> ServiceRegistryBuilder:
 	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "ServiceRegistry: Transform managers registered")
 	return self
 
-
 func with_visual_managers() -> ServiceRegistryBuilder:
 	"""Initialize visual/rendering managers (preview, overlay, grid)"""
 	_registry.preview_manager = PreviewManager.new(_registry)
@@ -118,7 +112,6 @@ func with_visual_managers() -> ServiceRegistryBuilder:
 	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "ServiceRegistry: Visual managers registered")
 	return self
 
-
 func with_state_machines() -> ServiceRegistryBuilder:
 	"""Initialize state management systems"""
 	_registry.mode_state_machine = ModeStateMachine.new(_registry)
@@ -126,7 +119,6 @@ func with_state_machines() -> ServiceRegistryBuilder:
 	_registry.transform_action_router = TransformActionRouter.new(_registry)
 	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "ServiceRegistry: State machines registered")
 	return self
-
 
 func with_utility_managers() -> ServiceRegistryBuilder:
 	"""Initialize utility systems (undo/redo, categories, scene utilities)"""
@@ -137,13 +129,11 @@ func with_utility_managers() -> ServiceRegistryBuilder:
 	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "ServiceRegistry: Utility managers registered")
 	return self
 
-
 func with_transformation_coordinator() -> ServiceRegistryBuilder:
 	"""Initialize the high-level transformation coordinator"""
 	_registry.transformation_coordinator = TransformationCoordinator.new(_registry)
 	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "ServiceRegistry: Transformation coordinator registered")
 	return self
-
 
 ## Validation & Build
 
@@ -191,7 +181,6 @@ func validate() -> bool:
 	
 	return valid
 
-
 func build() -> ServiceRegistry:
 	"""Build and return the configured ServiceRegistry
 	
@@ -204,7 +193,6 @@ func build() -> ServiceRegistry:
 	
 	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "ServiceRegistry built successfully with all required services")
 	return _registry
-
 
 ## Convenience Methods
 
@@ -224,7 +212,6 @@ static func create_full_registry(editor_interface: EditorInterface) -> ServiceRe
 		.with_utility_managers() \
 		.with_transformation_coordinator() \
 		.build()
-
 
 static func create_minimal_registry(editor_interface: EditorInterface) -> ServiceRegistry:
 	"""Create a minimal ServiceRegistry for testing purposes

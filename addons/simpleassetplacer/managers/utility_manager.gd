@@ -410,6 +410,3 @@ func place_mesh_in_scene(
 
 
 
-
-
-

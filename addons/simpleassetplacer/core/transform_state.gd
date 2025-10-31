@@ -52,7 +52,6 @@ func _init() -> void:
 	session = SessionState.new()
 	placement = PlacementConfig.new()
 
-
 ## CONVENIENCE DELEGATE METHODS (most commonly accessed)
 
 # Transform values
@@ -97,7 +96,6 @@ func get_preview_scale() -> Vector3:
 		return preview_mesh.scale
 	return get_scale_vector()
 
-
 ## UNIFIED OPERATIONS
 
 func reset_all() -> void:
@@ -106,12 +104,10 @@ func reset_all() -> void:
 	# Note: snap and placement config intentionally NOT reset
 	# They preserve user settings across operations
 
-
 func configure_from_settings(settings: Dictionary) -> void:
 	"""Configure all sub-components from settings dictionary"""
 	snap.configure_from_settings(settings)
 	placement.configure_from_settings(settings)
-
 
 func reset_for_new_placement(reset_height: bool = false, reset_position_offset: bool = false) -> void:
 	"""Reset state for new placement with optional selective resets"""
@@ -126,7 +122,6 @@ func reset_for_new_placement(reset_height: bool = false, reset_position_offset: 
 	if reset_position_offset:
 		values.manual_position_offset = Vector3.ZERO
 
-
 func begin_session(mode_type: int, initial_settings: Dictionary = {}) -> void:
 	"""Initialize session for a mode"""
 	session.begin_session(mode_type, initial_settings)
@@ -134,13 +129,11 @@ func begin_session(mode_type: int, initial_settings: Dictionary = {}) -> void:
 		configure_from_settings(initial_settings)
 	reset_all()
 
-
 func end_session() -> void:
 	"""Clean up session data"""
 	session.end_session()
 	preview_mesh = null
 	reset_all()
-
 
 ## SERIALIZATION
 
@@ -153,7 +146,6 @@ func to_dictionary() -> Dictionary:
 		"placement": placement.to_dictionary(),
 	}
 
-
 func from_dictionary(data: Dictionary) -> void:
 	"""Deserialize entire state from dictionary"""
 	if data.has("values"):
@@ -164,8 +156,6 @@ func from_dictionary(data: Dictionary) -> void:
 		session.from_dictionary(data["session"])
 	if data.has("placement"):
 		placement.from_dictionary(data["placement"])
-
-
 
 
 

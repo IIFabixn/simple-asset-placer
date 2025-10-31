@@ -618,5 +618,3 @@ func debug_print_status():
 
 
 
-
-

@@ -454,5 +454,3 @@ func update_thumbnail_size(new_size: int):
 
 
 
-
-

@@ -84,6 +84,78 @@ static func _is_supported_extension(extension: String) -> bool:
 	"""Check if file extension is supported"""
 	return extension in PluginConstants.get_all_supported_extensions()
 
+static func _can_load_resource_safely(file_path: String, extension: String) -> bool:
+	"""
+	Check if a resource can be loaded without errors
+	Returns false if the file has import errors or missing dependencies
+	"""
+	# First check if the resource path exists
+	if not ResourceLoader.exists(file_path):
+		return false
+	
+	# For imported files, verify the import was successful
+	if extension in ["blend", "fbx", "gltf", "glb", "dae", "obj"]:
+		var import_path = file_path + ".import"
+		
+		# No import file means import hasn't happened or failed
+		if not FileAccess.file_exists(import_path):
+			return false
+		
+		# Read the import file to check for the imported resource path
+		var import_file = FileAccess.open(import_path, FileAccess.READ)
+		if not import_file:
+			return false
+		
+		var import_content = import_file.get_as_text()
+		import_file.close()
+		
+		# Extract the path to the imported .scn file
+		var imported_path = ""
+		for line in import_content.split("\n"):
+			if line.begins_with("path="):
+				imported_path = line.split("=", false, 1)[1].strip_edges().trim_prefix('"').trim_suffix('"')
+				break
+		
+		# If we found an imported path, verify it exists
+		if imported_path != "":
+			if not FileAccess.file_exists(imported_path):
+				# Import failed - the .scn file doesn't exist
+				return false
+	
+	# Check if ResourceLoader has the resource cached or can load it
+	# Use has_cached to avoid triggering a load
+	if ResourceLoader.has_cached(file_path):
+		return true
+	
+	# For scene files, check if they reference missing resources
+	if extension in ["tscn", "scn"]:
+		# Quick check: if the file references .blend files that don't exist, skip it
+		var file = FileAccess.open(file_path, FileAccess.READ)
+		if file:
+			var content = file.get_as_text()
+			file.close()
+			
+			# Look for external resource references to .blend files
+			if ".blend" in content:
+				# This scene references a .blend file - check if it's valid
+				# If any referenced .blend import doesn't exist, this scene will fail
+				var lines = content.split("\n")
+				for line in lines:
+					if "ext_resource" in line and ".blend" in line:
+						# Extract the path
+						var path_start = line.find('path="')
+						if path_start != -1:
+							path_start += 6
+							var path_end = line.find('"', path_start)
+							if path_end != -1:
+								var blend_path = line.substr(path_start, path_end - path_start)
+								
+								# Check if this .blend file has a valid import
+								if not _can_load_resource_safely(blend_path, "blend"):
+									return false
+	
+	return true
+
 static func _process_asset_file(file_path: String, extension: String, include_meshlibs: bool) -> Dictionary:
 	"""
 	Process a potential asset file and return asset info if valid
@@ -96,12 +168,14 @@ static func _process_asset_file(file_path: String, extension: String, include_me
 	
 	# Determine asset type and validate
 	if PluginConstants.is_resource_extension(extension) or PluginConstants.is_meshlib_extension(extension):
-		# Try to load resource safely
-		if not ResourceLoader.exists(file_path):
+		# Check if the resource can be loaded safely without errors
+		if not _can_load_resource_safely(file_path, extension):
 			return {}
 		
-		var resource = load(file_path)
+		# Use ResourceLoader.load with cache mode to avoid triggering imports during scanning
+		var resource = ResourceLoader.load(file_path, "", ResourceLoader.CACHE_MODE_REUSE)
 		if not resource:
+			# Resource failed to load - skip it silently (may be import error, missing dependencies, etc.)
 			return {}
 		
 		if resource is MeshLibrary:
@@ -154,11 +228,16 @@ static func file_contains_mesh(file_path: String) -> bool:
 	
 	Works for: 3D models (.fbx, .obj, .gltf, etc.), scene files (.tscn, .scn)
 	"""
-	if not ResourceLoader.exists(file_path):
+	var extension = file_path.get_extension().to_lower()
+	
+	# Check if the resource can be loaded safely
+	if not _can_load_resource_safely(file_path, extension):
 		return false
 	
-	var resource = load(file_path)
+	# Use ResourceLoader.load with cache mode to avoid triggering imports
+	var resource = ResourceLoader.load(file_path, "", ResourceLoader.CACHE_MODE_REUSE)
 	if not resource:
+		# Resource failed to load - assume no mesh (may be import error)
 		return false
 	
 	if resource is Mesh:

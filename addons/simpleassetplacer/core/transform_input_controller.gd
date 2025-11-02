@@ -32,9 +32,9 @@ const PositionInputState = preload("res://addons/simpleassetplacer/managers/inpu
 const RotationInputState = preload("res://addons/simpleassetplacer/managers/input/rotation_input_state.gd")
 const ScaleInputState = preload("res://addons/simpleassetplacer/managers/input/scale_input_state.gd")
 
-var _services  # ServiceRegistry
+var _services: ServiceRegistry  # ServiceRegistry
 
-func _init(services) -> void:
+func _init(services: ServiceRegistry) -> void:
 	_services = services
 
 ## Main Input Processing
@@ -98,19 +98,19 @@ func process_keyboard_input(camera: Camera3D, state: TransformState, settings: D
 	
 	# Process resets
 	if pos_input.reset_height_pressed:
-		_services.transform_manager.reset_offset_normal(state)
+		_services.position_manager.reset_offset_normal(state)
 		changes["height_reset"] = true
 	
 	if pos_input.reset_position_pressed:
-		_services.transform_manager.reset_position(state)
+		_services.position_manager.reset_position(state)
 		changes["position_reset"] = true
 	
 	if rot_input.reset_pressed:
-		_services.transform_manager.reset_all_rotation(state)
+		_services.rotation_manager.reset_all_rotation(state)
 		changes["rotation_reset"] = true
 	
 	if scale_input.reset_pressed:
-		_services.transform_manager.reset_scale(state)
+		_services.scale_manager.reset_scale(state)
 		changes["scale_reset"] = true
 	
 	# Check for confirmation
@@ -138,7 +138,7 @@ func process_height_adjustment(pos_input: PositionInputState, state: TransformSt
 		delta_normal = -step
 	
 	if delta_normal != 0.0:
-		_services.transform_manager.adjust_offset_normal(state, delta_normal)
+		_services.position_manager.adjust_offset_normal(state, delta_normal)
 
 func process_wasd_movement(pos_input: PositionInputState, camera: Camera3D, state: TransformState, settings: Dictionary) -> void:
 	"""Process WASD position movement (plane-aware)"""
@@ -156,13 +156,13 @@ func process_wasd_movement(pos_input: PositionInputState, camera: Camera3D, stat
 	# - YZ plane (vertical): W/S moves up/down (Y), A/D moves left/right on plane
 	
 	if pos_input.position_forward_pressed:
-		_services.transform_manager.move_forward(state, position_step, camera)
+		_services.position_manager.move_forward(state, position_step, camera)
 	if pos_input.position_backward_pressed:
-		_services.transform_manager.move_backward(state, position_step, camera)
+		_services.position_manager.move_backward(state, position_step, camera)
 	if pos_input.position_right_pressed:
-		_services.transform_manager.move_right(state, position_step, camera)
+		_services.position_manager.move_right(state, position_step, camera)
 	if pos_input.position_left_pressed:
-		_services.transform_manager.move_left(state, position_step, camera)
+		_services.position_manager.move_left(state, position_step, camera)
 
 func process_rotation(rot_input: RotationInputState, state: TransformState, settings: Dictionary) -> void:
 	"""Process rotation input (X/Y/Z keys)"""
@@ -180,11 +180,11 @@ func process_rotation(rot_input: RotationInputState, state: TransformState, sett
 	
 	# Apply rotation
 	if rot_input.x_pressed:
-		_services.transform_manager.rotate_x(state, rotation_step)
+		_services.rotation_manager.rotate_x(state, rotation_step)
 	if rot_input.y_pressed:
-		_services.transform_manager.rotate_y(state, rotation_step)
+		_services.rotation_manager.rotate_y(state, rotation_step)
 	if rot_input.z_pressed:
-		_services.transform_manager.rotate_z(state, rotation_step)
+		_services.rotation_manager.rotate_z(state, rotation_step)
 
 func process_scale(scale_input: ScaleInputState, state: TransformState, settings: Dictionary) -> void:
 	"""Process scale input (Page Up/Down keys)"""
@@ -198,6 +198,6 @@ func process_scale(scale_input: ScaleInputState, state: TransformState, settings
 	
 	# Apply scale
 	if scale_input.up_pressed:
-		_services.transform_manager.increase_scale(state, scale_step)
+		_services.scale_manager.increase_scale(state, scale_step)
 	elif scale_input.down_pressed:
-		_services.transform_manager.decrease_scale(state, scale_step)
+		_services.scale_manager.decrease_scale(state, scale_step)

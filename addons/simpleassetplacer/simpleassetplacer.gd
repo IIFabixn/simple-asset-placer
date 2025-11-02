@@ -168,10 +168,6 @@ func _setup_dock():
 	# Add to Godot dock
 	add_control_to_dock(DOCK_SLOT_RIGHT_UL, dock)
 	
-	# Discover assets after dock is fully initialized (deferred to ensure _ready() completes)
-	if service_registry and service_registry.category_manager:
-		dock.call_deferred("discover_assets")
-	
 	# Store dock reference for UI updates
 	if service_registry and service_registry.transformation_coordinator:
 		service_registry.transformation_coordinator.set_dock_reference(dock)
@@ -180,7 +176,27 @@ func _setup_dock():
 	call_deferred("_connect_placement_settings_to_overlay")
 	call_deferred("_maybe_show_about_tab")
 	
+	# Discover assets after a short delay to avoid progress dialog issues
+	# This gives Godot time to finish initialization and allows resource loading without conflicts
+	if service_registry and service_registry.category_manager:
+		_schedule_asset_discovery()
+	
 	PluginLogger.info(PluginConstants.COMPONENT_DOCK, "Dock setup complete")
+
+func _schedule_asset_discovery():
+	"""Schedule asset discovery to run after initialization completes"""
+	# Use a timer to defer asset discovery outside of call_deferred context
+	# This prevents "Do not use progress dialog while flushing message queue" errors
+	var timer = Timer.new()
+	timer.one_shot = true
+	timer.wait_time = 0.1  # Small delay to ensure editor is fully initialized
+	add_child(timer)
+	timer.timeout.connect(func():
+		if dock and dock.has_method("discover_assets"):
+			dock.discover_assets()
+		timer.queue_free()
+	)
+	timer.start()
 
 func _connect_placement_settings_to_overlay():
 	"""Connect the PlacementSettings reference to the status overlay"""

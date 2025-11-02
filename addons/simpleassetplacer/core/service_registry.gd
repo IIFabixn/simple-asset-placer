@@ -30,44 +30,43 @@ USED BY: SimpleAssetPlacer, all managers
 var editor_interface: EditorInterface
 
 # Settings and configuration
-var settings_manager
-var settings_persistence
+var settings_manager: SettingsManager
+var settings_persistence: SettingsPersistence
 
 # Core managers
-var transformation_coordinator
-var position_manager
-var rotation_manager
-var scale_manager
-var grid_manager
-var mode_state_machine
-var control_mode_state
+var transformation_coordinator: TransformationCoordinator
+var position_manager: PositionManager
+var rotation_manager: RotationManager
+var scale_manager: ScaleManager
+var grid_manager: GridManager
+var mode_state_machine: ModeStateMachine
+var control_mode_state: ControlModeState
 
 # UI managers
-var preview_manager
-var overlay_manager
-var input_handler
+var preview_manager: PreviewManager
+var overlay_manager: OverlayManager
+var input_handler: InputHandler
 
 # Transform managers
-var smooth_transform_manager
-var transform_applicator
-# transform_accumulator removed - TransformState is used as single source of truth
+var smooth_transform_manager: SmoothTransformManager
+var transform_applicator: TransformApplicator
 
 # Placement system
-var placement_strategy_service
-var transform_action_router
+var placement_strategy_service: PlacementStrategyService
+var transform_action_router: TransformActionRouter
 
 # Utility managers
-var utility_manager
-var category_manager
-var undo_redo_helper
-var cursor_warp_adapter
+var utility_manager: UtilityManager
+var category_manager: CategoryManager
+var undo_redo_helper: UndoRedoHelper
+var cursor_warp_adapter: CursorWarpAdapter
 
 # Thumbnail system
-var thumbnail_generator
-var thumbnail_queue_manager
+var thumbnail_generator: ThumbnailGenerator
+var thumbnail_queue_manager: ThumbnailQueueManager
 
 # Transform state (shared)
-var transform_state
+var transform_state: TransformState
 
 # Undo/Redo manager (from editor)
 var undo_redo: EditorUndoRedoManager

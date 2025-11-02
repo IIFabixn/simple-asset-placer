@@ -28,6 +28,7 @@ const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_con
 
 ## Core Validation
 
+
 static func is_valid(node) -> bool:
 	"""
 	Check if node is valid and not queued for deletion.
@@ -51,6 +52,7 @@ static func is_valid(node) -> bool:
 	# Finally check if it's actually a Node
 	return node is Node
 
+
 static func is_valid_and_ready(node: Node) -> bool:
 	"""
 	Check if node is valid and has completed _ready().
@@ -64,6 +66,7 @@ static func is_valid_and_ready(node: Node) -> bool:
 		True if node is valid and ready, False otherwise
 	"""
 	return is_valid(node) and node.is_node_ready()
+
 
 static func is_valid_and_in_tree(node: Node) -> bool:
 	"""
@@ -79,7 +82,9 @@ static func is_valid_and_in_tree(node: Node) -> bool:
 	"""
 	return is_valid(node) and node.is_inside_tree()
 
+
 ## Safe Method Calling
+
 
 static func safe_call(node: Node, method: String, args: Array = []) -> Variant:
 	"""
@@ -100,12 +105,13 @@ static func safe_call(node: Node, method: String, args: Array = []) -> Variant:
 	"""
 	if not is_valid(node):
 		return null
-	
+
 	if not node.has_method(method):
 		PluginLogger.warning("NodeUtils", "Node %s does not have method %s" % [node.name, method])
 		return null
-	
+
 	return node.callv(method, args)
+
 
 static func safe_set(node: Node, property: String, value: Variant) -> bool:
 	"""
@@ -124,9 +130,10 @@ static func safe_set(node: Node, property: String, value: Variant) -> bool:
 	"""
 	if not is_valid(node):
 		return false
-	
+
 	node.set(property, value)
 	return true
+
 
 static func safe_get(node: Node, property: String, default = null) -> Variant:
 	"""
@@ -145,10 +152,12 @@ static func safe_get(node: Node, property: String, default = null) -> Variant:
 	"""
 	if not is_valid(node):
 		return default
-	
+
 	return node.get(property)
 
+
 ## Safe Cleanup
+
 
 static func safe_free(node: Node) -> void:
 	"""
@@ -166,6 +175,7 @@ static func safe_free(node: Node) -> void:
 	if is_valid(node):
 		node.queue_free()
 
+
 static func safe_remove_from_parent(node: Node) -> void:
 	"""
 	Safely remove node from parent with validation.
@@ -179,7 +189,9 @@ static func safe_remove_from_parent(node: Node) -> void:
 	if is_valid_and_in_tree(node):
 		node.get_parent().remove_child(node)
 
+
 ## Node Queries
+
 
 static func find_child_by_class(parent: Node, type_name: String, recursive: bool = false) -> Node:
 	"""
@@ -198,19 +210,22 @@ static func find_child_by_class(parent: Node, type_name: String, recursive: bool
 	"""
 	if not is_valid(parent):
 		return null
-	
+
 	for child in parent.get_children():
 		if child.is_class(type_name):
 			return child
-		
+
 		if recursive:
 			var found = find_child_by_class(child, type_name, true)
 			if found:
 				return found
-	
+
 	return null
 
-static func find_children_by_class(parent: Node, type_name: String, recursive: bool = false) -> Array:
+
+static func find_children_by_class(
+	parent: Node, type_name: String, recursive: bool = false
+) -> Array:
 	"""
 	Find all children of specific class type.
 	
@@ -226,28 +241,32 @@ static func find_children_by_class(parent: Node, type_name: String, recursive: b
 		var meshes = NodeUtils.find_children_by_class(scene_root, "MeshInstance3D", true)
 	"""
 	var results: Array = []
-	
+
 	if not is_valid(parent):
 		return results
-	
+
 	for child in parent.get_children():
 		if child.is_class(type_name):
 			results.append(child)
-		
+
 		if recursive:
 			results.append_array(find_children_by_class(child, type_name, true))
-	
+
 	return results
 
+
 ## Validation Helpers for Specific Node Types
+
 
 static func validate_node3d(node: Node) -> bool:
 	"""Check if node is valid Node3D"""
 	return is_valid(node) and node is Node3D
 
+
 static func validate_control(node: Node) -> bool:
 	"""Check if node is valid Control"""
 	return is_valid(node) and node is Control
+
 
 static func validate_mesh_instance(node: Node) -> bool:
 	"""Check if node is valid MeshInstance3D with mesh"""
@@ -256,7 +275,9 @@ static func validate_mesh_instance(node: Node) -> bool:
 	var mesh_inst = node as MeshInstance3D
 	return mesh_inst.mesh != null
 
+
 ## Safe Operations with Auto-Cleanup
+
 
 static func safe_hide(node: Node) -> bool:
 	"""
@@ -270,12 +291,13 @@ static func safe_hide(node: Node) -> bool:
 	"""
 	if not is_valid(node):
 		return false
-	
+
 	if node is CanvasItem or node is Node3D:
 		node.hide()
 		return true
-	
+
 	return false
+
 
 static func safe_show(node: Node) -> bool:
 	"""
@@ -289,12 +311,13 @@ static func safe_show(node: Node) -> bool:
 	"""
 	if not is_valid(node):
 		return false
-	
+
 	if node is CanvasItem or node is Node3D:
 		node.show()
 		return true
-	
+
 	return false
+
 
 static func safe_set_visible(node: Node, visible: bool) -> bool:
 	"""
@@ -312,7 +335,9 @@ static func safe_set_visible(node: Node, visible: bool) -> bool:
 	else:
 		return safe_hide(node)
 
+
 ## Cleanup with Null Assignment
+
 
 static func cleanup_and_null(node_ref: Node) -> Node:
 	"""
@@ -335,7 +360,9 @@ static func cleanup_and_null(node_ref: Node) -> Node:
 	safe_free(node_ref)
 	return null
 
+
 ## Debug Helpers
+
 
 static func debug_print_node_tree(node: Node, indent: int = 0) -> void:
 	"""
@@ -348,15 +375,19 @@ static func debug_print_node_tree(node: Node, indent: int = 0) -> void:
 	if not is_valid(node):
 		PluginLogger.debug("NodeUtils", "  ".repeat(indent) + "<invalid node>")
 		return
-	
+
 	var prefix = "  ".repeat(indent)
 	var valid_status = "✓" if is_valid(node) else "✗"
 	var tree_status = "T" if is_valid_and_in_tree(node) else "-"
-	
-	PluginLogger.debug("NodeUtils", "%s[%s%s] %s (%s)" % [prefix, valid_status, tree_status, node.name, node.get_class()])
-	
+
+	PluginLogger.debug(
+		"NodeUtils",
+		"%s[%s%s] %s (%s)" % [prefix, valid_status, tree_status, node.name, node.get_class()]
+	)
+
 	for child in node.get_children():
 		debug_print_node_tree(child, indent + 1)
+
 
 static func get_node_info(node: Node) -> Dictionary:
 	"""
@@ -369,11 +400,8 @@ static func get_node_info(node: Node) -> Dictionary:
 		Dictionary with node information
 	"""
 	if not is_valid(node):
-		return {
-			"valid": false,
-			"null": node == null
-		}
-	
+		return {"valid": false, "null": node == null}
+
 	return {
 		"valid": true,
 		"name": node.name,

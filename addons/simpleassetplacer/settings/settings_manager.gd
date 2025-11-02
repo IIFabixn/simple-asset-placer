@@ -39,20 +39,24 @@ var _cache_dirty: bool = true
 
 ## Initialization
 
+
 func _init() -> void:
 	"""Initialize settings manager with defaults from editor"""
 	_plugin_settings = SettingsStorage.load_from_editor_settings().duplicate(true)
 	_dock_settings = {}
 	_combined_cache = {}
 	_cache_dirty = true
-	
+
 	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "SettingsManager initialized")
 
+
 ## Settings Access
+
 
 func get_default_settings() -> Dictionary:
 	"""Get default plugin settings"""
 	return SettingsStorage.get_default_settings().duplicate(true)
+
 
 func get_combined_settings() -> Dictionary:
 	"""Get combined plugin + dock settings (cached)
@@ -64,6 +68,7 @@ func get_combined_settings() -> Dictionary:
 		_rebuild_cache()
 	return _combined_cache.duplicate()
 
+
 func get_setting(key: String, default_value = null):
 	"""Get a specific setting value
 	
@@ -71,22 +76,26 @@ func get_setting(key: String, default_value = null):
 	"""
 	if _dock_settings.has(key):
 		return _dock_settings[key]
-	
+
 	if _plugin_settings.has(key):
 		return _plugin_settings[key]
-	
+
 	return default_value
+
 
 func has_setting(key: String) -> bool:
 	"""Check if a setting exists in plugin or dock settings"""
 	return _dock_settings.has(key) or _plugin_settings.has(key)
 
+
 ## Settings Modification
+
 
 func set_plugin_setting(key: String, value) -> void:
 	"""Set a plugin setting (permanent)"""
 	_plugin_settings[key] = value
 	_cache_dirty = true
+
 
 func set_plugin_settings(settings: Dictionary) -> void:
 	"""Update multiple plugin settings at once"""
@@ -94,15 +103,18 @@ func set_plugin_settings(settings: Dictionary) -> void:
 		_plugin_settings[key] = settings[key]
 	_cache_dirty = true
 
+
 func set_dock_setting(key: String, value) -> void:
 	"""Set a dock setting (runtime/UI)"""
 	_dock_settings[key] = value
 	_cache_dirty = true
 
+
 func set_dock_settings(settings: Dictionary) -> void:
 	"""Replace dock settings entirely"""
 	_dock_settings = settings.duplicate()
 	_cache_dirty = true
+
 
 func update_dock_settings(settings: Dictionary) -> void:
 	"""Merge new dock settings with existing ones"""
@@ -110,7 +122,9 @@ func update_dock_settings(settings: Dictionary) -> void:
 		_dock_settings[key] = settings[key]
 	_cache_dirty = true
 
+
 ## Settings Persistence (EditorSettings is the single source of truth)
+
 
 func save_plugin_settings_to_editor() -> void:
 	"""Save current plugin settings to EditorSettings
@@ -121,13 +135,16 @@ func save_plugin_settings_to_editor() -> void:
 	SettingsStorage.save_to_editor_settings(_plugin_settings)
 	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "Saved plugin settings to EditorSettings")
 
+
 func reload_from_editor_settings() -> void:
 	"""Reload settings from Godot's EditorSettings (single source of truth)"""
 	_plugin_settings = SettingsStorage.load_from_editor_settings().duplicate(true)
 	_cache_dirty = true
 	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Reloaded settings from EditorSettings")
 
+
 ## Settings Reset
+
 
 func reset_to_defaults() -> void:
 	"""Reset all settings to defaults"""
@@ -136,29 +153,35 @@ func reset_to_defaults() -> void:
 	_cache_dirty = true
 	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "Settings reset to defaults")
 
+
 func reset_plugin_settings() -> void:
 	"""Reset plugin settings to defaults (keep dock settings)"""
 	_plugin_settings = get_default_settings()
 	_cache_dirty = true
+
 
 func clear_dock_settings() -> void:
 	"""Clear runtime dock settings"""
 	_dock_settings = {}
 	_cache_dirty = true
 
+
 ## Cache Management
+
 
 func invalidate_cache() -> void:
 	"""Force cache rebuild on next access"""
 	_cache_dirty = true
 
+
 ## Key Binding Helpers
+
 
 func is_plugin_key(key_string: String) -> bool:
 	"""Check if key string matches any plugin keybinding"""
 	var plugin_key_names = [
 		"cancel_key",
-		"transform_mode_key", 
+		"transform_mode_key",
 		"height_up_key",
 		"height_down_key",
 		"reset_height_key",
@@ -168,7 +191,7 @@ func is_plugin_key(key_string: String) -> bool:
 		"position_backward_key",
 		"reset_position_key",
 		"rotate_x_key",
-		"rotate_y_key", 
+		"rotate_y_key",
 		"rotate_z_key",
 		"reset_rotation_key",
 		"scale_up_key",
@@ -180,23 +203,27 @@ func is_plugin_key(key_string: String) -> bool:
 		"cycle_next_asset_key",
 		"cycle_previous_asset_key"
 	]
-	
+
 	var settings = get_combined_settings()
 	for plugin_key in plugin_key_names:
 		if settings.get(plugin_key, "") == key_string:
 			return true
-	
+
 	return false
+
 
 func get_key_binding(action_name: String) -> String:
 	"""Get the key binding for a specific action"""
 	return get_setting(action_name, "")
 
+
 func set_key_binding(action_name: String, key: String) -> void:
 	"""Set a key binding for an action"""
 	set_plugin_setting(action_name, key)
 
+
 ## Validation
+
 
 func validate_setting(key: String, value: Variant, auto_clamp: bool = true) -> Dictionary:
 	"""Validate a single setting using SettingsValidator
@@ -204,7 +231,7 @@ func validate_setting(key: String, value: Variant, auto_clamp: bool = true) -> D
 	Returns: {valid: bool, error: String, clamped_value: Variant, issues: Array}
 	"""
 	var report := SettingsValidator.validate_single(key, value, auto_clamp)
-	
+
 	if report.has("issues") and report["issues"].size() > 0:
 		for issue in report["issues"]:
 			var message: String = issue.get("message", "")
@@ -219,13 +246,14 @@ func validate_setting(key: String, value: Variant, auto_clamp: bool = true) -> D
 		"issues": report.get("issues", [])
 	}
 
+
 func validate_and_set_plugin_setting(key: String, value: Variant, auto_clamp: bool = true) -> bool:
 	"""Validate and set a plugin setting
 	
 	Returns: True if value was accepted (possibly after clamping), false otherwise
 	"""
 	var validation = validate_setting(key, value, auto_clamp)
-	
+
 	if validation["valid"]:
 		set_plugin_setting(key, validation["clamped_value"])
 		return true
@@ -236,6 +264,7 @@ func validate_and_set_plugin_setting(key: String, value: Variant, auto_clamp: bo
 
 	return false
 
+
 func validate_all() -> bool:
 	"""Validate all current settings
 	
@@ -243,7 +272,7 @@ func validate_all() -> bool:
 	"""
 	var combined := get_combined_settings().duplicate(true)
 	var result := SettingsValidator.validate(combined, false)
-	
+
 	if result.has("issues") and result["issues"].size() > 0:
 		for issue in result["issues"]:
 			var message: String = issue.get("message", "")
@@ -251,7 +280,9 @@ func validate_all() -> bool:
 
 	return result.get("is_valid", true)
 
+
 ## Debug & Info
+
 
 func get_summary() -> Dictionary:
 	"""Get summary of settings state for debugging"""
@@ -263,17 +294,28 @@ func get_summary() -> Dictionary:
 		"valid": validate_all()
 	}
 
+
 func print_settings() -> void:
 	"""Print all settings for debugging"""
-	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "=== Plugin Settings (%d) ===" % _plugin_settings.size())
+	PluginLogger.debug(
+		PluginConstants.COMPONENT_MAIN, "=== Plugin Settings (%d) ===" % _plugin_settings.size()
+	)
 	for key in _plugin_settings.keys():
-		PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "  %s: %s" % [key, str(_plugin_settings[key])])
-	
-	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "=== Dock Settings (%d) ===" % _dock_settings.size())
+		PluginLogger.debug(
+			PluginConstants.COMPONENT_MAIN, "  %s: %s" % [key, str(_plugin_settings[key])]
+		)
+
+	PluginLogger.debug(
+		PluginConstants.COMPONENT_MAIN, "=== Dock Settings (%d) ===" % _dock_settings.size()
+	)
 	for key in _dock_settings.keys():
-		PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "  %s: %s" % [key, str(_dock_settings[key])])
+		PluginLogger.debug(
+			PluginConstants.COMPONENT_MAIN, "  %s: %s" % [key, str(_dock_settings[key])]
+		)
+
 
 ## Internal
+
 
 func _rebuild_cache() -> void:
 	"""Rebuild the combined settings cache

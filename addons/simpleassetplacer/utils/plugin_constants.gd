@@ -53,8 +53,8 @@ const LARGE_HEIGHT_INCREMENT: float = 1.0
 
 ## Position Adjustment Settings (WASD keyboard movement)
 const DEFAULT_POSITION_INCREMENT: float = 1.0  # Match typical grid snap size
-const FINE_POSITION_INCREMENT: float = 0.1     # Precise adjustments with CTRL
-const LARGE_POSITION_INCREMENT: float = 5.0    # Large movements with ALT
+const FINE_POSITION_INCREMENT: float = 0.1  # Precise adjustments with CTRL
+const LARGE_POSITION_INCREMENT: float = 5.0  # Large movements with ALT
 
 ## Increment Modifiers (for keyboard-based transforms)
 const FINE_SENSITIVITY_MULTIPLIER: float = 0.1  # CTRL modifier makes adjustments 10x more precise
@@ -149,6 +149,7 @@ const COMPONENT_MODELLIB: String = "ModelLibBrowser"
 
 ## Helper Functions
 
+
 static func get_all_supported_extensions() -> Array:
 	"""Get all supported file extensions"""
 	var all_extensions = []
@@ -158,17 +159,21 @@ static func get_all_supported_extensions() -> Array:
 	all_extensions.append_array(SUPPORTED_MESHLIB_EXTENSIONS)
 	return all_extensions
 
+
 static func is_3d_model_extension(extension: String) -> bool:
 	"""Check if extension is a 3D model format"""
 	return extension.to_lower() in SUPPORTED_3D_EXTENSIONS
+
 
 static func is_scene_extension(extension: String) -> bool:
 	"""Check if extension is a scene format"""
 	return extension.to_lower() in SUPPORTED_SCENE_EXTENSIONS
 
+
 static func is_resource_extension(extension: String) -> bool:
 	"""Check if extension is a resource format"""
 	return extension.to_lower() in SUPPORTED_RESOURCE_EXTENSIONS
+
 
 static func is_meshlib_extension(extension: String) -> bool:
 	"""Check if extension is a MeshLibrary format"""

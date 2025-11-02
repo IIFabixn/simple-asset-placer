@@ -36,16 +36,19 @@ var last_raycast_xz: Vector2 = Vector2.ZERO  # Track XZ position changes for upd
 
 ## CONFIGURATION
 
+
 func configure_from_settings(settings: Dictionary) -> void:
 	"""Configure placement settings from settings dictionary"""
 	align_with_normal = bool(settings.get("align_with_normal", false))
 	collision_mask = settings.get("collision_mask", 1)
 	height_adjustment_step = settings.get("height_adjustment_step", 0.1)
 
+
 func reset_for_new_placement() -> void:
 	"""Reset placement tracking state for new placement"""
 	is_initial_position = true
 	last_raycast_xz = Vector2.ZERO
+
 
 func reset() -> void:
 	"""Reset all placement configuration to defaults"""
@@ -54,7 +57,9 @@ func reset() -> void:
 	height_adjustment_step = 0.1
 	reset_for_new_placement()
 
+
 ## SERIALIZATION
+
 
 func to_dictionary() -> Dictionary:
 	"""Serialize placement configuration to dictionary"""
@@ -65,6 +70,7 @@ func to_dictionary() -> Dictionary:
 		"is_initial_position": is_initial_position,
 		"last_raycast_xz": last_raycast_xz,
 	}
+
 
 func from_dictionary(data: Dictionary) -> void:
 	"""Deserialize placement configuration from dictionary"""

@@ -45,6 +45,7 @@ var dock_reference = null  # Reference to dock UI instance
 
 ## CONSTRUCTOR
 
+
 func _init() -> void:
 	"""Initialize all sub-components"""
 	values = TransformValues.new()
@@ -52,51 +53,65 @@ func _init() -> void:
 	session = SessionState.new()
 	placement = PlacementConfig.new()
 
+
 ## CONVENIENCE DELEGATE METHODS (most commonly accessed)
+
 
 # Transform values
 func get_final_position() -> Vector3:
 	return values.get_final_position()
 
+
 func get_final_rotation() -> Vector3:
 	return values.get_final_rotation()
+
 
 func get_final_rotation_degrees() -> Vector3:
 	return values.get_final_rotation_degrees()
 
+
 func get_scale_vector() -> Vector3:
 	return values.get_scale_vector()
+
 
 # Session queries
 func is_active() -> bool:
 	return session.is_active()
 
+
 func is_in_placement_mode() -> bool:
 	return session.is_in_placement_mode()
+
 
 func is_in_transform_mode() -> bool:
 	return session.is_in_transform_mode()
 
+
 # Preview management
 func has_preview() -> bool:
 	return preview_mesh != null and is_instance_valid(preview_mesh)
+
 
 func get_preview_position() -> Vector3:
 	if has_preview():
 		return preview_mesh.global_position
 	return values.position
 
+
 func get_preview_rotation() -> Vector3:
 	if has_preview():
 		return preview_mesh.rotation
 	return get_final_rotation()
+
 
 func get_preview_scale() -> Vector3:
 	if has_preview():
 		return preview_mesh.scale
 	return get_scale_vector()
 
+
 ## UNIFIED OPERATIONS
+
 
 func reset_all() -> void:
 	"""Reset all state to defaults (does NOT end session)"""
@@ -104,23 +119,28 @@ func reset_all() -> void:
 	# Note: snap and placement config intentionally NOT reset
 	# They preserve user settings across operations
 
+
 func configure_from_settings(settings: Dictionary) -> void:
 	"""Configure all sub-components from settings dictionary"""
 	snap.configure_from_settings(settings)
 	placement.configure_from_settings(settings)
 
-func reset_for_new_placement(reset_height: bool = false, reset_position_offset: bool = false) -> void:
+
+func reset_for_new_placement(
+	reset_height: bool = false, reset_position_offset: bool = false
+) -> void:
 	"""Reset state for new placement with optional selective resets"""
 	placement.reset_for_new_placement()
 	values.position = Vector3.ZERO
 	values.target_position = Vector3.ZERO
-	
+
 	if reset_height:
 		values.manual_position_offset.y = 0.0
 		values.base_position = Vector3.ZERO
-	
+
 	if reset_position_offset:
 		values.manual_position_offset = Vector3.ZERO
+
 
 func begin_session(mode_type: int, initial_settings: Dictionary = {}) -> void:
 	"""Initialize session for a mode"""
@@ -129,13 +149,16 @@ func begin_session(mode_type: int, initial_settings: Dictionary = {}) -> void:
 		configure_from_settings(initial_settings)
 	reset_all()
 
+
 func end_session() -> void:
 	"""Clean up session data"""
 	session.end_session()
 	preview_mesh = null
 	reset_all()
 
+
 ## SERIALIZATION
+
 
 func to_dictionary() -> Dictionary:
 	"""Serialize entire state to dictionary"""
@@ -145,6 +168,7 @@ func to_dictionary() -> Dictionary:
 		"session": session.to_dictionary(),
 		"placement": placement.to_dictionary(),
 	}
+
 
 func from_dictionary(data: Dictionary) -> void:
 	"""Deserialize entire state from dictionary"""

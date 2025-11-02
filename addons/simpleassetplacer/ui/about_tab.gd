@@ -10,8 +10,10 @@ var _initialized := false
 var _version_label: Label
 var _content_label: RichTextLabel
 
+
 func _ready():
 	ensure_ready()
+
 
 func ensure_ready() -> void:
 	if _initialized:
@@ -20,8 +22,10 @@ func ensure_ready() -> void:
 	_populate_content()
 	_initialized = true
 
+
 func get_version_text() -> String:
 	return _version_label.text if _version_label else ""
+
 
 func _build_layout() -> void:
 	name = "About"
@@ -51,7 +55,7 @@ func _build_layout() -> void:
 	var header_panel := PanelContainer.new()
 	header_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root_vbox.add_child(header_panel)
-	
+
 	# Use editor's category background style
 	var header_style := StyleBoxFlat.new()
 	header_style.bg_color = Color(0.24, 0.26, 0.3, 1.0)  # Inspector category background
@@ -103,7 +107,7 @@ func _build_layout() -> void:
 	var link_panel := PanelContainer.new()
 	link_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content_vbox.add_child(link_panel)
-	
+
 	var link_style := StyleBoxFlat.new()
 	link_style.bg_color = Color(0.24, 0.26, 0.3, 1.0)
 	link_style.set_content_margin_all(8)
@@ -119,6 +123,7 @@ func _build_layout() -> void:
 	docs_link.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	link_panel.add_child(docs_link)
 
+
 func _populate_content() -> void:
 	var version := _load_plugin_version()
 	_version_label.text = "Version %s" % version
@@ -126,7 +131,8 @@ func _populate_content() -> void:
 	var sections := [
 		{
 			"title": "Placement Workflow",
-			"items": [
+			"items":
+			[
 				"Pick assets from the 3D Models or MeshLibraries tabs.",
 				"Click an asset to send it to the viewport preview.",
 				"Left-click to place, or press ESC to exit placement."
@@ -134,7 +140,8 @@ func _populate_content() -> void:
 		},
 		{
 			"title": "Transform Workflow",
-			"items": [
+			"items":
+			[
 				"Select one or more Node3D objects in the scene.",
 				"Press TAB to enter transform mode, then drag in the viewport.",
 				"Use ENTER to confirm or ESC to cancel modal tweaks."
@@ -142,7 +149,8 @@ func _populate_content() -> void:
 		},
 		{
 			"title": "Essential Controls",
-			"items": [
+			"items":
+			[
 				"G/R/L switch between position, rotation, and scale while modal is active.",
 				"Hold CTRL for fine steps, ALT for large steps, and SHIFT to reverse wheel input.",
 				"Numeric input: press axis keys then type '=value' or '+offset' and hit ENTER."
@@ -150,7 +158,8 @@ func _populate_content() -> void:
 		},
 		{
 			"title": "Settings & Focus Tips",
-			"items": [
+			"items":
+			[
 				"Use the Settings tab for cursor warp, placement strategy, and sensitivity options.",
 				"Dock text fields keep keyboard focus; click the viewport to resume placement controls.",
 				"Toolbar toggles mirror these settings for quick changes while working in the viewport."
@@ -168,6 +177,7 @@ func _populate_content() -> void:
 		bbcode += "\n"
 
 	_content_label.bbcode_text = bbcode.strip_edges()
+
 
 func _load_plugin_version() -> String:
 	var config := ConfigFile.new()

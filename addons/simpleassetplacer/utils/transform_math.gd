@@ -36,6 +36,7 @@ const EPSILON = 0.001  # Small value for floating point comparisons
 ## SNAPPING FUNCTIONS
 ## ============================================================================
 
+
 static func snap_value(value: float, step: float, offset: float = 0.0) -> float:
 	"""Snap a single value to a grid
 	
@@ -49,11 +50,12 @@ static func snap_value(value: float, step: float, offset: float = 0.0) -> float:
 	"""
 	if step <= 0.0:
 		return value
-	
+
 	# Adjust for offset, snap, then restore offset
 	var adjusted = value - offset
 	var snapped = round(adjusted / step) * step
 	return snapped + offset
+
 
 static func snap_vector3(vec: Vector3, step: float, offset: Vector3 = Vector3.ZERO) -> Vector3:
 	"""Snap a Vector3 to a grid (all axes use same step)
@@ -72,6 +74,7 @@ static func snap_vector3(vec: Vector3, step: float, offset: Vector3 = Vector3.ZE
 		snap_value(vec.z, step, offset.z)
 	)
 
+
 static func snap_vector3_xz(vec: Vector3, step: float, offset: Vector3 = Vector3.ZERO) -> Vector3:
 	"""Snap only X and Z axes of a Vector3 to grid (leave Y unchanged)
 	
@@ -83,11 +86,8 @@ static func snap_vector3_xz(vec: Vector3, step: float, offset: Vector3 = Vector3
 	Returns:
 		Vector with X and Z snapped
 	"""
-	return Vector3(
-		snap_value(vec.x, step, offset.x),
-		vec.y,  # Y unchanged
-		snap_value(vec.z, step, offset.z)
-	)
+	return Vector3(snap_value(vec.x, step, offset.x), vec.y, snap_value(vec.z, step, offset.z))  # Y unchanged
+
 
 static func snap_angle(angle_radians: float, step_radians: float) -> float:
 	"""Snap an angle to a grid
@@ -101,8 +101,9 @@ static func snap_angle(angle_radians: float, step_radians: float) -> float:
 	"""
 	if step_radians <= 0.0:
 		return angle_radians
-	
+
 	return round(angle_radians / step_radians) * step_radians
+
 
 static func snap_rotation(rotation: Vector3, step_degrees: float) -> Vector3:
 	"""Snap rotation angles to grid
@@ -116,13 +117,14 @@ static func snap_rotation(rotation: Vector3, step_degrees: float) -> Vector3:
 	"""
 	if step_degrees <= 0.0:
 		return rotation
-	
+
 	var step_rad = deg_to_rad(step_degrees)
 	return Vector3(
 		snap_angle(rotation.x, step_rad),
 		snap_angle(rotation.y, step_rad),
 		snap_angle(rotation.z, step_rad)
 	)
+
 
 static func snap_scale(scale: Vector3, step: float) -> Vector3:
 	"""Snap scale values to grid
@@ -136,16 +138,14 @@ static func snap_scale(scale: Vector3, step: float) -> Vector3:
 	"""
 	if step <= 0.0:
 		return scale
-	
-	return Vector3(
-		snap_value(scale.x, step),
-		snap_value(scale.y, step),
-		snap_value(scale.z, step)
-	)
+
+	return Vector3(snap_value(scale.x, step), snap_value(scale.y, step), snap_value(scale.z, step))
+
 
 ## ============================================================================
 ## NORMALIZATION FUNCTIONS
 ## ============================================================================
+
 
 static func normalize_angle(angle_radians: float) -> float:
 	"""Normalize angle to [-PI, PI] range
@@ -158,6 +158,7 @@ static func normalize_angle(angle_radians: float) -> float:
 	"""
 	return fmod(angle_radians + PI, TAU) - PI
 
+
 static func normalize_angle_positive(angle_radians: float) -> float:
 	"""Normalize angle to [0, TAU) range
 	
@@ -169,6 +170,7 @@ static func normalize_angle_positive(angle_radians: float) -> float:
 	"""
 	return fmod(angle_radians, TAU)
 
+
 static func normalize_rotation(rotation: Vector3) -> Vector3:
 	"""Normalize rotation vector (keep angles within reasonable bounds)
 	
@@ -178,11 +180,8 @@ static func normalize_rotation(rotation: Vector3) -> Vector3:
 	Returns:
 		Normalized rotation vector
 	"""
-	return Vector3(
-		fmod(rotation.x, TAU),
-		fmod(rotation.y, TAU),
-		fmod(rotation.z, TAU)
-	)
+	return Vector3(fmod(rotation.x, TAU), fmod(rotation.y, TAU), fmod(rotation.z, TAU))
+
 
 static func normalize_rotation_degrees(rotation_degrees: Vector3) -> Vector3:
 	"""Normalize rotation degrees to 0-360 range
@@ -199,9 +198,11 @@ static func normalize_rotation_degrees(rotation_degrees: Vector3) -> Vector3:
 		fmod(rotation_degrees.z + 360.0, 360.0)
 	)
 
+
 ## ============================================================================
 ## CLAMPING FUNCTIONS
 ## ============================================================================
+
 
 static func clamp_vector3(vec: Vector3, min_val: Vector3, max_val: Vector3) -> Vector3:
 	"""Clamp each component of a Vector3
@@ -220,6 +221,7 @@ static func clamp_vector3(vec: Vector3, min_val: Vector3, max_val: Vector3) -> V
 		clampf(vec.z, min_val.z, max_val.z)
 	)
 
+
 static func clamp_vector3_uniform(vec: Vector3, min_val: float, max_val: float) -> Vector3:
 	"""Clamp all components of a Vector3 to same range
 	
@@ -237,6 +239,7 @@ static func clamp_vector3_uniform(vec: Vector3, min_val: float, max_val: float) 
 		clampf(vec.z, min_val, max_val)
 	)
 
+
 static func clamp_position_to_bounds(pos: Vector3, bounds: AABB) -> Vector3:
 	"""Clamp position to AABB bounds
 	
@@ -250,14 +253,17 @@ static func clamp_position_to_bounds(pos: Vector3, bounds: AABB) -> Vector3:
 	if bounds.size == Vector3.ZERO:
 		# Default bounds if empty AABB
 		bounds = AABB(Vector3(-1000, -100, -1000), Vector3(2000, 200, 2000))
-	
+
 	return Vector3(
 		clampf(pos.x, bounds.position.x, bounds.position.x + bounds.size.x),
 		clampf(pos.y, bounds.position.y, bounds.position.y + bounds.size.y),
 		clampf(pos.z, bounds.position.z, bounds.position.z + bounds.size.z)
 	)
 
-static func clamp_scale(scale: Vector3, min_scale: float = 0.01, max_scale: float = 100.0) -> Vector3:
+
+static func clamp_scale(
+	scale: Vector3, min_scale: float = 0.01, max_scale: float = 100.0
+) -> Vector3:
 	"""Clamp scale values to prevent zero/negative or excessive scaling
 	
 	Args:
@@ -270,9 +276,11 @@ static func clamp_scale(scale: Vector3, min_scale: float = 0.01, max_scale: floa
 	"""
 	return clamp_vector3_uniform(scale, min_scale, max_scale)
 
+
 ## ============================================================================
 ## VALIDATION FUNCTIONS
 ## ============================================================================
+
 
 static func is_valid_position(pos: Vector3, max_distance: float = 10000.0) -> bool:
 	"""Check if a position is valid (not too far from origin)
@@ -287,12 +295,13 @@ static func is_valid_position(pos: Vector3, max_distance: float = 10000.0) -> bo
 	# Check horizontal bounds
 	if abs(pos.x) > max_distance or abs(pos.z) > max_distance:
 		return false
-	
+
 	# Check vertical bounds
 	if pos.y < -1000 or pos.y > 1000:
 		return false
-	
+
 	return true
+
 
 static func is_rotation_zero(rotation: Vector3, tolerance: float = EPSILON) -> bool:
 	"""Check if rotation is approximately zero
@@ -306,6 +315,7 @@ static func is_rotation_zero(rotation: Vector3, tolerance: float = EPSILON) -> b
 	"""
 	return rotation.length_squared() < tolerance * tolerance
 
+
 static func is_scale_uniform(scale: Vector3, tolerance: float = EPSILON) -> bool:
 	"""Check if scale is uniform (all axes equal)
 	
@@ -317,7 +327,12 @@ static func is_scale_uniform(scale: Vector3, tolerance: float = EPSILON) -> bool
 		True if scale is uniform
 	"""
 	var avg = (scale.x + scale.y + scale.z) / 3.0
-	return abs(scale.x - avg) < tolerance and abs(scale.y - avg) < tolerance and abs(scale.z - avg) < tolerance
+	return (
+		abs(scale.x - avg) < tolerance
+		and abs(scale.y - avg) < tolerance
+		and abs(scale.z - avg) < tolerance
+	)
+
 
 static func is_scale_valid(scale: Vector3, min_scale: float = 0.01) -> bool:
 	"""Check if scale values are valid (not zero or negative)
@@ -331,9 +346,11 @@ static func is_scale_valid(scale: Vector3, min_scale: float = 0.01) -> bool:
 	"""
 	return scale.x >= min_scale and scale.y >= min_scale and scale.z >= min_scale
 
+
 ## ============================================================================
 ## INTERPOLATION HELPERS
 ## ============================================================================
+
 
 static func lerp_vector3_safe(from: Vector3, to: Vector3, weight: float) -> Vector3:
 	"""Safely interpolate between two vectors (clamps weight to [0, 1])
@@ -349,7 +366,15 @@ static func lerp_vector3_safe(from: Vector3, to: Vector3, weight: float) -> Vect
 	weight = clampf(weight, 0.0, 1.0)
 	return from.lerp(to, weight)
 
-static func smooth_damp_vector3(current: Vector3, target: Vector3, velocity: Vector3, smooth_time: float, delta: float, max_speed: float = INF) -> Dictionary:
+
+static func smooth_damp_vector3(
+	current: Vector3,
+	target: Vector3,
+	velocity: Vector3,
+	smooth_time: float,
+	delta: float,
+	max_speed: float = INF
+) -> Dictionary:
 	"""Smooth damp for Vector3 (similar to Unity's SmoothDamp)
 	
 	Args:
@@ -367,10 +392,10 @@ static func smooth_damp_vector3(current: Vector3, target: Vector3, velocity: Vec
 	var omega = 2.0 / smooth_time
 	var x = omega * delta
 	var exp = 1.0 / (1.0 + x + 0.48 * x * x + 0.235 * x * x * x)
-	
+
 	var change = current - target
 	var original_to = target
-	
+
 	# Clamp maximum change
 	var max_change = max_speed * smooth_time
 	var max_change_sq = max_change * max_change
@@ -378,21 +403,19 @@ static func smooth_damp_vector3(current: Vector3, target: Vector3, velocity: Vec
 	if change_sq > max_change_sq:
 		var mag = sqrt(change_sq)
 		change = change / mag * max_change
-	
+
 	target = current - change
 	var temp = (velocity + omega * change) * delta
 	velocity = (velocity - omega * temp) * exp
 	var output = target + (change + temp) * exp
-	
+
 	# Prevent overshooting
 	if (original_to - current).dot(output - original_to) > 0:
 		output = original_to
 		velocity = (output - original_to) / delta
-	
-	return {
-		"value": output,
-		"velocity": velocity
-	}
+
+	return {"value": output, "velocity": velocity}
+
 
 static func calculate_smooth_lerp_weight(speed: float, delta: float) -> float:
 	"""Calculate lerp weight for smooth interpolation
@@ -406,9 +429,11 @@ static func calculate_smooth_lerp_weight(speed: float, delta: float) -> float:
 	"""
 	return clampf(1.0 - exp(-speed * delta), 0.0, 1.0)
 
+
 ## ============================================================================
 ## ROTATION UTILITIES
 ## ============================================================================
+
 
 static func euler_to_quaternion(euler: Vector3) -> Quaternion:
 	"""Convert Euler angles to Quaternion
@@ -421,6 +446,7 @@ static func euler_to_quaternion(euler: Vector3) -> Quaternion:
 	"""
 	return Quaternion.from_euler(euler)
 
+
 static func quaternion_to_euler(quat: Quaternion) -> Vector3:
 	"""Convert Quaternion to Euler angles
 	
@@ -431,6 +457,7 @@ static func quaternion_to_euler(quat: Quaternion) -> Vector3:
 		Euler angles in radians
 	"""
 	return quat.get_euler()
+
 
 static func get_rotation_magnitude(rotation: Vector3) -> float:
 	"""Get magnitude of rotation vector
@@ -443,9 +470,11 @@ static func get_rotation_magnitude(rotation: Vector3) -> float:
 	"""
 	return rotation.length()
 
+
 ## ============================================================================
 ## VECTOR UTILITIES
 ## ============================================================================
+
 
 static func vector3_approximately_equal(a: Vector3, b: Vector3, tolerance: float = EPSILON) -> bool:
 	"""Check if two vectors are approximately equal
@@ -459,6 +488,7 @@ static func vector3_approximately_equal(a: Vector3, b: Vector3, tolerance: float
 		True if vectors are approximately equal
 	"""
 	return (a - b).length_squared() < tolerance * tolerance
+
 
 static func get_horizontal_distance(a: Vector3, b: Vector3) -> float:
 	"""Get horizontal distance between two points (ignoring Y)
@@ -474,6 +504,7 @@ static func get_horizontal_distance(a: Vector3, b: Vector3) -> float:
 	var dz = a.z - b.z
 	return sqrt(dx * dx + dz * dz)
 
+
 static func project_onto_plane(vector: Vector3, plane_normal: Vector3) -> Vector3:
 	"""Project vector onto plane defined by normal
 	
@@ -487,9 +518,11 @@ static func project_onto_plane(vector: Vector3, plane_normal: Vector3) -> Vector
 	plane_normal = plane_normal.normalized()
 	return vector - plane_normal * vector.dot(plane_normal)
 
+
 ## ============================================================================
 ## SCALE UTILITIES
 ## ============================================================================
+
 
 static func get_uniform_scale(scale: Vector3) -> float:
 	"""Get average scale value (converts non-uniform to uniform)
@@ -502,6 +535,7 @@ static func get_uniform_scale(scale: Vector3) -> float:
 	"""
 	return (scale.x + scale.y + scale.z) / 3.0
 
+
 static func make_uniform_scale(value: float) -> Vector3:
 	"""Create uniform scale vector
 	
@@ -513,9 +547,11 @@ static func make_uniform_scale(value: float) -> Vector3:
 	"""
 	return Vector3(value, value, value)
 
+
 ## ============================================================================
 ## DEBUG UTILITIES
 ## ============================================================================
+
 
 static func format_vector3(vec: Vector3, precision: int = 2) -> String:
 	"""Format Vector3 for logging
@@ -528,7 +564,16 @@ static func format_vector3(vec: Vector3, precision: int = 2) -> String:
 		Formatted string
 	"""
 	var format_str = "%." + str(precision) + "f"
-	return "(X:" + (format_str % vec.x) + " Y:" + (format_str % vec.y) + " Z:" + (format_str % vec.z) + ")"
+	return (
+		"(X:"
+		+ (format_str % vec.x)
+		+ " Y:"
+		+ (format_str % vec.y)
+		+ " Z:"
+		+ (format_str % vec.z)
+		+ ")"
+	)
+
 
 static func format_rotation_degrees(rotation_radians: Vector3, precision: int = 1) -> String:
 	"""Format rotation as degrees for logging

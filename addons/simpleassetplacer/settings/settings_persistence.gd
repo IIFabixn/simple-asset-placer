@@ -23,27 +23,31 @@ const SettingsUIBuilder = preload("res://addons/simpleassetplacer/settings/setti
 
 ## Initialization
 
+
 func _init() -> void:
 	"""Initialize the settings persistence handler"""
 	pass
 
+
 ## Settings Persistence
+
 
 func save_settings(owner_node: Node) -> void:
 	"""Save all settings to EditorSettings"""
 	var editor_settings = EditorInterface.get_editor_settings()
 	var all_settings = SettingsDefinition.get_all_settings()
-	
+
 	for setting in all_settings:
 		var value = owner_node.get(setting.id)
 		if value != null:
 			editor_settings.set_setting(setting.editor_key, value)
 
+
 func load_settings(owner_node: Node) -> void:
 	"""Load all settings from EditorSettings"""
 	var editor_settings = EditorInterface.get_editor_settings()
 	var all_settings = SettingsDefinition.get_all_settings()
-	
+
 	for setting in all_settings:
 		if editor_settings.has_setting(setting.editor_key):
 			var value = editor_settings.get_setting(setting.editor_key)
@@ -52,31 +56,35 @@ func load_settings(owner_node: Node) -> void:
 			# Use default value if setting doesn't exist
 			owner_node.set(setting.id, setting.default_value)
 
+
 func reset_to_defaults(owner_node: Node) -> void:
 	"""Reset all settings to defaults"""
 	var all_settings = SettingsDefinition.get_all_settings()
-	
+
 	for setting in all_settings:
 		owner_node.set(setting.id, setting.default_value)
+
 
 func get_settings_dict(owner_node: Node) -> Dictionary:
 	"""Get all settings as a dictionary"""
 	var result = {}
 	var all_settings = SettingsDefinition.get_all_settings()
-	
+
 	for setting in all_settings:
 		var value = owner_node.get(setting.id)
 		if value != null:
 			result[setting.id] = value
-	
+
 	return result
 
+
 ## UI Synchronization
+
 
 func update_ui_from_settings(ui_controls: Dictionary, owner_node: Node) -> void:
 	"""Update UI controls from current settings"""
 	var all_settings = SettingsDefinition.get_all_settings()
-	
+
 	for setting in all_settings:
 		if not ui_controls.has(setting.id):
 			# Special case for vector3 grid offset
@@ -87,10 +95,10 @@ func update_ui_from_settings(ui_controls: Dictionary, owner_node: Node) -> void:
 				if ui_controls.has("grid_offset_z"):
 					ui_controls["grid_offset_z"].value = offset.z
 			continue
-		
+
 		var control = ui_controls[setting.id]
 		var value = owner_node.get(setting.id)
-		
+
 		match setting.type:
 			SettingsDefinition.SettingType.BOOL:
 				if control is CheckBox and value != null:
@@ -119,13 +127,16 @@ func update_ui_from_settings(ui_controls: Dictionary, owner_node: Node) -> void:
 								if root_container.get_child_count() > 0:
 									root_container = root_container.get_child(0)
 								break
-						
-						SettingsUIBuilder._update_dependent_visibility(root_container, setting.id, value)
+
+						SettingsUIBuilder._update_dependent_visibility(
+							root_container, setting.id, value
+						)
+
 
 func read_ui_to_settings(ui_controls: Dictionary, owner_node: Node) -> void:
 	"""Read settings from UI controls back to properties"""
 	var all_settings = SettingsDefinition.get_all_settings()
-	
+
 	for setting in all_settings:
 		if not ui_controls.has(setting.id):
 			# Special case for vector3 grid offset
@@ -139,9 +150,9 @@ func read_ui_to_settings(ui_controls: Dictionary, owner_node: Node) -> void:
 					)
 					owner_node.set(setting.id, new_offset)
 			continue
-		
+
 		var control = ui_controls[setting.id]
-		
+
 		match setting.type:
 			SettingsDefinition.SettingType.BOOL:
 				if control is CheckBox:
@@ -160,4 +171,3 @@ func read_ui_to_settings(ui_controls: Dictionary, owner_node: Node) -> void:
 			SettingsDefinition.SettingType.KEY_BINDING:
 				if control is Button:
 					owner_node.set(setting.id, control.text)
-

@@ -7,6 +7,7 @@ const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger
 const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
 const SettingsDefinition = preload("res://addons/simpleassetplacer/settings/settings_definition.gd")
 
+
 static func get_default_settings() -> Dictionary:
 	var defaults: Dictionary = {
 		"cancel_key": "ESCAPE",
@@ -77,6 +78,7 @@ static func get_default_settings() -> Dictionary:
 
 	return defaults
 
+
 static func load_from_editor_settings() -> Dictionary:
 	"""Load all settings from EditorSettings (single source of truth)
 	
@@ -89,8 +91,11 @@ static func load_from_editor_settings() -> Dictionary:
 		if editor_settings.has_setting(setting_meta.editor_key):
 			settings[setting_meta.id] = editor_settings.get_setting(setting_meta.editor_key)
 
-	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "SettingsStorage: Loaded settings from EditorSettings")
+	PluginLogger.debug(
+		PluginConstants.COMPONENT_MAIN, "SettingsStorage: Loaded settings from EditorSettings"
+	)
 	return settings
+
 
 static func save_to_editor_settings(settings: Dictionary) -> void:
 	"""Save settings to EditorSettings (single source of truth)
@@ -100,10 +105,13 @@ static func save_to_editor_settings(settings: Dictionary) -> void:
 	"""
 	var editor_settings := EditorInterface.get_editor_settings()
 	var all_settings := SettingsDefinition.get_all_settings()
-	
+
 	for setting_meta in all_settings:
 		if settings.has(setting_meta.id):
 			var value = settings[setting_meta.id]
 			editor_settings.set_setting(setting_meta.editor_key, value)
-	
-	PluginLogger.debug(PluginConstants.COMPONENT_MAIN, "SettingsStorage: Saved %d settings to EditorSettings" % settings.size())
+
+	PluginLogger.debug(
+		PluginConstants.COMPONENT_MAIN,
+		"SettingsStorage: Saved %d settings to EditorSettings" % settings.size()
+	)

@@ -73,11 +73,14 @@ var undo_redo: EditorUndoRedoManager
 
 ## Initialization
 
+
 func _init() -> void:
 	"""Initialize empty registry"""
 	pass
 
+
 ## Validation
+
 
 func validate() -> bool:
 	"""Validate that all critical services are registered
@@ -86,30 +89,32 @@ func validate() -> bool:
 		bool: True if all required services are present
 	"""
 	var valid = true
-	
+
 	if not editor_interface:
 		push_error("ServiceRegistry: editor_interface is not registered")
 		valid = false
-	
+
 	if not transformation_coordinator:
 		push_error("ServiceRegistry: transformation_coordinator is not registered")
 		valid = false
-	
+
 	if not position_manager:
 		push_error("ServiceRegistry: position_manager is not registered")
 		valid = false
-	
+
 	if not preview_manager:
 		push_error("ServiceRegistry: preview_manager is not registered")
 		valid = false
-	
+
 	if not overlay_manager:
 		push_error("ServiceRegistry: overlay_manager is not registered")
 		valid = false
-	
+
 	return valid
 
+
 ## Cleanup
+
 
 func cleanup() -> void:
 	"""Clear all references"""

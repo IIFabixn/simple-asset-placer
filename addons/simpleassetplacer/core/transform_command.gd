@@ -52,11 +52,7 @@ var snap_override: Dictionary = {}
 var confirm: bool = false
 var cancel: bool = false
 var source_flags: Dictionary = {}
-var axis_constraints: Dictionary = {
-	"X": false,
-	"Y": false,
-	"Z": false
-}
+var axis_constraints: Dictionary = {"X": false, "Y": false, "Z": false}
 var metadata: Dictionary = {}
 
 # Track priority ownership per field so merges can respect precedence
@@ -68,13 +64,16 @@ var _axis_priority: int = _PRIORITY_NONE
 
 ## FACTORY HELPERS
 
+
 static func from_mouse_pointer(data: Dictionary) -> TransformCommand:
 	"""Build a command from mouse pointer input (highest priority)."""
 	var command := TransformCommand.new()
 	command._apply_dictionary(data, SOURCE_MOUSE_POINTER)
 	return command
 
+
 ## MUTATORS
+
 
 func clear() -> void:
 	"""Reset the command to an empty state."""
@@ -85,11 +84,7 @@ func clear() -> void:
 	confirm = false
 	cancel = false
 	source_flags.clear()
-	axis_constraints = {
-		"X": false,
-		"Y": false,
-		"Z": false
-	}
+	axis_constraints = {"X": false, "Y": false, "Z": false}
 	metadata.clear()
 	_position_priority = _PRIORITY_NONE
 	_rotation_priority = _PRIORITY_NONE
@@ -97,14 +92,18 @@ func clear() -> void:
 	_snap_priority = _PRIORITY_NONE
 	_axis_priority = _PRIORITY_NONE
 
+
 func set_position_delta(delta: Vector3, source_flag: String) -> void:
 	_apply_vector_component("position_delta", delta, source_flag)
+
 
 func set_rotation_delta(delta: Vector3, source_flag: String) -> void:
 	_apply_vector_component("rotation_delta", delta, source_flag)
 
+
 func set_scale_delta(delta: Vector3, source_flag: String) -> void:
 	_apply_vector_component("scale_delta", delta, source_flag)
+
 
 func set_snap_override(override: Dictionary, source_flag: String) -> void:
 	if override == null:
@@ -114,6 +113,7 @@ func set_snap_override(override: Dictionary, source_flag: String) -> void:
 		snap_override = override.duplicate(true)
 		_snap_priority = priority
 	_register_source(source_flag)
+
 
 func set_axis_constraints_from_dict(constraints: Dictionary, source_flag: String) -> void:
 	if constraints == null:
@@ -125,6 +125,7 @@ func set_axis_constraints_from_dict(constraints: Dictionary, source_flag: String
 		_axis_priority = priority
 	_register_source(source_flag)
 
+
 func merge_metadata(additional_metadata: Dictionary) -> void:
 	if additional_metadata == null:
 		return
@@ -132,13 +133,16 @@ func merge_metadata(additional_metadata: Dictionary) -> void:
 		var value = additional_metadata[key]
 		metadata[key] = _duplicate_if_needed(value)
 
+
 func set_confirm(value: bool) -> void:
 	confirm = value and not cancel
+
 
 func set_cancel(value: bool) -> void:
 	if value:
 		cancel = true
 		confirm = false
+
 
 func merge(other: TransformCommand) -> void:
 	"""Merge another command into this one respecting source precedence."""
@@ -154,15 +158,24 @@ func merge(other: TransformCommand) -> void:
 	_merge_metadata(other)
 	_merge_source_flags(other)
 
+
 ## QUERY HELPERS
 
+
 func has_any_delta() -> bool:
-	return position_delta != Vector3.ZERO or rotation_delta != Vector3.ZERO or scale_delta != Vector3.ZERO
+	return (
+		position_delta != Vector3.ZERO
+		or rotation_delta != Vector3.ZERO
+		or scale_delta != Vector3.ZERO
+	)
+
 
 func get_priority_for_axis() -> int:
 	return _axis_priority
 
+
 ## INTERNAL HELPERS
+
 
 func _apply_dictionary(data: Dictionary, source_flag: String) -> void:
 	if data == null:
@@ -185,6 +198,7 @@ func _apply_dictionary(data: Dictionary, source_flag: String) -> void:
 		merge_metadata(data.get("metadata", {}))
 	_register_source(source_flag)
 
+
 func _apply_vector_component(property_name: String, delta: Vector3, source_flag: String) -> void:
 	if delta == null:
 		return
@@ -196,7 +210,10 @@ func _apply_vector_component(property_name: String, delta: Vector3, source_flag:
 		set(priority_property, priority)
 	_register_source(source_flag)
 
-func _merge_vector_component(property_name: String, incoming: Vector3, incoming_priority: int) -> void:
+
+func _merge_vector_component(
+	property_name: String, incoming: Vector3, incoming_priority: int
+) -> void:
 	if incoming_priority == _PRIORITY_NONE:
 		return
 	var priority_property := _priority_property_for(property_name)
@@ -205,12 +222,14 @@ func _merge_vector_component(property_name: String, incoming: Vector3, incoming_
 		set(property_name, incoming)
 		set(priority_property, incoming_priority)
 
+
 func _merge_snap_override(other: TransformCommand) -> void:
 	if other.snap_override.is_empty():
 		return
 	if other._snap_priority >= _snap_priority:
 		snap_override = other.snap_override.duplicate(true)
 		_snap_priority = other._snap_priority
+
 
 func _merge_axis_constraints(other: TransformCommand) -> void:
 	if other._axis_priority == _PRIORITY_NONE:
@@ -219,6 +238,7 @@ func _merge_axis_constraints(other: TransformCommand) -> void:
 		axis_constraints = other.axis_constraints.duplicate(true)
 		_axis_priority = other._axis_priority
 
+
 func _merge_confirm_cancel(other: TransformCommand) -> void:
 	if other.cancel:
 		cancel = true
@@ -226,25 +246,32 @@ func _merge_confirm_cancel(other: TransformCommand) -> void:
 	elif other.confirm and not cancel:
 		confirm = true
 
+
 func _merge_metadata(other: TransformCommand) -> void:
 	if other.metadata.is_empty():
 		return
 	for key in other.metadata.keys():
 		metadata[key] = _duplicate_if_needed(other.metadata[key])
 
+
 func _merge_source_flags(other: TransformCommand) -> void:
 	for key in other.source_flags.keys():
 		if other.source_flags[key]:
 			source_flags[key] = true
+
 
 func _priority_for_source(source_flag: String) -> int:
 	if source_flag == null or source_flag.is_empty():
 		return _SOURCE_PRIORITY[SOURCE_KEY_DIRECT]
 	return _SOURCE_PRIORITY.get(source_flag, _SOURCE_PRIORITY[SOURCE_KEY_DIRECT])
 
+
 func _register_source(source_flag: String) -> void:
-	var flag := source_flag if source_flag != null and not source_flag.is_empty() else SOURCE_KEY_DIRECT
+	var flag := (
+		source_flag if source_flag != null and not source_flag.is_empty() else SOURCE_KEY_DIRECT
+	)
 	source_flags[flag] = true
+
 
 func _priority_property_for(property_name: String) -> String:
 	match property_name:
@@ -257,11 +284,13 @@ func _priority_property_for(property_name: String) -> String:
 		_:
 			return "_position_priority"
 
+
 func _sanitize_axis_constraints(input_constraints: Dictionary) -> Dictionary:
 	var sanitized := {}
 	for axis in _AXES:
 		sanitized[axis] = bool(input_constraints.get(axis, false))
 	return sanitized
+
 
 func _duplicate_if_needed(value):
 	if typeof(value) == TYPE_DICTIONARY:

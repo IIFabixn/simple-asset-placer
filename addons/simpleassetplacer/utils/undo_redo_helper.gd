@@ -34,10 +34,13 @@ const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger
 
 var _services: ServiceRegistry
 
+
 func _init(services: ServiceRegistry):
 	_services = services
 
+
 ## VALIDATION
+
 
 func is_valid_for_undo(node: Node) -> bool:
 	"""Check if node is valid for undo operations
@@ -56,18 +59,22 @@ func is_valid_for_undo(node: Node) -> bool:
 		return false
 	return true
 
+
 func is_scene_valid() -> bool:
 	"""Check if the currently edited scene is valid
 	
 	Returns:
 		bool: True if scene exists and is valid
 	"""
-	var scene = _services.editor_interface.get_edited_scene_root() if _services.editor_interface else null
+	var scene = (
+		_services.editor_interface.get_edited_scene_root() if _services.editor_interface else null
+	)
 	if not scene:
 		return false
 	if not is_instance_valid(scene):
 		return false
 	return true
+
 
 func validate_undo_manager(undo_redo: EditorUndoRedoManager) -> bool:
 	"""Validate that undo manager is available and usable
@@ -86,12 +93,12 @@ func validate_undo_manager(undo_redo: EditorUndoRedoManager) -> bool:
 		return false
 	return true
 
+
 ## PLACEMENT UNDO/REDO
 
+
 func create_placement_undo(
-	undo_redo: EditorUndoRedoManager,
-	placed_node: Node3D,
-	action_name: String = ""
+	undo_redo: EditorUndoRedoManager, placed_node: Node3D, action_name: String = ""
 ) -> bool:
 	"""Create undo/redo action for a placed node
 	
@@ -110,46 +117,50 @@ func create_placement_undo(
 	# Validate inputs
 	if not validate_undo_manager(undo_redo):
 		return false
-	
+
 	if not is_valid_for_undo(placed_node):
 		PluginLogger.warning("UndoRedoHelper", "Invalid node for placement undo")
 		return false
-	
+
 	var parent = placed_node.get_parent()
 	if not parent or not is_instance_valid(parent):
 		PluginLogger.warning("UndoRedoHelper", "Node has no valid parent for undo")
 		return false
-	
+
 	# Generate action name if not provided
 	if action_name.is_empty():
 		action_name = "Place " + placed_node.name
-	
+
 	# Store the scene root
-	var scene_root = _services.editor_interface.get_edited_scene_root() if _services.editor_interface else null
-	
+	var scene_root = (
+		_services.editor_interface.get_edited_scene_root() if _services.editor_interface else null
+	)
+
 	# IMPORTANT: The node is already in the scene. We need to remove it and re-add via undo/redo
 	# to make it properly recognized by the editor.
 	parent.remove_child(placed_node)
-	
+
 	# Create the undo/redo action
 	undo_redo.create_action(action_name)
-	
+
 	# DO: Add node to parent and set owner
 	undo_redo.add_do_method(parent, "add_child", placed_node)
 	undo_redo.add_do_property(placed_node, "owner", scene_root)
 	undo_redo.add_do_reference(placed_node)
-	
+
 	# UNDO: Remove node from scene
 	undo_redo.add_undo_method(parent, "remove_child", placed_node)
 	undo_redo.add_undo_reference(placed_node)
-	
+
 	# Commit the action - this will execute the DO methods, actually adding the node
 	undo_redo.commit_action()
-	
+
 	PluginLogger.debug("UndoRedoHelper", "Created placement undo: " + action_name)
 	return true
 
+
 ## TRANSFORM UNDO/REDO (SINGLE OBJECT)
+
 
 func create_transform_undo(
 	undo_redo: EditorUndoRedoManager,
@@ -177,35 +188,37 @@ func create_transform_undo(
 	# Validate inputs
 	if not validate_undo_manager(undo_redo):
 		return false
-	
+
 	if not is_valid_for_undo(target_node):
 		PluginLogger.warning("UndoRedoHelper", "Invalid node for transform undo")
 		return false
-	
+
 	# Use current transform if new_transform not specified
 	if new_transform == Transform3D():
 		new_transform = target_node.transform
-	
+
 	# Generate action name if not provided
 	if action_name.is_empty():
 		action_name = "Transform " + target_node.name
-	
+
 	# Create the undo/redo action
 	undo_redo.create_action(action_name)
-	
+
 	# DO: Apply new transform (needed for redo)
 	undo_redo.add_do_property(target_node, "transform", new_transform)
-	
+
 	# UNDO: Restore original transform
 	undo_redo.add_undo_property(target_node, "transform", original_transform)
-	
+
 	# Commit the action
 	undo_redo.commit_action()
-	
+
 	PluginLogger.debug("UndoRedoHelper", "Created transform undo: " + action_name)
 	return true
 
+
 ## TRANSFORM UNDO/REDO (MULTIPLE OBJECTS)
+
 
 func create_multi_transform_undo(
 	undo_redo: EditorUndoRedoManager,
@@ -231,48 +244,55 @@ func create_multi_transform_undo(
 	# Validate inputs
 	if not validate_undo_manager(undo_redo):
 		return false
-	
+
 	if target_nodes.is_empty():
 		PluginLogger.warning("UndoRedoHelper", "No nodes provided for multi-transform undo")
 		return false
-	
+
 	# Validate all nodes and collect valid ones
 	var valid_nodes = []
 	for node in target_nodes:
 		if is_valid_for_undo(node) and original_transforms.has(node):
 			valid_nodes.append(node)
 		else:
-			PluginLogger.warning("UndoRedoHelper", "Skipping invalid node in multi-transform: " + str(node))
-	
+			PluginLogger.warning(
+				"UndoRedoHelper", "Skipping invalid node in multi-transform: " + str(node)
+			)
+
 	if valid_nodes.is_empty():
 		PluginLogger.warning("UndoRedoHelper", "No valid nodes for multi-transform undo")
 		return false
-	
+
 	# Generate action name if not provided
 	if action_name.is_empty():
 		action_name = "Transform " + str(valid_nodes.size()) + " objects"
-	
+
 	# Create the undo/redo action
 	undo_redo.create_action(action_name)
-	
+
 	# Add do/undo properties for each valid node
 	for node in valid_nodes:
 		var original = original_transforms[node]
 		var new_transform = node.transform
-		
+
 		# DO: Apply new transform
 		undo_redo.add_do_property(node, "transform", new_transform)
-		
+
 		# UNDO: Restore original transform
 		undo_redo.add_undo_property(node, "transform", original)
-	
+
 	# Commit the action
 	undo_redo.commit_action()
-	
-	PluginLogger.debug("UndoRedoHelper", "Created multi-transform undo: " + action_name + " (" + str(valid_nodes.size()) + " nodes)")
+
+	PluginLogger.debug(
+		"UndoRedoHelper",
+		"Created multi-transform undo: " + action_name + " (" + str(valid_nodes.size()) + " nodes)"
+	)
 	return true
 
+
 ## ERROR HANDLING
+
 
 func handle_undo_error(context: String, error_message: String) -> void:
 	"""Log and handle undo/redo errors
@@ -283,12 +303,12 @@ func handle_undo_error(context: String, error_message: String) -> void:
 	"""
 	PluginLogger.error("UndoRedo [" + context + "]", error_message)
 
+
 ## UTILITY FUNCTIONS
 
+
 func get_action_description(
-	action_type: String,
-	node_name: String = "",
-	node_count: int = 1
+	action_type: String, node_name: String = "", node_count: int = 1
 ) -> String:
 	"""Generate a descriptive action name for the History panel
 	
@@ -307,6 +327,7 @@ func get_action_description(
 	else:
 		return action_type
 
+
 func should_create_undo(confirm_changes: bool) -> bool:
 	"""Determine if an undo entry should be created based on confirmation
 	
@@ -319,4 +340,3 @@ func should_create_undo(confirm_changes: bool) -> bool:
 	# Only create undo entries when confirming changes
 	# If canceling (ESC key), don't create undo because changes are reverted immediately
 	return confirm_changes
-

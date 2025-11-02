@@ -50,6 +50,7 @@ var snap_scale_step: float = 0.1
 
 ## CONFIGURATION
 
+
 func configure_from_settings(settings: Dictionary) -> void:
 	"""Configure snap settings from settings dictionary"""
 	# Position snap
@@ -61,20 +62,31 @@ func configure_from_settings(settings: Dictionary) -> void:
 	snap_center_x = settings.get("snap_center_x", false)
 	snap_center_y = settings.get("snap_center_y", false)
 	snap_center_z = settings.get("snap_center_z", false)
-	
+
 	# Rotation and scale snap settings
 	snap_rotation_enabled = settings.get("snap_rotation_enabled", false)
 	snap_rotation_step = settings.get("snap_rotation_step", 15.0)
 	snap_scale_enabled = settings.get("snap_scale_enabled", false)
 	snap_scale_step = settings.get("snap_scale_step", 0.1)
-	
+
 	# Debug logging for snap settings
 	if snap_rotation_enabled or snap_scale_enabled or snap_enabled:
-		PluginLogger.debug("SnapConfiguration", 
-			"Snap settings | Pos:%s step:%s Rot:%s step:%s Scale:%s step:%s half_step:%s" % [
-				snap_enabled, snap_step, snap_rotation_enabled, snap_rotation_step, 
-				snap_scale_enabled, snap_scale_step, use_half_step
-			])
+		PluginLogger.debug(
+			"SnapConfiguration",
+			(
+				"Snap settings | Pos:%s step:%s Rot:%s step:%s Scale:%s step:%s half_step:%s"
+				% [
+					snap_enabled,
+					snap_step,
+					snap_rotation_enabled,
+					snap_rotation_step,
+					snap_scale_enabled,
+					snap_scale_step,
+					use_half_step
+				]
+			)
+		)
+
 
 func reset() -> void:
 	"""Reset all snap settings to defaults"""
@@ -92,7 +104,9 @@ func reset() -> void:
 	snap_scale_enabled = false
 	snap_scale_step = 0.1
 
+
 ## SERIALIZATION
+
 
 func to_dictionary() -> Dictionary:
 	"""Serialize snap configuration to dictionary"""
@@ -111,6 +125,7 @@ func to_dictionary() -> Dictionary:
 		"snap_scale_enabled": snap_scale_enabled,
 		"snap_scale_step": snap_scale_step,
 	}
+
 
 func from_dictionary(data: Dictionary) -> void:
 	"""Deserialize snap configuration from dictionary"""

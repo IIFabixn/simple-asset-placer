@@ -4,10 +4,17 @@ extends RefCounted
 class_name RawInputSnapshot
 
 const TAP_DETECTION_KEYS := [
-	"height_up", "height_down",
-	"rotate_x", "rotate_y", "rotate_z",
-	"scale_up", "scale_down",
-	"position_left", "position_right", "position_forward", "position_backward"
+	"height_up",
+	"height_down",
+	"rotate_x",
+	"rotate_y",
+	"rotate_z",
+	"scale_up",
+	"scale_down",
+	"position_left",
+	"position_right",
+	"position_forward",
+	"position_backward"
 ]
 
 var settings: Dictionary = {}
@@ -33,12 +40,8 @@ var _mouse_buffer_a: Dictionary = {}
 var _mouse_buffer_b: Dictionary = {}
 
 var _key_tap_grace_period: float = 0.15
-var _repeat_intervals := {
-	"rotation": 0.1,
-	"scale": 0.08,
-	"height": 0.08,
-	"position": 0.05
-}
+var _repeat_intervals := {"rotation": 0.1, "scale": 0.08, "height": 0.08, "position": 0.05}
+
 
 func update(new_settings: Dictionary, viewport: SubViewport) -> void:
 	settings = new_settings if new_settings else {}
@@ -52,11 +55,14 @@ func update(new_settings: Dictionary, viewport: SubViewport) -> void:
 	_update_mouse_states()
 	_update_action_states()
 
+
 func is_key_pressed(key_name: String) -> bool:
 	return _current_keys.get(key_name, false)
 
+
 func was_key_pressed(key_name: String) -> bool:
 	return _previous_keys.get(key_name, false)
+
 
 func is_key_just_pressed(key_name: String) -> bool:
 	var current := _current_keys.get(key_name, false)
@@ -68,15 +74,18 @@ func is_key_just_pressed(key_name: String) -> bool:
 		return false
 	return current and not previous
 
+
 func key_edge_pressed(key_name: String) -> bool:
 	var current := _current_keys.get(key_name, false)
 	var previous := _previous_keys.get(key_name, false)
 	return current and not previous
 
+
 func is_key_just_released(key_name: String) -> bool:
 	var current := _current_keys.get(key_name, false)
 	var previous := _previous_keys.get(key_name, false)
 	return not current and previous
+
 
 func is_key_held_with_repeat(key_name: String, repeat_delay: float = 0.15) -> bool:
 	if not is_key_pressed(key_name):
@@ -90,8 +99,11 @@ func is_key_held_with_repeat(key_name: String, repeat_delay: float = 0.15) -> bo
 	var time_in_repeat_phase: float = time_since_press - _key_tap_grace_period
 	var repeat_count := int(time_in_repeat_phase / repeat_delay)
 	var next_repeat_time: float = _key_tap_grace_period + (repeat_count * repeat_delay)
-	var time_to_next: float = (_key_press_times[key_name] + next_repeat_time + repeat_delay) - current_time
+	var time_to_next: float = (
+		(_key_press_times[key_name] + next_repeat_time + repeat_delay) - current_time
+	)
 	return time_to_next <= 0.016
+
 
 func is_action_key_held_with_repeat(key_name: String, action_type: String) -> bool:
 	if _wheel_interrupted_keys.has(key_name):
@@ -122,8 +134,11 @@ func is_action_key_held_with_repeat(key_name: String, action_type: String) -> bo
 	var time_in_repeat_phase: float = time_since_press - _key_tap_grace_period
 	var repeat_count := int(time_in_repeat_phase / repeat_delay)
 	var next_repeat_time: float = _key_tap_grace_period + (repeat_count * repeat_delay)
-	var time_to_next: float = (_key_press_times[key_name] + next_repeat_time + repeat_delay) - current_time
+	var time_to_next: float = (
+		(_key_press_times[key_name] + next_repeat_time + repeat_delay) - current_time
+	)
 	return time_to_next <= 0.016
+
 
 func is_key_held_for_wheel(key_name: String) -> bool:
 	if not is_key_pressed(key_name):
@@ -132,17 +147,21 @@ func is_key_held_for_wheel(key_name: String) -> bool:
 		return false
 	return true
 
+
 func clear_pending_tap(key_name: String) -> void:
 	_pending_taps.erase(key_name)
+
 
 func mark_wheel_interrupt(keys: Array) -> void:
 	for key_name in keys:
 		if is_key_held_for_wheel(key_name):
 			_wheel_interrupted_keys[key_name] = true
 
+
 func clear_active_repeat() -> void:
 	_active_repeat_key = ""
 	_active_repeat_modifiers.clear()
+
 
 func is_mouse_button_pressed(button: String) -> bool:
 	match button:
@@ -154,6 +173,7 @@ func is_mouse_button_pressed(button: String) -> bool:
 			return _current_mouse.get("middle_pressed", false)
 		_:
 			return false
+
 
 func is_mouse_button_just_pressed(button: String) -> bool:
 	var current := false
@@ -172,8 +192,10 @@ func is_mouse_button_just_pressed(button: String) -> bool:
 			return false
 	return current and not previous
 
+
 func mouse_position() -> Vector2:
 	return _current_mouse.get("position", Vector2.ZERO)
+
 
 func is_mouse_in_viewport() -> bool:
 	if not _cached_viewport:
@@ -182,21 +204,27 @@ func is_mouse_in_viewport() -> bool:
 	var viewport_rect := _cached_viewport.get_visible_rect()
 	return viewport_rect.has_point(mouse_pos)
 
+
 func is_action_pressed(action_name: String) -> bool:
 	return _current_actions.get(action_name, false)
+
 
 func is_action_just_pressed(action_name: String) -> bool:
 	var current := _current_actions.get(action_name, false)
 	return current
 
+
 func is_reverse_modifier_held() -> bool:
 	return is_key_pressed("reverse_modifier")
+
 
 func is_large_increment_modifier_held() -> bool:
 	return is_key_pressed("large_increment_modifier")
 
+
 func is_fine_increment_modifier_held() -> bool:
 	return is_key_pressed("fine_increment_modifier")
+
 
 func get_modifier_state() -> Dictionary:
 	return {
@@ -205,39 +233,51 @@ func get_modifier_state() -> Dictionary:
 		"fine": is_fine_increment_modifier_held()
 	}
 
+
 func is_alias_pressed(alias: String) -> bool:
 	return is_key_pressed(alias)
+
 
 func was_alias_pressed(alias: String) -> bool:
 	return was_key_pressed(alias)
 
+
 func digit_just_pressed(index: int) -> bool:
 	return is_key_just_pressed("digit_%d" % index)
+
 
 func decimal_just_pressed() -> bool:
 	return is_key_just_pressed("decimal_point")
 
+
 func minus_just_pressed() -> bool:
 	return is_key_just_pressed("minus")
+
 
 func plus_just_pressed() -> bool:
 	return is_key_just_pressed("plus")
 
+
 func equals_just_pressed() -> bool:
 	return is_key_just_pressed("equals")
+
 
 func backspace_just_pressed() -> bool:
 	return is_key_just_pressed("backspace")
 
+
 func enter_just_pressed() -> bool:
 	return is_key_just_pressed("enter")
+
 
 func escape_just_pressed() -> bool:
 	return is_key_just_pressed("escape")
 
+
 func mark_pending_taps(keys: Array) -> void:
 	for key_name in keys:
 		_pending_taps.erase(key_name)
+
 
 func get_all_pressed_keys() -> Array:
 	var pressed := []
@@ -246,8 +286,10 @@ func get_all_pressed_keys() -> Array:
 			pressed.append(key_name)
 	return pressed
 
+
 func string_to_keycode(key_string: String) -> Key:
 	return OS.find_keycode_from_string(key_string)
+
 
 func _swap_buffers() -> void:
 	if _use_buffer_a:
@@ -262,17 +304,26 @@ func _swap_buffers() -> void:
 		_current_mouse = _mouse_buffer_a
 	_use_buffer_a = not _use_buffer_a
 
+
 func _update_key_states() -> void:
 	var current_time := Time.get_ticks_msec() / 1000.0
 	_current_keys["tab"] = _check_key_with_modifiers(settings.get("transform_mode_key", "TAB"))
-	_current_keys["confirm"] = _check_key_with_modifiers(settings.get("confirm_action_key", "ENTER"))
+	_current_keys["confirm"] = _check_key_with_modifiers(
+		settings.get("confirm_action_key", "ENTER")
+	)
 	_current_keys["escape"] = Input.is_key_pressed(KEY_ESCAPE)
 	_current_keys["shift"] = Input.is_key_pressed(KEY_SHIFT)
 	_current_keys["ctrl"] = Input.is_key_pressed(KEY_CTRL)
 	_current_keys["alt"] = Input.is_key_pressed(KEY_ALT)
-	_current_keys["reverse_modifier"] = _check_key_with_modifiers(settings.get("reverse_modifier_key", "SHIFT"))
-	_current_keys["large_increment_modifier"] = _check_key_with_modifiers(settings.get("large_increment_modifier_key", "ALT"))
-	_current_keys["fine_increment_modifier"] = _check_key_with_modifiers(settings.get("fine_increment_modifier_key", "CTRL"))
+	_current_keys["reverse_modifier"] = _check_key_with_modifiers(
+		settings.get("reverse_modifier_key", "SHIFT")
+	)
+	_current_keys["large_increment_modifier"] = _check_key_with_modifiers(
+		settings.get("large_increment_modifier_key", "ALT")
+	)
+	_current_keys["fine_increment_modifier"] = _check_key_with_modifiers(
+		settings.get("fine_increment_modifier_key", "CTRL")
+	)
 	_current_keys["cancel"] = _check_key_with_modifiers(settings.get("cancel_key", "ESCAPE"))
 	var height_up_key := settings.get("height_up_key", "Q")
 	var height_down_key := settings.get("height_down_key", "E")
@@ -301,7 +352,9 @@ func _update_key_states() -> void:
 	_current_keys["rotate_x"] = _check_key_with_modifiers(settings.get("rotate_x_key", "X"))
 	_current_keys["rotate_y"] = _check_key_with_modifiers(settings.get("rotate_y_key", "Y"))
 	_current_keys["rotate_z"] = _check_key_with_modifiers(settings.get("rotate_z_key", "Z"))
-	_current_keys["reset_rotation"] = _check_key_with_modifiers(settings.get("reset_rotation_key", "T"))
+	_current_keys["reset_rotation"] = _check_key_with_modifiers(
+		settings.get("reset_rotation_key", "T")
+	)
 	_track_key_press_time("rotate_x", current_time)
 	_track_key_press_time("rotate_y", current_time)
 	_track_key_press_time("rotate_z", current_time)
@@ -324,9 +377,9 @@ func _update_key_states() -> void:
 	var cycle_mode_key := settings.get("cycle_placement_mode_key", "P")
 	_current_keys["cycle_placement_mode"] = _check_key_with_modifiers(cycle_mode_key)
 	_track_key_press_time("cycle_placement_mode", current_time)
-	
+
 	# Modal system removed - G/R/L keys no longer tracked
-	
+
 	var axis_x_key := settings.get("rotate_x_key", "X")
 	var axis_y_key := settings.get("rotate_y_key", "Y")
 	var axis_z_key := settings.get("rotate_z_key", "Z")
@@ -338,8 +391,14 @@ func _update_key_states() -> void:
 	_track_key_press_time("axis_z", current_time)
 	_current_keys["decimal_point"] = Input.is_key_pressed(KEY_PERIOD)
 	_current_keys["minus"] = Input.is_key_pressed(KEY_MINUS)
-	_current_keys["plus"] = Input.is_key_pressed(KEY_PLUS) or (Input.is_key_pressed(KEY_EQUAL) and Input.is_key_pressed(KEY_SHIFT))
-	_current_keys["equals"] = (Input.is_key_pressed(KEY_EQUAL) and not Input.is_key_pressed(KEY_SHIFT)) or (Input.is_key_pressed(KEY_0) and Input.is_key_pressed(KEY_SHIFT))
+	_current_keys["plus"] = (
+		Input.is_key_pressed(KEY_PLUS)
+		or (Input.is_key_pressed(KEY_EQUAL) and Input.is_key_pressed(KEY_SHIFT))
+	)
+	_current_keys["equals"] = (
+		(Input.is_key_pressed(KEY_EQUAL) and not Input.is_key_pressed(KEY_SHIFT))
+		or (Input.is_key_pressed(KEY_0) and Input.is_key_pressed(KEY_SHIFT))
+	)
 	_current_keys["backspace"] = Input.is_key_pressed(KEY_BACKSPACE)
 	_current_keys["enter"] = Input.is_key_pressed(KEY_ENTER) or Input.is_key_pressed(KEY_KP_ENTER)
 	for i in range(10):
@@ -352,6 +411,7 @@ func _update_key_states() -> void:
 			is_digit = false
 		_current_keys[digit_key] = is_digit
 
+
 func _update_mouse_states() -> void:
 	if _cached_viewport:
 		_current_mouse["position"] = _cached_viewport.get_mouse_position()
@@ -361,8 +421,10 @@ func _update_mouse_states() -> void:
 	_current_mouse["right_pressed"] = Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
 	_current_mouse["middle_pressed"] = Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE)
 
+
 func _update_action_states() -> void:
 	_current_actions["ui_cancel"] = Input.is_action_just_pressed("ui_cancel")
+
 
 func _check_key_with_modifiers(key_string: String) -> bool:
 	var normalized := key_string.strip_edges().to_upper()
@@ -376,12 +438,7 @@ func _check_key_with_modifiers(key_string: String) -> bool:
 		return Input.is_key_pressed(KEY_META)
 	if "+" in key_string:
 		var parts := key_string.split("+")
-		var required_modifiers := {
-			"ctrl": false,
-			"alt": false,
-			"shift": false,
-			"meta": false
-		}
+		var required_modifiers := {"ctrl": false, "alt": false, "shift": false, "meta": false}
 		var base_key := ""
 		for part in parts:
 			part = part.strip_edges().to_upper()
@@ -420,6 +477,7 @@ func _check_key_with_modifiers(key_string: String) -> bool:
 		if keycode_simple != KEY_NONE:
 			return Input.is_key_pressed(keycode_simple)
 		return false
+
 
 func _track_key_press_time(key_name: String, current_time: float) -> void:
 	var is_pressed := _current_keys.get(key_name, false)

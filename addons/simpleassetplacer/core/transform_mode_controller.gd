@@ -247,10 +247,14 @@ func update_node_transforms(state: TransformState) -> void:
 		# STEP 2: Calculate new position - center + rotated offset + manual position offset
 		var new_position = center_position + rotated_offset + state.values.manual_position_offset
 
-		# STEP 3: Calculate rotation - original + manual offset
-		# Each node keeps its original rotation and adds the manual rotation
+		# STEP 3: Calculate rotation - original + surface alignment + manual offset
+		# Each node keeps its original rotation and adds surface alignment and manual rotation
 		var original_rotation = original_rotations.get(node, Vector3.ZERO)
-		var new_rotation = original_rotation + state.values.manual_rotation_offset
+		var new_rotation = (
+			original_rotation
+			+ state.values.surface_alignment_rotation
+			+ state.values.manual_rotation_offset
+		)
 
 		# STEP 4: Calculate scale - original + scale offset
 		var original_transform = original_transforms.get(node, Transform3D())

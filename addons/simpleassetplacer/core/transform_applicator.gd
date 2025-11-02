@@ -64,15 +64,17 @@ static func apply_transform_state(
 	var final_position = base_position + state.manual_position_offset
 
 	# Calculate final rotation based on mode
-	# Transform mode (has original_transform): original + manual_offset only
+	# Transform mode (has original_transform): original + surface_alignment + manual_offset
 	# Placement mode (no original_transform): surface_alignment + manual_offset
 	var is_transform_mode = original_transform != Transform3D()
 	var final_rotation: Vector3
 
 	if is_transform_mode:
-		# Transform mode: preserve original rotation, add only manual adjustments
+		# Transform mode: preserve original rotation, add surface alignment and manual adjustments
 		var original_rotation = original_transform.basis.get_euler()
-		final_rotation = original_rotation + state.manual_rotation_offset
+		final_rotation = (
+			original_rotation + state.surface_alignment_rotation + state.manual_rotation_offset
+		)
 	else:
 		# Placement mode: use surface alignment + manual offset
 		final_rotation = state.get_final_rotation()

@@ -94,23 +94,23 @@ func _process_rotation(
 	# Check which axis was pressed (using pressed to support hold-to-repeat)
 	if rotation_input.x_pressed:
 		# Rotate around X axis
-		_services.transform_manager.rotate_x(transform_state, increment)
+		_services.rotation_manager.rotate_x(transform_state, increment)
 		delta_vector.x = deg_to_rad(increment)
 		axis_rotated = "X"
 	elif rotation_input.y_pressed:
 		# Rotate around Y axis
-		_services.transform_manager.rotate_y(transform_state, increment)
+		_services.rotation_manager.rotate_y(transform_state, increment)
 		delta_vector.y = deg_to_rad(increment)
 		axis_rotated = "Y"
 	elif rotation_input.z_pressed:
 		# Rotate around Z axis
-		_services.transform_manager.rotate_z(transform_state, increment)
+		_services.rotation_manager.rotate_z(transform_state, increment)
 		delta_vector.z = deg_to_rad(increment)
 		axis_rotated = "Z"
 	elif rotation_input.reset_pressed:
 		# Reset rotation to zero
 		var previous_rotation = transform_state.manual_rotation_offset
-		_services.transform_manager.reset_all_rotation(transform_state)
+		_services.rotation_manager.reset_all_rotation(transform_state)
 		delta_vector = transform_state.manual_rotation_offset - previous_rotation
 		axis_rotated = "ALL"
 
@@ -165,16 +165,16 @@ func _process_scale(
 	var transform_state = _get_transform_state(context)
 
 	var increment = _get_scale_increment(scale_input, settings)
-	var previous_scale = _services.transform_manager.get_scale_vector(transform_state)
+	var previous_scale = _services.scale_manager.get_scale_vector(transform_state)
 
 	if scale_input.up_pressed:
-		_services.transform_manager.increase_scale(transform_state, increment)
+		_services.scale_manager.increase_scale(transform_state, increment)
 	elif scale_input.down_pressed:
-		_services.transform_manager.decrease_scale(transform_state, increment)
+		_services.scale_manager.decrease_scale(transform_state, increment)
 	elif scale_input.reset_pressed:
-		_services.transform_manager.reset_scale(transform_state)
+		_services.scale_manager.reset_scale(transform_state)
 
-	var new_scale = _services.transform_manager.get_scale_vector(transform_state)
+	var new_scale = _services.scale_manager.get_scale_vector(transform_state)
 	var scale_delta = new_scale - previous_scale
 
 	if scale_delta != Vector3.ZERO:

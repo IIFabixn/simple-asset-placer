@@ -4,6 +4,15 @@
 
 ### ✨ New Features
 
+#### Scene Tree Context Menu Enhancements
+
+- **Transform Node Context Menu**: Quick access to transform mode from Scene Tree
+  - Right-click any Node3D object(s) in Scene Tree → "Transform Node"
+  - Instantly enters transform mode for selected nodes
+  - Works with single or multiple selected Node3D objects
+  - Alternative to TAB keyboard shortcut for activating transform mode
+  - Files: `context_menu/scene_tree_context_menu.gd`, `simpleassetplacer.gd`
+
 #### Pickup for Placement
 
 - **Pick Up Scene Nodes for Placement**: Select existing Node3D objects and enter placement mode to place copies

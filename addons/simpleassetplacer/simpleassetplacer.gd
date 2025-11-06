@@ -761,6 +761,35 @@ func _on_asset_selected(asset_path: String, mesh_resource: Resource, settings: D
 		)
 
 
+func trigger_transform_mode(selected_nodes: Array) -> void:
+	"""Trigger transform mode for selected nodes (from context menu)
+	
+	Args:
+		selected_nodes: Array of Node3D objects selected in the scene tree
+	"""
+	if not service_registry or not service_registry.transformation_coordinator:
+		PluginLogger.error(
+			PluginConstants.COMPONENT_MAIN,
+			"Cannot start transform mode - service registry not initialized"
+		)
+		return
+
+	# Filter to only Node3D objects
+	var node3d_nodes = selected_nodes.filter(func(node): return node is Node3D)
+
+	if node3d_nodes.is_empty():
+		PluginLogger.warning(PluginConstants.COMPONENT_MAIN, "No valid Node3D objects to transform")
+		return
+
+	PluginLogger.info(
+		PluginConstants.COMPONENT_MAIN,
+		"Transform mode triggered for %d node(s)" % node3d_nodes.size()
+	)
+
+	# Start transform mode with selected nodes
+	service_registry.transformation_coordinator.start_transform_mode(node3d_nodes, dock)
+
+
 func trigger_pickup_mode(selected_nodes: Array) -> void:
 	"""Trigger pickup mode for selected nodes (from context menu or keybind)
 	

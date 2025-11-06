@@ -5,13 +5,30 @@ extends EditorContextMenuPlugin
 SCENE TREE CONTEXT MENU PLUGIN
 ================================
 
-PURPOSE: Add custom context menu option to set parent placement target from scene tree
+PURPOSE: Add custom context menu options for scene tree nodes
 
-WORKFLOW:
+FEATURES:
+1. Set as Asset Parent - Set any node as the target parent for asset placement
+2. Transform Node - Enter transform mode for selected Node3D objects
+3. Pickup for Placement - Pick up nodes and enter placement mode to place copies
+
+WORKFLOWS:
+
+Set as Asset Parent:
 1. Right-click a node in the scene tree
 2. Select "Set as Asset Parent"
 3. Custom parent path is automatically updated in settings
 4. Parent placement mode is switched to "custom"
+
+Transform Node:
+1. Right-click one or more Node3D objects in the scene tree
+2. Select "Transform Node"
+3. Enters transform mode for the selected nodes
+
+Pickup for Placement:
+1. Right-click one or more Node3D objects in the scene tree
+2. Select "Pickup for Placement"
+3. Enters placement mode with copies of the selected nodes
 
 USED BY: Main plugin (registered as context menu plugin)
 """
@@ -63,6 +80,11 @@ func _popup_menu(paths: PackedStringArray) -> void:
 	# Add "Set as Asset Parent" only for single selection
 	if paths.size() == 1:
 		add_context_menu_item("Set as Asset Parent", _on_set_as_parent, null)
+
+	# Add "Transform Node" if nodes are Node3D
+	var can_transform = selected_nodes.all(func(node): return node is Node3D)
+	if can_transform:
+		add_context_menu_item("Transform Node", _on_transform_node, null)
 
 	# Add "Pickup for Placement" if nodes can be picked up
 	if PickupHandler.can_pickup_nodes(selected_nodes):
@@ -123,6 +145,35 @@ func _on_set_as_parent(paths: PackedStringArray) -> void:
 		)
 	else:
 		PluginLogger.error("SceneTreeContextMenu", "Settings manager not available")
+
+
+func _on_transform_node(paths: PackedStringArray) -> void:
+	"""Callback when user clicks 'Transform Node'
+	
+	Args:
+		paths: Array containing the selected node paths
+	"""
+	if paths.is_empty():
+		return
+
+	# Get selected nodes
+	var selected_nodes: Array = []
+	for path in paths:
+		var node = _get_node_from_path(path)
+		if node and node is Node3D:
+			selected_nodes.append(node)
+
+	if selected_nodes.is_empty():
+		PluginLogger.warning("SceneTreeContextMenu", "No valid Node3D nodes selected for transform")
+		return
+
+	# Trigger transform mode via main plugin
+	if _plugin and _plugin.has_method("trigger_transform_mode"):
+		_plugin.trigger_transform_mode(selected_nodes)
+	else:
+		PluginLogger.error(
+			"SceneTreeContextMenu", "Cannot trigger transform mode - plugin reference not set"
+		)
 
 
 func _on_pickup_for_placement(paths: PackedStringArray) -> void:

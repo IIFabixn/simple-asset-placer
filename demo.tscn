@@ -16,17 +16,23 @@ uv1_scale = Vector3(10, 10, 10)
 
 [node name="AssetRoot" type="Node3D" parent="."]
 
-[node name="building_a_2" type="Node3D" parent="AssetRoot" instance=ExtResource("1_m0rpm")]
-transform = Transform3D(-0.9659255, 0, -0.25881833, 0, 1, 0, 0.25881833, 0, -0.9659255, 15.048799, -1.5414324e-06, -13.649964)
-
 [node name="building_b" type="Node3D" parent="AssetRoot" instance=ExtResource("2_c6xj6")]
-transform = Transform3D(0.70668745, 1.4732232e-10, 0.7075254, 0, 1, -2.0822181e-10, -0.7075254, 1.4714784e-10, 0.70668745, 12.9512005, 1.5414324e-06, -4.3500357)
+transform = Transform3D(0.70668745, 1.4732232e-10, 0.7075254, 0, 1, -2.0822181e-10, -0.7075254, 1.4714784e-10, 0.70668745, 11.9512005, 1.5414324e-06, -2.3500357)
 
-[node name="@Node3D@61190" type="Node3D" parent="AssetRoot" instance=ExtResource("1_m0rpm")]
-transform = Transform3D(-0.9659255, 0, -0.25881833, 0, 1, 0, 0.25881833, 0, -0.9659255, 7.0487986, -1.5414324e-06, -11.649964)
+[node name="building_a_2" type="Node3D" parent="AssetRoot" instance=ExtResource("1_m0rpm")]
+transform = Transform3D(-0.9659255, 0, -0.25881833, 0, 1, 0, 0.25881833, 0, -0.9659255, 14.048799, -1.5414324e-06, -11.649964)
 
-[node name="@Node3D@61189" type="Node3D" parent="AssetRoot" instance=ExtResource("2_c6xj6")]
-transform = Transform3D(0.70668745, 1.4732232e-10, 0.7075254, 0, 1, -2.0822181e-10, -0.7075254, 1.4714784e-10, 0.70668745, 4.9512005, 1.5414324e-06, -2.3500357)
+[node name="building_b2" type="Node3D" parent="AssetRoot" instance=ExtResource("2_c6xj6")]
+transform = Transform3D(0.70668745, 1.4732232e-10, 0.7075254, 0, 1, -2.0822181e-10, -0.7075254, 1.4714784e-10, 0.70668745, 6.9512005, 1.5414324e-06, -2.3500357)
+
+[node name="building_a_22" type="Node3D" parent="AssetRoot" instance=ExtResource("1_m0rpm")]
+transform = Transform3D(-0.9659255, 0, -0.25881833, 0, 1, 0, 0.25881833, 0, -0.9659255, 9.048799, -1.5414324e-06, -11.649964)
+
+[node name="building_b3" type="Node3D" parent="AssetRoot" instance=ExtResource("2_c6xj6")]
+transform = Transform3D(0.70668745, 1.4732232e-10, 0.7075254, 0, 1, -2.0822181e-10, -0.7075254, 1.4714784e-10, 0.70668745, 2.9512005, 1.5414324e-06, -3.3500357)
+
+[node name="building_a_23" type="Node3D" parent="AssetRoot" instance=ExtResource("1_m0rpm")]
+transform = Transform3D(-0.9659255, 0, -0.25881833, 0, 1, 0, 0.25881833, 0, -0.9659255, 5.0487986, -1.5414324e-06, -12.649964)
 
 [node name="CSGCombiner3D" type="CSGCombiner3D" parent="."]
 use_collision = true

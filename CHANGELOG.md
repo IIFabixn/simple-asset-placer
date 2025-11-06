@@ -1,5 +1,26 @@
 # Changelog
 
+## [Unreleased]
+
+### ✨ New Features
+
+#### Pickup for Placement
+
+- **Pick Up Scene Nodes for Placement**: Select existing Node3D objects and enter placement mode to place copies
+  - **Keyboard Shortcut**: Press `SHIFT+TAB` to pick up selected nodes
+  - **Context Menu**: Right-click Node3D objects in Scene Tree → "Pickup for Placement"
+  - **Multi-Node Support**: Pick up multiple nodes simultaneously as a group
+  - **Smart Pivot**: Container origin automatically centered on selection for intuitive rotation/movement
+  - **Non-Destructive**: Original nodes remain in place, only copies are placed
+  - **Full Transform Support**: Rotate, scale, and position picked-up nodes like regular assets
+  - **Preview Accuracy**: Placed nodes exactly match preview transforms (WYSIWYG)
+  - **Clean Scene Tree**: Wrapper container automatically removed, only actual nodes placed
+  - **Unique Naming**: Automatically generates readable unique names (e.g., `building_a2`, `building_a3`)
+  - **Universal Compatibility**: Works with any Node3D type (MeshInstance3D, StaticBody3D, scenes, etc.)
+  - Files: `utils/pickup_handler.gd`, `context_menu/scene_tree_context_menu.gd`, `simpleassetplacer.gd`, `core/placement_mode_controller.gd`
+
+---
+
 ## [2.1.0] - 2025-10-31
 
 ### ✨ New Features

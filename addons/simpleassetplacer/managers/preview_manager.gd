@@ -184,6 +184,58 @@ func start_preview_asset(asset_path: String, settings: Dictionary = {}) -> void:
 	PluginLogger.info("PreviewManager", "Started asset preview for: " + asset_path)
 
 
+func start_preview_node(preview_node: Node3D, settings: Dictionary = {}) -> void:
+	"""Start preview with an already instantiated node (for pickup feature)
+	
+	Args:
+		preview_node: Instantiated Node3D to use as preview
+		settings: Preview settings
+	"""
+	if not preview_node or not is_instance_valid(preview_node):
+		PluginLogger.error("PreviewManager", "Cannot start preview - invalid node provided")
+		return
+
+	cleanup_preview()
+
+	var current_scene = (
+		_services.editor_interface.get_edited_scene_root() if _services.editor_interface else null
+	)
+	if not current_scene or not is_instance_valid(current_scene):
+		PluginLogger.error("PreviewManager", "No valid scene available for preview")
+		return
+
+	_preview_mesh = preview_node
+	_preview_mesh.name = "AssetPlacerPreview"
+
+	# Apply transparency to all mesh instances
+	_apply_preview_transparency_to_children(_preview_mesh)
+
+	# Disable collision on preview to prevent raycast interference
+	_disable_collision_on_preview(_preview_mesh)
+
+	# Add to scene first
+	current_scene.add_child(_preview_mesh)
+
+	# Apply initial transform (after node is in tree)
+	_preview_mesh.global_position = _current_position
+	_preview_mesh.rotation = _current_rotation
+	_preview_mesh.scale = _current_scale
+
+	# Register with smooth transform manager for interpolation
+	if _services and _services.smooth_transform_manager:
+		_services.smooth_transform_manager.register_object(_preview_mesh)
+
+	# Debug: log child count to help diagnose issues
+	var child_count = preview_node.get_child_count()
+	PluginLogger.info(
+		"PreviewManager",
+		(
+			"Started preview from instantiated node (type: %s, children: %d)"
+			% [preview_node.get_class(), child_count]
+		)
+	)
+
+
 func _apply_preview_transparency_to_children(node: Node) -> void:
 	"""Apply transparency to all GeometryInstance3D children (preserves original materials)"""
 	if node is GeometryInstance3D:

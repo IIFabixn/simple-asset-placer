@@ -59,6 +59,7 @@ const EXTRA_BOOLEAN_KEYS := [
 const EXTRA_KEY_BINDINGS := [
 	"cancel_key",
 	"transform_mode_key",
+	"pickup_mode_key",
 	"height_up_key",
 	"height_down_key",
 	"reset_height_key",

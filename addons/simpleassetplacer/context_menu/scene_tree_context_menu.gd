@@ -18,10 +18,12 @@ USED BY: Main plugin (registered as context menu plugin)
 
 const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
+const PickupHandler = preload("res://addons/simpleassetplacer/utils/pickup_handler.gd")
 
 # Dependencies
 var _settings_manager
 var _dock  # Reference to AssetPlacerDock to refresh UI
+var _plugin  # Reference to main plugin for triggering pickup mode
 
 
 func set_settings_manager(settings_manager) -> void:
@@ -34,25 +36,37 @@ func set_dock_reference(dock) -> void:
 	_dock = dock
 
 
+func set_plugin_reference(plugin) -> void:
+	"""Inject main plugin reference for pickup mode"""
+	_plugin = plugin
+
+
 func _popup_menu(paths: PackedStringArray) -> void:
 	"""Called when scene tree context menu is opened
 	
 	Args:
 		paths: Array containing node paths of selected nodes
 	"""
-	# Only show option if exactly one node is selected
-	if paths.size() != 1:
+	if paths.is_empty():
 		return
 
-	# Get the selected node
-	var node_path = paths[0]
-	var selected_node = _get_node_from_path(node_path)
+	# Get selected nodes
+	var selected_nodes: Array = []
+	for path in paths:
+		var node = _get_node_from_path(path)
+		if node:
+			selected_nodes.append(node)
 
-	if not selected_node:
+	if selected_nodes.is_empty():
 		return
 
-	# Add our custom menu item
-	add_context_menu_item("Set as Asset Parent", _on_set_as_parent, null)  # No icon for now
+	# Add "Set as Asset Parent" only for single selection
+	if paths.size() == 1:
+		add_context_menu_item("Set as Asset Parent", _on_set_as_parent, null)
+
+	# Add "Pickup for Placement" if nodes can be picked up
+	if PickupHandler.can_pickup_nodes(selected_nodes):
+		add_context_menu_item("Pickup for Placement", _on_pickup_for_placement, null)
 
 
 func _on_set_as_parent(paths: PackedStringArray) -> void:
@@ -109,6 +123,35 @@ func _on_set_as_parent(paths: PackedStringArray) -> void:
 		)
 	else:
 		PluginLogger.error("SceneTreeContextMenu", "Settings manager not available")
+
+
+func _on_pickup_for_placement(paths: PackedStringArray) -> void:
+	"""Callback when user clicks 'Pickup for Placement'
+	
+	Args:
+		paths: Array containing the selected node paths
+	"""
+	if paths.is_empty():
+		return
+
+	# Get selected nodes
+	var selected_nodes: Array = []
+	for path in paths:
+		var node = _get_node_from_path(path)
+		if node:
+			selected_nodes.append(node)
+
+	if selected_nodes.is_empty():
+		PluginLogger.warning("SceneTreeContextMenu", "No valid nodes selected for pickup")
+		return
+
+	# Trigger pickup mode via main plugin
+	if _plugin and _plugin.has_method("trigger_pickup_mode"):
+		_plugin.trigger_pickup_mode(selected_nodes)
+	else:
+		PluginLogger.error(
+			"SceneTreeContextMenu", "Cannot trigger pickup mode - plugin reference not set"
+		)
 
 
 func _get_node_from_path(node_path_str: String) -> Node:

@@ -75,6 +75,26 @@ func start_placement_mode(
 	)
 
 
+func start_placement_mode_with_scene(
+	packed_scene: PackedScene, placement_settings: Dictionary, dock_instance = null
+) -> void:
+	"""Start placement mode with a PackedScene (used for pickup feature)
+	
+	Args:
+		packed_scene: PackedScene to place
+		placement_settings: Settings dictionary
+		dock_instance: Reference to dock UI
+	"""
+	exit_any_mode()
+	_ensure_undo_redo()
+
+	# Use empty asset_path to signal that we're using a temporary PackedScene
+	# We'll need to handle this specially in the placement controller
+	_placement_controller.start_with_packed_scene(
+		packed_scene, placement_settings, dock_instance, _state()
+	)
+
+
 func start_transform_mode(target_nodes: Variant, dock_instance = null) -> void:
 	"""Start transform mode - delegates to TransformModeController"""
 	exit_any_mode()

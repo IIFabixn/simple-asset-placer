@@ -462,6 +462,7 @@ static func get_all_settings() -> Array:
 		settings, "confirm_action_key", "ENTER", "Confirm Placement/Transform", "keybinds"
 	)
 	_add_key_binding(settings, "transform_mode_key", "TAB", "Transform Mode", "keybinds")
+	_add_key_binding(settings, "pickup_mode_key", "SHIFT+TAB", "Pickup for Placement", "keybinds")
 	_add_key_binding(
 		settings, "cycle_placement_mode_key", "P", "Cycle Placement Strategy", "keybinds"
 	)

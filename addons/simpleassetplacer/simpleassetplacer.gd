@@ -390,6 +390,9 @@ func _setup_scene_tree_context_menu():
 	if dock:
 		scene_tree_context_menu.set_dock_reference(dock)
 
+	# Inject plugin reference for pickup mode
+	scene_tree_context_menu.set_plugin_reference(self)
+
 	# Register the context menu plugin with the editor
 	add_context_menu_plugin(
 		EditorContextMenuPlugin.ContextMenuSlot.CONTEXT_SLOT_SCENE_TREE, scene_tree_context_menu
@@ -643,6 +646,20 @@ func _forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 			full_key_string += "SHIFT+"
 		full_key_string += key_string
 
+		# Special handling for pickup mode key - CHECK THIS FIRST (before transform key)
+		# to avoid SHIFT+TAB matching just TAB
+		var pickup_key = service_registry.settings_manager.get_setting(
+			"pickup_mode_key", "SHIFT+TAB"
+		)
+		if key_string == pickup_key or full_key_string == pickup_key:
+			# Trigger pickup mode for selected nodes
+			var selected_nodes = get_editor_interface().get_selection().get_selected_nodes()
+			if not selected_nodes.is_empty():
+				trigger_pickup_mode(selected_nodes)
+			# Consume the event
+			get_viewport().set_input_as_handled()
+			return EditorPlugin.AFTER_GUI_INPUT_STOP
+
 		# Special handling for transform mode key - intercept even when no mode is active
 		var transform_key = service_registry.settings_manager.get_setting(
 			"transform_mode_key", "TAB"
@@ -741,6 +758,69 @@ func _on_asset_selected(asset_path: String, mesh_resource: Resource, settings: D
 	if service_registry and service_registry.overlay_manager:
 		service_registry.overlay_manager.show_status_message(
 			"Placement mode started - Left-click to place, ESC to exit", Color.GREEN, 3.0
+		)
+
+
+func trigger_pickup_mode(selected_nodes: Array) -> void:
+	"""Trigger pickup mode for selected nodes (from context menu or keybind)
+	
+	Args:
+		selected_nodes: Array of Node objects selected in the scene tree
+	"""
+	const PickupHandler = preload("res://addons/simpleassetplacer/utils/pickup_handler.gd")
+
+	PluginLogger.info(
+		PluginConstants.COMPONENT_MAIN,
+		"Pickup mode triggered for %d node(s)" % selected_nodes.size()
+	)
+
+	if not service_registry or not service_registry.transformation_coordinator:
+		PluginLogger.error(
+			PluginConstants.COMPONENT_MAIN,
+			"Cannot start pickup mode - service registry not initialized"
+		)
+		return
+
+	# Extract pickup data from selected nodes
+	var pickup_data = PickupHandler.extract_pickup_data(selected_nodes)
+
+	if not pickup_data.success:
+		PluginLogger.error(
+			PluginConstants.COMPONENT_MAIN, "Pickup failed: " + pickup_data.error_message
+		)
+		if service_registry.overlay_manager:
+			service_registry.overlay_manager.show_status_message(
+				"Pickup failed: " + pickup_data.error_message, Color.RED, 3.0
+			)
+		return
+
+	# Get current settings
+	var combined_settings = service_registry.settings_manager.get_combined_settings()
+
+	# Apply initial transform from picked node
+	combined_settings["initial_scale"] = pickup_data.initial_scale
+	combined_settings["initial_rotation"] = pickup_data.initial_rotation
+
+	# Start placement mode with picked asset
+	if pickup_data.packed_scene:
+		# Use PackedScene directly (for non-instanced nodes or multi-selection)
+		service_registry.transformation_coordinator.start_placement_mode_with_scene(
+			pickup_data.packed_scene, combined_settings, dock
+		)
+	elif not pickup_data.asset_path.is_empty():
+		# Use scene file path (for instanced scenes)
+		service_registry.transformation_coordinator.start_placement_mode(
+			null, null, -1, pickup_data.asset_path, combined_settings, dock
+		)
+	else:
+		PluginLogger.error(PluginConstants.COMPONENT_MAIN, "Invalid pickup data - no asset")
+		return
+
+	# Show user feedback
+	var node_label = "node" if pickup_data.node_count == 1 else "%d nodes" % pickup_data.node_count
+	if service_registry.overlay_manager:
+		service_registry.overlay_manager.show_status_message(
+			"Picked up %s - Left-click to place, ESC to exit" % node_label, Color.GREEN, 3.0
 		)
 
 

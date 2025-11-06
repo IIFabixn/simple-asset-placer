@@ -12,6 +12,7 @@ static func get_default_settings() -> Dictionary:
 	var defaults: Dictionary = {
 		"cancel_key": "ESCAPE",
 		"transform_mode_key": "TAB",
+		"pickup_mode_key": "SHIFT+TAB",
 		"height_up_key": "Q",
 		"height_down_key": "E",
 		"reset_height_key": "R",

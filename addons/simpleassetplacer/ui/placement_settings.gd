@@ -146,6 +146,7 @@ var fine_increment_modifier_key: String = "CTRL"
 # Control Settings
 var cancel_key: String = "ESCAPE"
 var transform_mode_key: String = "TAB"
+var pickup_mode_key: String = "SHIFT+TAB"
 var cycle_placement_mode_key: String = "P"
 
 # Asset Cycling Settings

@@ -103,6 +103,67 @@ func start(
 	PluginLogger.info(PluginConstants.COMPONENT_TRANSFORM, "Started placement mode")
 
 
+func start_with_packed_scene(
+	packed_scene: PackedScene, settings: Dictionary, dock_instance, state: TransformState
+) -> void:
+	"""Start placement mode with a PackedScene (for pickup feature)
+	
+	Args:
+		packed_scene: PackedScene to place
+		settings: Placement settings
+		dock_instance: Reference to dock UI
+		state: Transform state
+	"""
+	if not _services.mode_state_machine.transition_to_mode(ModeStateMachine.Mode.PLACEMENT):
+		return
+
+	# Reset control mode when entering placement
+	if _services.control_mode_state:
+		_services.control_mode_state.reset()
+
+	# Initialize session
+	state.begin_session(ModeStateMachine.Mode.PLACEMENT, settings)
+	state.dock_reference = dock_instance
+
+	# Determine and store the target parent node
+	var target_parent = _determine_target_parent(settings)
+
+	# Store placement data with PackedScene
+	state.session.placement_data = {
+		"mesh": null,
+		"meshlib": null,
+		"item_id": -1,
+		"asset_path": "",  # Empty means we're using packed_scene
+		"packed_scene": packed_scene,  # Store the PackedScene
+		"settings": settings,
+		"dock_reference": dock_instance,
+		"undo_redo": _services.undo_redo,
+		"target_parent": target_parent
+	}
+
+	# Initialize overlays
+	_services.overlay_manager.initialize_overlays()
+	_services.overlay_manager.set_mode(ModeStateMachine.Mode.PLACEMENT)
+
+	# Setup preview from PackedScene
+	_setup_preview_from_packed_scene(packed_scene, settings)
+
+	# Configure managers
+	_configure_managers(state, settings)
+
+	# Initialize plane strategy
+	if _services.placement_strategy_service:
+		_services.placement_strategy_service.initialize_plane_for_placement()
+
+	# Setup viewport focus
+	_services.grid_manager.reset_tracking()
+	state.session.focus_grab_frames = PluginConstants.FOCUS_GRAB_FRAMES
+
+	PluginLogger.info(
+		PluginConstants.COMPONENT_TRANSFORM, "Started placement mode with PackedScene"
+	)
+
+
 func confirm_placement(state: TransformState) -> void:
 	"""Confirm and place the asset, then check if we should continue or exit"""
 	if not _services.mode_state_machine.is_placement_mode():
@@ -220,6 +281,33 @@ func _setup_preview(
 		_services.preview_manager.start_preview_asset(asset_path, settings)
 
 
+func _setup_preview_from_packed_scene(packed_scene: PackedScene, settings: Dictionary) -> void:
+	"""Setup preview from a PackedScene (for pickup feature)
+	
+	Args:
+		packed_scene: PackedScene to preview
+		settings: Preview settings
+	"""
+	if not packed_scene:
+		PluginLogger.error(
+			PluginConstants.COMPONENT_TRANSFORM, "Cannot setup preview - null PackedScene"
+		)
+		return
+
+	# Instantiate the scene for preview
+	# Use GEN_EDIT_STATE_DISABLED to prevent naming conflict dialogs
+	var scene_instance = packed_scene.instantiate(PackedScene.GEN_EDIT_STATE_DISABLED)
+
+	if not scene_instance:
+		PluginLogger.error(
+			PluginConstants.COMPONENT_TRANSFORM, "Failed to instantiate PackedScene for preview"
+		)
+		return
+
+	# Use the preview manager to display the instantiated scene
+	_services.preview_manager.start_preview_node(scene_instance, settings)
+
+
 func _configure_managers(state: TransformState, settings: Dictionary) -> void:
 	"""Configure all managers for placement mode"""
 	_services.position_manager.configure(state, settings)
@@ -276,30 +364,45 @@ func _place_asset(state: TransformState) -> void:
 
 	var placed_node = null
 
-	# Check if this is a MeshLibrary item or an asset file
-	var meshlib = placement_data.get("meshlib", null)
-	var item_id = placement_data.get("item_id", -1)
-
-	if meshlib and item_id >= 0:
-		# Place from MeshLibrary
-		var mesh = placement_data.get("mesh")
-		var rotation_offset = state.values.manual_rotation_offset
-
-		placed_node = _services.utility_manager.place_from_meshlib(
-			mesh, meshlib, item_id, final_position, rotation_offset, state, settings, stored_parent  # Pass the stored parent
+	# Check if this is a PackedScene (pickup feature)
+	var packed_scene = placement_data.get("packed_scene", null)
+	if packed_scene:
+		# Place from PackedScene (pickup feature)
+		placed_node = _place_from_packed_scene(
+			packed_scene, final_position, state, settings, stored_parent
 		)
 	else:
-		# Place from asset file
-		var asset_path = placement_data.get("asset_path", "")
-		if asset_path.is_empty():
-			PluginLogger.error(
-				PluginConstants.COMPONENT_TRANSFORM, "No asset path in placement data"
-			)
-			return
+		# Check if this is a MeshLibrary item or an asset file
+		var meshlib = placement_data.get("meshlib", null)
+		var item_id = placement_data.get("item_id", -1)
 
-		placed_node = _services.utility_manager.place_asset_in_scene(
-			asset_path, final_position, settings, state, stored_parent  # Pass the stored parent
-		)
+		if meshlib and item_id >= 0:
+			# Place from MeshLibrary
+			var mesh = placement_data.get("mesh")
+			var rotation_offset = state.values.manual_rotation_offset
+
+			placed_node = _services.utility_manager.place_from_meshlib(
+				mesh,
+				meshlib,
+				item_id,
+				final_position,
+				rotation_offset,
+				state,
+				settings,
+				stored_parent  # Pass the stored parent
+			)
+		else:
+			# Place from asset file
+			var asset_path = placement_data.get("asset_path", "")
+			if asset_path.is_empty():
+				PluginLogger.error(
+					PluginConstants.COMPONENT_TRANSFORM, "No asset path in placement data"
+				)
+				return
+
+			placed_node = _services.utility_manager.place_asset_in_scene(
+				asset_path, final_position, settings, state, stored_parent  # Pass the stored parent
+			)
 
 	if placed_node:
 		PluginLogger.info(
@@ -350,6 +453,185 @@ func _reset_for_next_placement(state: TransformState) -> void:
 
 	# Reset focus grab for viewport
 	state.session.focus_grab_frames = PluginConstants.FOCUS_GRAB_FRAMES
+
+
+func _clean_pickup_node_name(node_name: String) -> String:
+	"""Clean up node names from pickup (remove _pickup suffix and unique identifiers)
+	
+	Args:
+		node_name: Original node name with pickup suffixes
+		
+	Returns:
+		Cleaned node name
+	"""
+	var cleaned = node_name
+
+	# Remove _pickup suffix and any trailing numbers
+	# Patterns to remove: "_pickup", "_pickup_1", "_pickup_123", etc.
+	var pickup_pattern = RegEx.new()
+	pickup_pattern.compile("_pickup(_\\d+)?$")
+	cleaned = pickup_pattern.sub(cleaned, "", true)
+
+	return cleaned
+
+
+func _make_unique_name(base_name: String, parent: Node) -> String:
+	"""Generate a unique name for a node within its parent
+	
+	Args:
+		base_name: Base name to make unique
+		parent: Parent node to check for name conflicts
+		
+	Returns:
+		Unique name that doesn't conflict with existing children
+	"""
+	# If base name doesn't exist in parent, use it as-is
+	if not parent.has_node(base_name):
+		return base_name
+
+	# Otherwise, append a number to make it unique
+	var counter = 2
+	var unique_name = base_name + str(counter)
+
+	while parent.has_node(unique_name):
+		counter += 1
+		unique_name = base_name + str(counter)
+
+	return unique_name
+
+
+func _clean_node_names_recursive(node: Node) -> void:
+	"""Recursively clean up all node names in the hierarchy
+	
+	Args:
+		node: Root node to start cleaning from
+	"""
+	if node:
+		node.name = _clean_pickup_node_name(node.name)
+
+		# Clean all children recursively
+		for child in node.get_children():
+			_clean_node_names_recursive(child)
+
+
+func _place_from_packed_scene(
+	packed_scene: PackedScene,
+	position: Vector3,
+	state: TransformState,
+	settings: Dictionary,
+	parent_node: Node
+) -> Node:
+	"""Place an instance from a PackedScene (pickup feature)
+	
+	Args:
+		packed_scene: PackedScene to instantiate
+		position: World position for placement
+		state: Transform state with rotation/scale
+		settings: Placement settings
+		parent_node: Parent node to attach to
+		
+	Returns:
+		The placed Node3D or null if failed
+	"""
+	if not packed_scene:
+		PluginLogger.error(PluginConstants.COMPONENT_TRANSFORM, "Cannot place null PackedScene")
+		return null
+
+	if not parent_node or not is_instance_valid(parent_node):
+		PluginLogger.error(PluginConstants.COMPONENT_TRANSFORM, "Invalid parent node for placement")
+		return null
+
+	# Instantiate the scene
+	# Use GEN_EDIT_STATE_DISABLED to prevent naming conflict dialogs during placement
+	var container = packed_scene.instantiate(PackedScene.GEN_EDIT_STATE_DISABLED)
+
+	if not container:
+		PluginLogger.error(PluginConstants.COMPONENT_TRANSFORM, "Failed to instantiate PackedScene")
+		return null
+
+	# Check if this is a multi-node pickup (container with children)
+	var is_multi_node = container.get_child_count() > 0
+
+	if is_multi_node:
+		# For multi-node pickup, we need to "unwrap" the container
+		# and place only the children with the container's transform applied
+
+		# Temporarily add container to tree to calculate transforms
+		parent_node.add_child(container)
+
+		# Set container transform
+		if container is Node3D:
+			container.global_position = position
+			var preview_rotation = _services.preview_manager.get_preview_rotation()
+			container.rotation = preview_rotation
+			var preview_scale = _services.preview_manager.get_preview_scale()
+			container.scale = preview_scale
+
+		# Get all children before reparenting
+		var children = container.get_children()
+		var placed_nodes = []
+
+		# Reparent each child to the actual parent
+		for child in children:
+			if child is Node3D:
+				# Store global transform before reparenting
+				var global_transform = child.global_transform
+
+				# Clean up node names (remove _pickup suffixes)
+				_clean_node_names_recursive(child)
+
+				# Ensure unique name in parent to avoid auto-generated names like @Node3D@12345
+				child.name = _make_unique_name(child.name, parent_node)
+
+				# Reparent to actual parent
+				container.remove_child(child)
+				parent_node.add_child(child)
+				child.owner = _services.editor_interface.get_edited_scene_root()
+
+				# Restore global transform
+				child.global_transform = global_transform
+
+				placed_nodes.append(child)
+
+		# Remove the now-empty container
+		parent_node.remove_child(container)
+		container.queue_free()
+
+		PluginLogger.info(
+			PluginConstants.COMPONENT_TRANSFORM,
+			"Placed %d nodes from pickup (unwrapped container)" % placed_nodes.size()
+		)
+
+		# Return first placed node (for undo/redo tracking)
+		return placed_nodes[0] if placed_nodes.size() > 0 else null
+	else:
+		# Single node pickup - place directly
+		# Clean up node names (remove _pickup suffixes)
+		_clean_node_names_recursive(container)
+
+		# Ensure unique name in parent to avoid conflicts
+		container.name = _make_unique_name(container.name, parent_node)
+
+		parent_node.add_child(container)
+		container.owner = _services.editor_interface.get_edited_scene_root()
+
+		# Set transform AFTER adding to tree (global_position requires being in tree)
+		if container is Node3D:
+			container.global_position = position
+
+			# Apply rotation from preview (use actual preview rotation for accuracy)
+			var preview_rotation = _services.preview_manager.get_preview_rotation()
+			container.rotation = preview_rotation
+
+			# Apply scale from preview (consistent with rotation approach)
+			var preview_scale = _services.preview_manager.get_preview_scale()
+			container.scale = preview_scale
+
+		PluginLogger.info(
+			PluginConstants.COMPONENT_TRANSFORM, "Placed single node from pickup: " + container.name
+		)
+
+		return container
 
 
 func _determine_target_parent(settings: Dictionary) -> Node:

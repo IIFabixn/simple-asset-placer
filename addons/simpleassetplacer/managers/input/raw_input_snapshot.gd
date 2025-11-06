@@ -308,6 +308,9 @@ func _swap_buffers() -> void:
 func _update_key_states() -> void:
 	var current_time := Time.get_ticks_msec() / 1000.0
 	_current_keys["tab"] = _check_key_with_modifiers(settings.get("transform_mode_key", "TAB"))
+	_current_keys["pickup"] = _check_key_with_modifiers(
+		settings.get("pickup_mode_key", "SHIFT+TAB")
+	)
 	_current_keys["confirm"] = _check_key_with_modifiers(
 		settings.get("confirm_action_key", "ENTER")
 	)

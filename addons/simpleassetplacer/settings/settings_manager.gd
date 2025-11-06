@@ -182,6 +182,7 @@ func is_plugin_key(key_string: String) -> bool:
 	var plugin_key_names = [
 		"cancel_key",
 		"transform_mode_key",
+		"pickup_mode_key",
 		"height_up_key",
 		"height_down_key",
 		"reset_height_key",

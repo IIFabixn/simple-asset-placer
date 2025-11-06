@@ -86,14 +86,14 @@ static func get_all_settings() -> Array:
 		SettingType.BOOL,
 		"Enable Grid Snapping"
 	)
-	snap_enabled.section = "basic"
+	snap_enabled.section = "grid_snapping"
 	snap_enabled.ui_tooltip = "Snap to grid during placement"
 	settings.append(snap_enabled)
 
 	var snap_step = SettingMeta.new(
 		"snap_step", "simple_asset_placer/snap_step", 1.0, SettingType.FLOAT, "Grid Size"
 	)
-	snap_step.section = "basic"
+	snap_step.section = "grid_snapping"
 	snap_step.min_value = 0.01
 	snap_step.max_value = 10.0
 	snap_step.step = 0.01
@@ -103,14 +103,14 @@ static func get_all_settings() -> Array:
 	var show_grid = SettingMeta.new(
 		"show_grid", "simple_asset_placer/show_grid", false, SettingType.BOOL, "Show Grid Overlay"
 	)
-	show_grid.section = "basic"
+	show_grid.section = "grid_snapping"
 	show_grid.ui_tooltip = "Display visual grid overlay"
 	settings.append(show_grid)
 
 	var grid_extent = SettingMeta.new(
 		"grid_extent", "simple_asset_placer/grid_extent", 20.0, SettingType.FLOAT, "Grid Extent"
 	)
-	grid_extent.section = "basic"
+	grid_extent.section = "grid_snapping"
 	grid_extent.min_value = 5.0
 	grid_extent.max_value = 100.0
 	grid_extent.step = 1.0

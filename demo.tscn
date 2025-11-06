@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3 uid="uid://repnqsnpqatg"]
+[gd_scene load_steps=12 format=3 uid="uid://repnqsnpqatg"]
 
 [ext_resource type="PackedScene" uid="uid://b4iki8vmw48j3" path="res://sample/assets/kenny_retro-medival-kit/detail-barrel.glb" id="1_884kg"]
 [ext_resource type="PackedScene" uid="uid://bi526m4rgyylo" path="res://sample/building_a.tscn" id="1_m0rpm"]
@@ -8,6 +8,7 @@
 [ext_resource type="Texture2D" uid="uid://14lix33xubj1" path="res://sample/textures/rocky_terrain/rocky_terrain_02_diff_1k.jpg" id="5_6bw2v"]
 [ext_resource type="PackedScene" uid="uid://c14fvskvwnirm" path="res://sample/building_d.tscn" id="6_kem5a"]
 [ext_resource type="PackedScene" uid="uid://b6c0q5frrklx6" path="res://barrels_2.tscn" id="10_d4o4o"]
+[ext_resource type="PackedScene" uid="uid://cdp38qgugpkmj" path="res://sample/assets/blend/cone_blend.blend" id="10_gdsc3"]
 [ext_resource type="PackedScene" uid="uid://c2hol86kdgqxl" path="res://sample/assets/kenny_retro-medival-kit/tree-large.glb" id="10_svejp"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kem5a"]
@@ -75,3 +76,6 @@ transform = Transform3D(1.099999, -2.9802322e-08, -2.6552354e-07, 2.9802322e-08,
 
 [node name="building_a_3" parent="." instance=ExtResource("1_m0rpm")]
 transform = Transform3D(-3.934025e-08, 0, 0.9, 0, 0.9, 0, -0.9, 0, -3.934025e-08, 1, 0, 1)
+
+[node name="cone_blend" type="Node3D" parent="." instance=ExtResource("10_gdsc3")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.933361, 1, 1.7599008)

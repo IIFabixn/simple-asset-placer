@@ -868,9 +868,18 @@ func _on_meshlib_item_selected(meshlib: MeshLibrary, item_id: int, settings: Dic
 	service_registry.settings_manager.update_dock_settings(settings)
 	var combined_settings = service_registry.settings_manager.get_combined_settings()
 
+	# Extract mesh from meshlib for placement
+	var mesh = meshlib.get_item_mesh(item_id)
+	if not mesh:
+		PluginLogger.error(
+			PluginConstants.COMPONENT_MAIN,
+			"Failed to get mesh for item_id: " + str(item_id)
+		)
+		return
+
 	# Start placement mode through the coordinator
 	service_registry.transformation_coordinator.start_placement_mode(
-		null, meshlib, item_id, "", combined_settings, dock
+		mesh, meshlib, item_id, "", combined_settings, dock
 	)
 
 	# Show user feedback

@@ -51,10 +51,10 @@ operation = 2
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0.95690453, 0, -13.057328)
 
 [node name="building_a" parent="." instance=ExtResource("1_m0rpm")]
-transform = Transform3D(4.3312562e-07, 0, -0.99999964, 0, 1, 0, 0.99999964, 0, 4.3312562e-07, -4.4034243, -0.06889253, -7.9194717)
+transform = Transform3D(0.99999887, 0, -0.0012327865, 0, 1, 0, 0.0012327865, 0, 0.99999887, -10.093251, -0.1, 16.199823)
 
 [node name="building_a_2" parent="." instance=ExtResource("1_m0rpm")]
-transform = Transform3D(-0.9659256, 0, -0.25881833, 0, 1, 0, 0.25881833, 0, -0.9659256, 9.330184, -3.0828649e-06, -6.91311)
+transform = Transform3D(0.25762782, 0, -0.96624386, 0, 1, 0, 0.96624386, 0, 0.25762782, 5.6007037, 0, 8.218426)
 
 [node name="building_b" parent="." instance=ExtResource("2_c6xj6")]
 transform = Transform3D(0.70668745, 1.4732236e-10, 0.7075254, 0, 1, -2.0822188e-10, -0.7075254, 1.4714789e-10, 0.70668745, 7.232586, 0, 2.3868194)

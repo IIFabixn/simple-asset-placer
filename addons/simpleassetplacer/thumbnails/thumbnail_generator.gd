@@ -1,7 +1,6 @@
 @tool
-extends RefCounted
-
 class_name ThumbnailGenerator
+extends RefCounted
 
 const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
@@ -851,28 +850,44 @@ static func _position_camera_simple(mesh: Mesh):
 
 	# Calculate mesh bounds
 	var aabb = mesh.get_aabb()
+	
+	# Validate AABB has volume (not degenerate)
+	if not aabb.has_volume() or aabb.size.length() < 0.0001:
+		# Fallback for degenerate meshes - use default positioning
+		mesh_instance.position = Vector3.ZERO
+		camera.position = Vector3(2, 2, 3)
+		camera.look_at(Vector3.ZERO, Vector3.UP)
+		return
+	
 	var center = aabb.get_center()
 	var size = aabb.size
 	var max_extent = max(max(size.x, size.y), size.z)
 
-	# Position mesh at origin
+	# Position mesh at origin for consistent framing
 	mesh_instance.position = -center
 
 	if max_extent > 0:
 		# Ensure reasonable size for tiny meshes
 		var display_size = max(max_extent, 0.001)
 
-		# Use an attractive 3/4 view angle that shows depth and form well
-		var distance = display_size * 3.5  # Further back for perspective view
+		# Calculate proper distance based on FOV to fit the entire mesh
+		# Using FOV and trigonometry to ensure the mesh fits in frame
+		var fov_rad = deg_to_rad(camera.fov)
+		var distance = (display_size / tan(fov_rad / 2.0)) * 1.5  # 1.5 for padding
 
-		# Use a more dramatic angle to better show shape differences
+		# Use an attractive 3/4 view angle that shows depth and form well
 		# Position camera at a 3/4 view that emphasizes the top and sides
-		var cam_x = distance * 0.8  # Strong side angle
-		var cam_y = distance * 0.9  # High angle to see the top
-		var cam_z = distance * 0.6  # Moderate front view
+		var cam_x = distance * 0.7  # Strong side angle
+		var cam_y = distance * 0.7  # High angle to see the top
+		var cam_z = distance * 0.7  # Moderate front view
 
 		camera.position = Vector3(cam_x, cam_y, cam_z)
 		camera.look_at(Vector3.ZERO, Vector3.UP)
+		
+		# Update light to match camera position for better lighting
+		if light and is_instance_valid(light):
+			light.position = camera.position + Vector3(1, 2, 1)
+			light.look_at(Vector3.ZERO, Vector3.UP)
 
 
 static func _collect_all_meshes_from_node(node: Node, collection: Array):

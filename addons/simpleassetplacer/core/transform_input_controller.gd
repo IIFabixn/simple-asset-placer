@@ -164,13 +164,13 @@ func process_wasd_movement(
 	pos_input: PositionInputState, camera: Camera3D, state: TransformState, settings: Dictionary
 ) -> void:
 	"""Process WASD position movement (plane-aware)"""
-	var position_step = settings.get("position_adjustment_step", 0.1)
+	var position_step = settings.get("position_increment", 1.0)
 
 	# Apply modifiers
 	if pos_input.fine_increment_modifier_held:
-		position_step = settings.get("fine_position_increment", 0.01)
+		position_step = settings.get("fine_position_increment", 0.1)
 	elif pos_input.large_increment_modifier_held:
-		position_step = settings.get("large_position_increment", 1.0)
+		position_step = settings.get("large_position_increment", 5.0)
 
 	# Use plane-aware movement functions that handle all plane orientations correctly
 	# - XZ plane (horizontal): W/S moves along camera-snapped Z/X, A/D moves perpendicular

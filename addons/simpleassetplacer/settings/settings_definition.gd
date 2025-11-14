@@ -245,35 +245,6 @@ static func get_all_settings() -> Array:
 	auto_parent_name.ui_tooltip = "Name for auto-created parent container. Used only when Parent Placement Mode is set to 'auto'."
 	settings.append(auto_parent_name)
 
-	# Increment modifiers for keyboard-based transforms
-	var fine_sensitivity_multiplier = SettingMeta.new(
-		"fine_sensitivity_multiplier",
-		"simple_asset_placer/fine_sensitivity_multiplier",
-		PluginConstants.FINE_SENSITIVITY_MULTIPLIER,
-		SettingType.FLOAT,
-		"Fine Increment Multiplier"
-	)
-	fine_sensitivity_multiplier.section = "increments"
-	fine_sensitivity_multiplier.min_value = 0.01
-	fine_sensitivity_multiplier.max_value = 1.0
-	fine_sensitivity_multiplier.step = 0.05
-	fine_sensitivity_multiplier.ui_tooltip = "Multiplier for adjustment increments when CTRL modifier is held (lower = more precise)"
-	settings.append(fine_sensitivity_multiplier)
-
-	var large_sensitivity_multiplier = SettingMeta.new(
-		"large_sensitivity_multiplier",
-		"simple_asset_placer/large_sensitivity_multiplier",
-		PluginConstants.LARGE_SENSITIVITY_MULTIPLIER,
-		SettingType.FLOAT,
-		"Large Increment Multiplier"
-	)
-	large_sensitivity_multiplier.section = "increments"
-	large_sensitivity_multiplier.min_value = 1.0
-	large_sensitivity_multiplier.max_value = 10.0
-	large_sensitivity_multiplier.step = 0.5
-	large_sensitivity_multiplier.ui_tooltip = "Multiplier for adjustment increments when ALT modifier is held (higher = faster adjustments)"
-	settings.append(large_sensitivity_multiplier)
-
 	# Advanced Grid Settings
 	var snap_offset = SettingMeta.new(
 		"snap_offset",

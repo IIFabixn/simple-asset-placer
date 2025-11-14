@@ -68,8 +68,6 @@ static func get_default_settings() -> Dictionary:
 		"large_position_increment": 5.0,
 		"large_height_increment": 1.0,
 		"cursor_warp_enabled": true,
-		"fine_sensitivity_multiplier": PluginConstants.FINE_SENSITIVITY_MULTIPLIER,
-		"large_sensitivity_multiplier": PluginConstants.LARGE_SENSITIVITY_MULTIPLIER,
 		"debug_commands": false
 	}
 

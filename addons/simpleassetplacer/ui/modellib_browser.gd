@@ -13,7 +13,7 @@ signal asset_item_selected(asset_info: Dictionary)
 
 # Dependency injection
 var _services: ServiceRegistry = null
-var _thumbnail_queue_manager = null
+var _thumbnail_service: ThumbnailService = null
 
 # UI state
 var category_filter: OptionButton
@@ -101,8 +101,8 @@ func set_category_manager(manager: CategoryManager):
 func set_services(services: ServiceRegistry) -> void:
 	"""Inject ServiceRegistry for access to managers"""
 	_services = services
-	if _services and _services.thumbnail_queue_manager:
-		_thumbnail_queue_manager = _services.thumbnail_queue_manager
+	if _services and _services.thumbnail_service:
+		_thumbnail_service = _services.thumbnail_service
 
 
 func update_grid_columns(available_width: float):
@@ -174,8 +174,8 @@ func update_asset_grid():
 	for asset in filtered_assets:
 		var thumbnail_item = AssetThumbnailItem.create_for_asset(asset, thumbnail_size)
 		thumbnail_item.set_category_manager(category_manager)
-		if _thumbnail_queue_manager:
-			thumbnail_item.set_queue_manager(_thumbnail_queue_manager)
+		if _thumbnail_service:
+			thumbnail_item.set_thumbnail_service(_thumbnail_service)
 		thumbnail_item.asset_item_selected.connect(_on_asset_item_selected)
 		thumbnail_item.context_menu_requested.connect(_on_context_menu_requested)
 		items_grid.add_child(thumbnail_item)

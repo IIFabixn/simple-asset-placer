@@ -13,7 +13,7 @@ signal meshlib_item_selected(meshlib: MeshLibrary, item_id: int)
 
 # Dependency injection
 var _services: ServiceRegistry = null
-var _thumbnail_queue_manager = null
+var _thumbnail_service: ThumbnailService = null
 
 # UI state
 var category_filter: OptionButton
@@ -94,8 +94,8 @@ func set_category_manager(manager: CategoryManager):
 func set_services(services: ServiceRegistry) -> void:
 	"""Inject ServiceRegistry for access to managers"""
 	_services = services
-	if _services and _services.thumbnail_queue_manager:
-		_thumbnail_queue_manager = _services.thumbnail_queue_manager
+	if _services and _services.thumbnail_service:
+		_thumbnail_service = _services.thumbnail_service
 
 
 func update_grid_columns(available_width: float):
@@ -231,8 +231,8 @@ func update_meshlib_grid():
 		var thumbnail_item = AssetThumbnailItem.new(
 			current_meshlib, item_data["id"], thumbnail_size
 		)
-		if _thumbnail_queue_manager:
-			thumbnail_item.set_queue_manager(_thumbnail_queue_manager)
+		if _thumbnail_service:
+			thumbnail_item.set_thumbnail_service(_thumbnail_service)
 		thumbnail_item.thumbnail_item_selected.connect(_on_meshlib_item_selected)
 		items_grid.add_child(thumbnail_item)
 

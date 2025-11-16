@@ -10,18 +10,15 @@ PLACEMENT SETTINGS (UI COMPONENT)
 PURPOSE: Manages placement mode configuration UI
 
 ARCHITECTURE: Instance-based with dependency injection
-- Receives SettingsPersistence and ThumbnailQueueManager via set_* methods
+- Receives SettingsPersistence and ThumbnailService via set_* methods
 - All service calls use injected instances
 
 USED BY: AssetPlacerDock
-DEPENDS ON: SettingsPersistence, ThumbnailQueueManager
+DEPENDS ON: SettingsPersistence, ThumbnailService
 """
 
 # Refactored PlacementSettings - Reduced from 2178 lines to ~300 lines using data-driven architecture
 
-const ThumbnailGenerator = preload(
-	"res://addons/simpleassetplacer/thumbnails/thumbnail_generator.gd"
-)
 const SettingsDefinition = preload("res://addons/simpleassetplacer/settings/settings_definition.gd")
 const SettingsUIBuilder = preload("res://addons/simpleassetplacer/settings/settings_ui_builder.gd")
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
@@ -31,7 +28,7 @@ const PlacementStrategyService = preload(
 
 # Dependency injection
 var _settings_persistence: SettingsPersistence
-var _thumbnail_queue_manager: ThumbnailQueueManager
+var _thumbnail_service: ThumbnailService
 var _settings_manager: SettingsManager  # ADDED: For reloading EditorSettings changes
 
 signal settings_changed
@@ -45,9 +42,9 @@ func set_settings_persistence(settings_persistence: SettingsPersistence) -> void
 	_settings_persistence = settings_persistence
 
 
-func set_thumbnail_queue_manager(queue_manager: ThumbnailQueueManager) -> void:
-	"""Inject the thumbnail queue manager"""
-	_thumbnail_queue_manager = queue_manager
+func set_thumbnail_service(thumbnail_service: ThumbnailService) -> void:
+	"""Inject the thumbnail service"""
+	_thumbnail_service = thumbnail_service
 
 
 func set_settings_manager(settings_manager: SettingsManager) -> void:
@@ -429,7 +426,8 @@ func _perform_reset_settings():
 
 
 func _on_clear_cache_pressed():
-	ThumbnailGenerator.clear_cache()
+	if _thumbnail_service:
+		_thumbnail_service.clear_cache()
 	cache_cleared.emit()
 
 

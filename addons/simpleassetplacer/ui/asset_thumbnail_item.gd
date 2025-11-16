@@ -8,7 +8,7 @@ signal asset_item_selected(asset_info: Dictionary)
 signal context_menu_requested(asset_item: AssetThumbnailItem, position: Vector2)
 
 # Dependency injection
-var _queue_manager: ThumbnailQueueManager
+var _thumbnail_service: ThumbnailService
 
 # Data
 var meshlib: MeshLibrary
@@ -26,9 +26,9 @@ var category_manager = null
 ## Dependency Injection
 
 
-func set_queue_manager(queue_manager: ThumbnailQueueManager) -> void:
-	"""Inject the thumbnail queue manager"""
-	_queue_manager = queue_manager
+func set_thumbnail_service(thumbnail_service: ThumbnailService) -> void:
+	"""Inject the thumbnail service"""
+	_thumbnail_service = thumbnail_service
 
 
 # Constructor for MeshLibrary items
@@ -264,9 +264,9 @@ func _generate_thumbnail_async():
 		_generate_asset_thumbnail()
 
 
-func _request_thumbnail_async(queue_manager, asset_path: String):
+func _request_thumbnail_async(thumbnail_service: ThumbnailService, asset_path: String):
 	"""Request thumbnail generation asynchronously and update UI when ready"""
-	var thumbnail = await queue_manager.request_asset_thumbnail(asset_path)
+	var thumbnail = await thumbnail_service.request_asset_thumbnail(asset_path)
 
 	# Update thumbnail when ready (if this item still exists)
 	if thumbnail and is_instance_valid(thumbnail_rect) and is_inside_tree():
@@ -286,15 +286,15 @@ func _generate_meshlib_thumbnail():
 		thumbnail_rect.texture = preview
 		return
 
-	# Use the injected ThumbnailQueueManager for centralized, sequential processing
-	if _queue_manager:
+	# Use the injected ThumbnailService for centralized, sequential processing
+	if _thumbnail_service:
 		# Don't await - let it generate asynchronously and update when ready
-		_request_meshlib_thumbnail_async(_queue_manager, mesh)
+		_request_meshlib_thumbnail_async(_thumbnail_service, mesh)
 
 
-func _request_meshlib_thumbnail_async(queue_manager: ThumbnailQueueManager, mesh: Mesh):
+func _request_meshlib_thumbnail_async(thumbnail_service: ThumbnailService, mesh: Mesh):
 	"""Request meshlib thumbnail generation asynchronously and update UI when ready"""
-	var thumbnail = await queue_manager.request_meshlib_thumbnail(meshlib, item_id)
+	var thumbnail = await thumbnail_service.request_meshlib_thumbnail(meshlib, item_id)
 
 	# Update thumbnail when ready (if this item still exists)
 	if thumbnail and is_instance_valid(thumbnail_rect) and is_inside_tree():
@@ -315,10 +315,10 @@ func _generate_asset_thumbnail():
 		extension in ["fbx", "obj", "gltf", "glb", "dae", "blend", "tscn", "scn"]
 		and asset_path != ""
 	):
-		# Use the injected ThumbnailQueueManager for centralized, sequential processing
-		if _queue_manager:
+		# Use the injected ThumbnailService for centralized, sequential processing
+		if _thumbnail_service:
 			# Don't await - let it generate asynchronously and update when ready
-			_request_thumbnail_async(_queue_manager, asset_path)
+			_request_thumbnail_async(_thumbnail_service, asset_path)
 		return
 
 	# For scene files or if 3D thumbnail failed, try appropriate editor icons

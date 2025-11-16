@@ -12,9 +12,6 @@ const ServiceRegistry = preload("res://addons/simpleassetplacer/core/service_reg
 const ServiceRegistryBuilder = preload(
 	"res://addons/simpleassetplacer/core/service_registry_builder.gd"
 )
-const ThumbnailGenerator = preload(
-	"res://addons/simpleassetplacer/thumbnails/thumbnail_generator.gd"
-)
 
 # Import editor helpers
 const DockManager = preload("res://addons/simpleassetplacer/editor/dock_manager.gd")
@@ -85,9 +82,6 @@ func _initialize_systems():
 	# Initialize error handler with editor interface instance
 	ErrorHandler.initialize(get_editor_interface())
 
-	# Initialize thumbnail system (still static)
-	ThumbnailGenerator.initialize()
-
 	PluginLogger.info(PluginConstants.COMPONENT_MAIN, "All systems initialized")
 
 
@@ -131,11 +125,10 @@ func _cleanup_systems():
 		)
 
 	# Clean up thumbnail systems
-	_safe_cleanup("ThumbnailGenerator.cleanup", func(): ThumbnailGenerator.cleanup())
-	if service_registry and service_registry.thumbnail_queue_manager:
+	if service_registry and service_registry.thumbnail_service:
 		_safe_cleanup(
-			"ThumbnailQueueManager.cleanup",
-			func(): service_registry.thumbnail_queue_manager.cleanup()
+			"ThumbnailService.cleanup",
+			func(): service_registry.thumbnail_service.cleanup()
 		)
 
 	# Clean up placement system

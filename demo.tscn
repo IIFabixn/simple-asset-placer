@@ -41,6 +41,9 @@ transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 2.9,
 [node name="barrels_2" type="Node3D" parent="AssetRoot" instance=ExtResource("3_n4w22")]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 5.5, 0, -1)
 
+[node name="building_c" type="Node3D" parent="AssetRoot" instance=ExtResource("3_6bw2v")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.4, 0, 6)
+
 [node name="CSGCombiner3D" type="CSGCombiner3D" parent="."]
 use_collision = true
 

@@ -6,9 +6,6 @@ class_name AssetPlacerDock
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
 const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
 const AssetScanner = preload("res://addons/simpleassetplacer/thumbnails/asset_scanner.gd")
-const ThumbnailGenerator = preload(
-	"res://addons/simpleassetplacer/thumbnails/thumbnail_generator.gd"
-)
 const MeshLibraryBrowser = preload("res://addons/simpleassetplacer/ui/meshlib_browser.gd")
 const ModelLibraryBrowser = preload("res://addons/simpleassetplacer/ui/modellib_browser.gd")
 const PlacementSettings = preload("res://addons/simpleassetplacer/ui/placement_settings.gd")
@@ -210,8 +207,8 @@ func setup_ui():
 			placement_settings.set_placement_strategy_service(_services.placement_strategy_service)
 		if _services.settings_persistence:
 			placement_settings.set_settings_persistence(_services.settings_persistence)
-		if _services.thumbnail_queue_manager:
-			placement_settings.set_thumbnail_queue_manager(_services.thumbnail_queue_manager)
+		if _services.thumbnail_service:
+			placement_settings.set_thumbnail_service(_services.thumbnail_service)
 		if _services.settings_manager:
 			placement_settings.set_settings_manager(_services.settings_manager)
 	placement_settings.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

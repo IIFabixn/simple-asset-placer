@@ -62,8 +62,7 @@ var undo_redo_helper: UndoRedoHelper
 var cursor_warp_adapter: CursorWarpAdapter
 
 # Thumbnail system
-var thumbnail_generator: ThumbnailGenerator
-var thumbnail_queue_manager: ThumbnailQueueManager
+var thumbnail_service: ThumbnailService
 
 # Transform state (shared)
 var transform_state: TransformState
@@ -138,7 +137,6 @@ func cleanup() -> void:
 	utility_manager = null
 	category_manager = null
 	cursor_warp_adapter = null
-	thumbnail_generator = null
-	thumbnail_queue_manager = null
+	thumbnail_service = null
 	transform_state = null
 	undo_redo = null

@@ -60,9 +60,7 @@ const CategoryManager = preload("res://addons/simpleassetplacer/managers/categor
 const TransformationCoordinator = preload(
 	"res://addons/simpleassetplacer/core/transformation_coordinator.gd"
 )
-const ThumbnailQueueManager = preload(
-	"res://addons/simpleassetplacer/thumbnails/thumbnail_queue_manager.gd"
-)
+const ThumbnailService = preload("res://addons/simpleassetplacer/thumbnails/thumbnail_service.gd")
 const PluginLogger = preload("res://addons/simpleassetplacer/utils/plugin_logger.gd")
 const PluginConstants = preload("res://addons/simpleassetplacer/utils/plugin_constants.gd")
 
@@ -154,7 +152,7 @@ func with_utility_managers() -> ServiceRegistryBuilder:
 	_registry.utility_manager = UtilityManager.new(_registry)
 	_registry.undo_redo_helper = UndoRedoHelper.new(_registry)
 	_registry.category_manager = CategoryManager.new(_registry)
-	_registry.thumbnail_queue_manager = ThumbnailQueueManager.new()
+	_registry.thumbnail_service = ThumbnailService.new()
 	PluginLogger.debug(
 		PluginConstants.COMPONENT_MAIN, "ServiceRegistry: Utility managers registered"
 	)

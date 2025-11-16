@@ -147,8 +147,9 @@ func _handle_transform_mouse_motion(
 	if _services.input_handler and _services.input_handler.is_mouse_button_pressed("right"):
 		return
 
-	var target_nodes = state.session.transform_data.get("target_nodes", [])
-	var current_center = state.session.transform_data.get("center_position", Vector3.ZERO)
+	var transform_session = state.session.transform_data
+	var target_nodes = transform_session.target_nodes
+	var current_center = transform_session.get_center_position()
 
 	# Get the plane normal direction (perpendicular to the active plane)
 	# - XZ plane (horizontal): normal = Y axis (up/down)
@@ -184,7 +185,7 @@ func _handle_transform_mouse_motion(
 		var new_normal_component = current_center.dot(plane_normal)
 		current_center += plane_normal * (preserved_normal_offset - new_normal_component)
 
-	state.session.transform_data["center_position"] = current_center
+	transform_session.set_center_position(current_center)
 
 
 ## Mouse Wheel Handlers
@@ -214,11 +215,10 @@ func _apply_height_adjustment(wheel_input: Dictionary) -> void:
 	if mode == ModeStateMachine.Mode.PLACEMENT:
 		_services.position_manager.adjust_offset_normal(state, delta)
 	elif mode == ModeStateMachine.Mode.TRANSFORM:
-		var center_position = state.session.transform_data.get(
-			"center_position", state.values.position
-		)
+		var transform_session = state.session.transform_data
+		var center_position = transform_session.get_center_position()
 		center_position.y += delta
-		state.session.transform_data["center_position"] = center_position
+		transform_session.set_center_position(center_position)
 		state.values.position = center_position
 		state.values.base_position = center_position
 
@@ -390,7 +390,7 @@ func _handle_asset_cycling(nav_input, state: TransformState) -> void:
 		return
 
 	# Get the dock reference to call cycling methods
-	var dock = state.session.placement_data.get("dock_reference", null)
+	var dock = state.session.placement_data.dock_reference
 	if not dock:
 		dock = state.dock_reference
 

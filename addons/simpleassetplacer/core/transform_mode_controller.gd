@@ -118,17 +118,17 @@ func start(target_nodes: Variant, dock_instance, state: TransformState) -> void:
 	_services.scale_manager.reset_scale(state)
 
 	# Store transform data
-	state.session.transform_data = {
-		"target_nodes": valid_nodes,
-		"original_transforms": original_transforms,
-		"original_rotations": original_rotations,
-		"center_position": snapped_center,
-		"original_center": center_pos,
-		"node_offsets": node_offsets,
-		"settings": settings,
-		"dock_reference": dock_instance,
-		"undo_redo": _services.undo_redo
-	}
+	state.session.transform_data.configure(
+		valid_nodes,
+		original_transforms,
+		original_rotations,
+		node_offsets,
+		snapped_center,
+		center_pos,
+		settings,
+		dock_instance,
+		_services.undo_redo
+	)
 
 	# Apply initial snap if needed
 	if snapped_center != center_pos:
@@ -158,8 +158,8 @@ func exit(confirm_changes: bool, state: TransformState) -> void:
 		return
 
 	# Unregister nodes from smooth transform manager
-	if state.session.transform_data and state.session.transform_data.has("target_nodes"):
-		var nodes = state.session.transform_data["target_nodes"]
+	if state.session.transform_data.has_targets():
+		var nodes = state.session.transform_data.target_nodes
 		if _services.smooth_transform_manager:
 			for node in nodes:
 				if node and is_instance_valid(node):
@@ -195,10 +195,11 @@ func process_input(
 	if not state or not camera:
 		return
 
-	if not state.session.transform_data or not state.session.transform_data.has("target_nodes"):
+	var transform_session = state.session.transform_data
+	if not transform_session.has_targets():
 		return
 
-	var nodes: Array = state.session.transform_data["target_nodes"]
+	var nodes: Array = transform_session.target_nodes
 	if nodes.is_empty():
 		return
 
@@ -207,7 +208,7 @@ func process_input(
 
 	# Check for exit confirmation
 	if changes.get("confirm_action", false):
-		state.session.transform_data["_confirm_exit"] = true
+		transform_session.request_confirm_exit()
 
 	# Handle scale reset (Home key)
 	if changes.get("scale_reset", false):
@@ -216,18 +217,15 @@ func process_input(
 
 func update_node_transforms(state: TransformState) -> void:
 	"""Apply current state transforms to the target nodes"""
-	if not state.session.transform_data or not state.session.transform_data.has("target_nodes"):
+	var transform_session = state.session.transform_data
+	if not transform_session.has_targets():
 		return
 
-	var nodes: Array = state.session.transform_data["target_nodes"]
-	var center_position: Vector3 = state.session.transform_data.get(
-		"center_position", state.values.position
-	)
-	var node_offsets: Dictionary = state.session.transform_data.get("node_offsets", {})
-	var original_transforms: Dictionary = state.session.transform_data.get(
-		"original_transforms", {}
-	)
-	var original_rotations: Dictionary = state.session.transform_data.get("original_rotations", {})
+	var nodes: Array = transform_session.target_nodes
+	var center_position: Vector3 = transform_session.get_center_position()
+	var node_offsets: Dictionary = transform_session.node_offsets
+	var original_transforms: Dictionary = transform_session.original_transforms
+	var original_rotations: Dictionary = transform_session.original_rotations
 
 	# Calculate rotation basis for group rotation around center
 	var rotation_basis = Basis.from_euler(state.values.manual_rotation_offset)
@@ -301,7 +299,7 @@ func _calculate_center(nodes: Array) -> Vector3:
 
 func _reset_node_scales(nodes: Array, state: TransformState) -> void:
 	"""Reset all node scales to original"""
-	var original_transforms = state.session.transform_data.get("original_transforms", {})
+	var original_transforms = state.session.transform_data.original_transforms
 	for node in nodes:
 		if not node or not node.is_inside_tree():
 			continue
@@ -312,13 +310,12 @@ func _reset_node_scales(nodes: Array, state: TransformState) -> void:
 
 func _register_undo(state: TransformState) -> void:
 	"""Register undo/redo action for transform changes"""
-	if not state.session.transform_data:
+	var transform_session = state.session.transform_data
+	if not transform_session.has_targets():
 		return
 
-	var nodes: Array = state.session.transform_data.get("target_nodes", [])
-	var original_transforms: Dictionary = state.session.transform_data.get(
-		"original_transforms", {}
-	)
+	var nodes: Array = transform_session.target_nodes
+	var original_transforms: Dictionary = transform_session.original_transforms
 
 	if nodes.is_empty() or not _services.undo_redo:
 		return
@@ -353,13 +350,12 @@ func _register_undo(state: TransformState) -> void:
 
 func _restore_original_transforms(state: TransformState) -> void:
 	"""Restore all nodes to original transforms"""
-	if not state.session.transform_data:
+	var transform_session = state.session.transform_data
+	if not transform_session.has_targets():
 		return
 
-	var nodes: Array = state.session.transform_data.get("target_nodes", [])
-	var original_transforms: Dictionary = state.session.transform_data.get(
-		"original_transforms", {}
-	)
+	var nodes: Array = transform_session.target_nodes
+	var original_transforms: Dictionary = transform_session.original_transforms
 
 	for node in nodes:
 		if node is Node3D and original_transforms.has(node):
@@ -395,5 +391,4 @@ func _reset_transforms_on_exit(state: TransformState) -> void:
 	if settings.get("reset_position_on_exit", false):
 		state.values.manual_position_offset = Vector3.ZERO
 
-	if state.session.transform_data:
-		state.session.transform_data.clear()
+	state.session.transform_data.reset()

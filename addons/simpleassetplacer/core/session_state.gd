@@ -11,7 +11,7 @@ PURPOSE: Track mode session lifecycle and per-mode data.
 
 RESPONSIBILITIES:
 - Track current mode (NONE, PLACEMENT, TRANSFORM)
-- Store per-mode data dictionaries (placement_data, transform_data)
+- Store typed per-mode data objects (placement_data, transform_data)
 - Track session frame counters
 - Store callbacks for mode events
 - Manage UI focus state
@@ -26,6 +26,12 @@ USED BY: TransformState (composition), TransformationCoordinator, ModeStateMachi
 """
 
 const ModeStateMachine = preload("res://addons/simpleassetplacer/core/mode_state_machine.gd")
+const PlacementSessionData = preload(
+	"res://addons/simpleassetplacer/core/placement/placement_session_data.gd"
+)
+const TransformSessionData = preload(
+	"res://addons/simpleassetplacer/core/transform/transform_session_data.gd"
+)
 
 ## MODE STATE
 
@@ -33,13 +39,18 @@ var mode: int = 0  # ModeStateMachine.Mode enum value
 
 ## PER-MODE DATA
 
-var placement_data: Dictionary = {}  # Placement mode data (mesh, asset_path, etc.)
-var transform_data: Dictionary = {}  # Transform mode data (nodes, original_transforms, etc.)
+var placement_data: PlacementSessionData
+var transform_data: TransformSessionData
 
 ## REFERENCES
 
 var dock_reference = null  # Reference to the dock UI (weak)
 var settings: Dictionary = {}  # Current session settings
+
+
+func _init() -> void:
+	placement_data = PlacementSessionData.new()
+	transform_data = TransformSessionData.new()
 
 ## SESSION TRACKING
 
@@ -83,8 +94,8 @@ func begin_session(mode_type: int, initial_settings: Dictionary = {}) -> void:
 		settings = initial_settings.duplicate(true)
 
 	# Clear per-mode payloads for the new session
-	placement_data.clear()
-	transform_data.clear()
+	placement_data.reset()
+	transform_data.reset()
 	dock_reference = null
 	focus_grab_frames = 0
 	ui_focus_locked = false
@@ -94,8 +105,8 @@ func begin_session(mode_type: int, initial_settings: Dictionary = {}) -> void:
 func end_session() -> void:
 	"""Clean up session data"""
 	mode = 0
-	placement_data.clear()
-	transform_data.clear()
+	placement_data.reset()
+	transform_data.reset()
 	settings.clear()
 	dock_reference = null
 	focus_grab_frames = 0

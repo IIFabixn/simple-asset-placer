@@ -71,16 +71,16 @@ func start(
 	var target_parent = _determine_target_parent(settings)
 
 	# Store placement data
-	state.session.placement_data = {
-		"mesh": mesh,
-		"meshlib": meshlib,
-		"item_id": item_id,
-		"asset_path": asset_path,
-		"settings": settings,
-		"dock_reference": dock_instance,
-		"undo_redo": _services.undo_redo,
-		"target_parent": target_parent  # Store the parent node for this placement session
-	}
+	state.session.placement_data.configure_for_asset(
+		mesh,
+		meshlib,
+		item_id,
+		asset_path,
+		settings,
+		dock_instance,
+		_services.undo_redo,
+		target_parent
+	)
 
 	# Initialize overlays
 	_services.overlay_manager.initialize_overlays()
@@ -129,17 +129,13 @@ func start_with_packed_scene(
 	var target_parent = _determine_target_parent(settings)
 
 	# Store placement data with PackedScene
-	state.session.placement_data = {
-		"mesh": null,
-		"meshlib": null,
-		"item_id": -1,
-		"asset_path": "",  # Empty means we're using packed_scene
-		"packed_scene": packed_scene,  # Store the PackedScene
-		"settings": settings,
-		"dock_reference": dock_instance,
-		"undo_redo": _services.undo_redo,
-		"target_parent": target_parent
-	}
+	state.session.placement_data.configure_for_packed_scene(
+		packed_scene,
+		settings,
+		dock_instance,
+		_services.undo_redo,
+		target_parent
+	)
 
 	# Initialize overlays
 	_services.overlay_manager.initialize_overlays()
@@ -169,11 +165,18 @@ func confirm_placement(state: TransformState) -> void:
 	if not _services.mode_state_machine.is_placement_mode():
 		return
 
+	var placement_data = state.session.placement_data
+	if not placement_data or not placement_data.is_configured():
+		PluginLogger.error(
+			PluginConstants.COMPONENT_TRANSFORM, "Cannot confirm placement - session not configured"
+		)
+		return
+
 	# Place the asset
 	_place_asset(state)
 
 	# Check if continuous placement is enabled
-	var settings = state.session.placement_data.get("settings", {})
+	var settings = placement_data.get_settings()
 	var continuous_enabled = settings.get("continuous_placement_enabled", true)
 
 	if continuous_enabled:
@@ -196,7 +199,7 @@ func exit(state: TransformState, confirm_placement: bool = false) -> void:
 		return
 
 	# Place asset if confirmed (used when exiting with confirmation)
-	if confirm_placement and state.session.placement_data:
+	if confirm_placement and state.session.placement_data.is_configured():
 		_place_asset(state)
 
 	# Cleanup preview
@@ -236,7 +239,7 @@ func process_input(
 
 	# Check for placement confirmation
 	if changes.get("confirm_action", false):
-		state.session.placement_data["_confirm_exit"] = true
+		state.session.placement_data.request_confirm_exit()
 
 
 func update_preview_transform(state: TransformState) -> void:
@@ -351,58 +354,53 @@ func _reset_transforms_on_exit(state: TransformState) -> void:
 func _place_asset(state: TransformState) -> void:
 	"""Actually place the asset in the scene"""
 	var placement_data = state.session.placement_data
-	if not placement_data:
+	if not placement_data or not placement_data.is_configured():
 		PluginLogger.error(PluginConstants.COMPONENT_TRANSFORM, "No placement data available")
 		return
 
 	# Get final position from state
 	var final_position = state.values.position + state.values.manual_position_offset
-	var settings = placement_data.get("settings", {})
+	var settings = placement_data.get_settings()
 
-	# Get the stored parent node from placement data
-	var stored_parent = placement_data.get("target_parent", null)
+	# Use stored parent if still valid, otherwise determine fallback
+	var stored_parent: Node = placement_data.target_parent
+	if stored_parent and not is_instance_valid(stored_parent):
+		stored_parent = null
+
+	if not stored_parent:
+		stored_parent = _determine_target_parent(settings)
 
 	var placed_node = null
 
 	# Check if this is a PackedScene (pickup feature)
-	var packed_scene = placement_data.get("packed_scene", null)
-	if packed_scene:
+	if placement_data.has_packed_scene():
 		# Place from PackedScene (pickup feature)
 		placed_node = _place_from_packed_scene(
-			packed_scene, final_position, state, settings, stored_parent
+			placement_data.packed_scene, final_position, state, settings, stored_parent
+		)
+	elif placement_data.is_meshlib_item():
+		# Place from MeshLibrary
+		var rotation_offset = state.values.manual_rotation_offset
+		placed_node = _services.utility_manager.place_from_meshlib(
+			placement_data.mesh,
+			placement_data.meshlib,
+			placement_data.item_id,
+			final_position,
+			rotation_offset,
+			state,
+			settings,
+			stored_parent
+		)
+	elif placement_data.has_asset_path():
+		# Place from asset file
+		placed_node = _services.utility_manager.place_asset_in_scene(
+			placement_data.asset_path, final_position, settings, state, stored_parent
 		)
 	else:
-		# Check if this is a MeshLibrary item or an asset file
-		var meshlib = placement_data.get("meshlib", null)
-		var item_id = placement_data.get("item_id", -1)
-
-		if meshlib and item_id >= 0:
-			# Place from MeshLibrary
-			var mesh = placement_data.get("mesh")
-			var rotation_offset = state.values.manual_rotation_offset
-
-			placed_node = _services.utility_manager.place_from_meshlib(
-				mesh,
-				meshlib,
-				item_id,
-				final_position,
-				rotation_offset,
-				state,
-				settings,
-				stored_parent  # Pass the stored parent
-			)
-		else:
-			# Place from asset file
-			var asset_path = placement_data.get("asset_path", "")
-			if asset_path.is_empty():
-				PluginLogger.error(
-					PluginConstants.COMPONENT_TRANSFORM, "No asset path in placement data"
-				)
-				return
-
-			placed_node = _services.utility_manager.place_asset_in_scene(
-				asset_path, final_position, settings, state, stored_parent  # Pass the stored parent
-			)
+		PluginLogger.error(
+			PluginConstants.COMPONENT_TRANSFORM, "Placement session missing resource reference"
+		)
+		return
 
 	if placed_node:
 		PluginLogger.info(
@@ -436,7 +434,7 @@ func _place_asset(state: TransformState) -> void:
 
 func _reset_for_next_placement(state: TransformState) -> void:
 	"""Reset state for next placement while staying in placement mode"""
-	var settings = state.session.placement_data.get("settings", {})
+	var settings = state.session.placement_data.get_settings()
 
 	# Reset transforms based on settings
 	if settings.get("reset_height_on_exit", false):

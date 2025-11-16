@@ -188,8 +188,7 @@ func process_frame_input(
 				_update_overlay_display(mode, state)
 
 				# Check for placement confirmation
-				if state.session.placement_data.get("_confirm_exit", false):
-					state.session.placement_data.erase("_confirm_exit")
+				if state.session.placement_data.consume_confirm_exit():
 					_placement_controller.confirm_placement(state)
 					return
 
@@ -199,8 +198,7 @@ func process_frame_input(
 				_update_overlay_display(mode, state)
 
 				# Check for exit
-				if state.session.transform_data.get("_confirm_exit", false):
-					state.session.transform_data.erase("_confirm_exit")
+				if state.session.transform_data.consume_confirm_exit():
 					exit_transform_mode(true)
 					return
 
@@ -210,10 +208,9 @@ func process_frame_input(
 
 	if mode != ModeStateMachine.Mode.NONE:
 		var placement_center = _services.position_manager.get_base_position(state)
+		var transform_session = state.session.transform_data
 		var target_nodes = (
-			state.session.transform_data.get("target_nodes", [])
-			if mode == ModeStateMachine.Mode.TRANSFORM
-			else []
+			transform_session.target_nodes if mode == ModeStateMachine.Mode.TRANSFORM else []
 		)
 		_services.grid_manager.update_grid_overlay(
 			mode, combined_settings, state, placement_center, target_nodes
@@ -352,8 +349,9 @@ func reset_transforms() -> void:
 		_services.overlay_manager.show_status_message("Reset all transforms", Color.GREEN, 1.5)
 
 	elif mode == ModeStateMachine.Mode.TRANSFORM:
-		var target_nodes = state.session.transform_data.get("target_nodes", [])
-		var original_transforms = state.session.transform_data.get("original_transforms", {})
+		var transform_session = state.session.transform_data
+		var target_nodes = transform_session.target_nodes
+		var original_transforms = transform_session.original_transforms
 
 		# Reset all nodes
 		for node in target_nodes:
@@ -371,7 +369,7 @@ func reset_transforms() -> void:
 
 		var center_pos = state.values.base_position
 		state.values.position = center_pos
-		state.session.transform_data["center_position"] = center_pos
+		transform_session.set_center_position(center_pos)
 
 		_services.overlay_manager.show_status_message("Reset all transforms", Color.GREEN, 1.5)
 
@@ -440,7 +438,7 @@ func _update_overlay_display(mode: int, state: TransformState) -> void:
 	var scale_value = state.values.scale_multiplier
 
 	if mode == ModeStateMachine.Mode.TRANSFORM:
-		var nodes = state.session.transform_data.get("target_nodes", [])
+		var nodes = state.session.transform_data.target_nodes
 		if nodes.size() == 1:
 			node_name = nodes[0].name if nodes[0] else ""
 			if nodes[0] and is_instance_valid(nodes[0]):
